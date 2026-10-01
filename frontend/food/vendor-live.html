@@ -146,6 +146,7 @@
       z-index: 100;
     }
   </style>
+<link rel="stylesheet" href="../responsive.css">
 </head>
 
 <body>
@@ -206,7 +207,7 @@
       loadVendorOrders(myId);
     } else {
       // Admin: Load dropdown
-      fetch(`${API}/vendors-dropdown`)
+      authFetch(`${API}/vendors-dropdown`)
         .then(res => res.json())
         .then(data => {
           data.forEach(v => {
@@ -221,7 +222,7 @@
     }
 
     function updateStatus(orderId, newStatus) {
-      fetch(`${API}/order/${orderId}/delivery`, {
+      authFetch(`${API}/order/${orderId}/delivery`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus })
@@ -236,7 +237,7 @@
 
       ordersDiv.innerHTML = '<div class="empty-state">Loading orders...</div>';
 
-      fetch(`${API}/vendor-orders/${vendorId}`)
+      authFetch(`${API}/vendor-orders/${vendorId}`)
         .then(res => res.json())
         .then(data => {
           if (data.length === 0) {

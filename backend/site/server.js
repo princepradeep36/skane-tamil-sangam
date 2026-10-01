@@ -4,14 +4,26 @@ const cors = require('cors');
 const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const pool = require('./db');
 const initializeDatabase = require('./init-db');
 const { encryptData, decryptData } = require('./encryption');
+
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is required');
 
 const app = express();
 app.use(express.json());
 app.use(cors());
 app.use(express.static('public'));
+
+function authenticateToken(req,res,next){
+  const h=req.headers.authorization;
+  if(!h || !h.startsWith('Bearer ')) return res.status(401).json({error:'Authentication required'});
+  try{req.user=jwt.verify(h.substring(7),JWT_SECRET);next();}catch(_){return res.status(401).json({error:'Invalid or expired token'});}
+}
+function requireAdmin(req,res,next){authenticateToken(req,res,()=>req.user.role==='admin'?next():res.status(403).json({error:'Admin access required'}));}
+
 
 // --- Email Configuration ---
 // Note: To send real emails, add SMTP credentials to .env
@@ -101,10 +113,9 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ error: "Invalid email or password" });
         }
 
-        // For simplicity, returning the user role. In a real app, use JWT.
+        const token = jwt.sign({ userId: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '8h' });
         res.json({
-            message: "Login successful",
-            role: user.role,
+            message: "Login successful", role: user.role, token,
             user: { firstName: user.first_name, lastName: user.last_name, email: user.email }
         });
     } catch (err) {
@@ -113,8 +124,9 @@ app.post('/api/login', async (req, res) => {
 });
 
 // 1.2 Change Password (Secure)
-app.post('/api/user/change-password', async (req, res) => {
-    const { email, oldPassword, newPassword } = req.body;
+app.post('/api/user/change-password', authenticateToken, async (req, res) => {
+    const { oldPassword, newPassword } = req.body;
+    const email = req.user.email;
     try {
         const result = await pool.query('SELECT password FROM members WHERE email = $1', [email]);
         if (result.rows.length === 0) {
@@ -180,7 +192,7 @@ app.post('/api/reset-password', async (req, res) => {
 });
 
 // 2. Admin: View Decrypted Members
-app.get('/api/admin/members', async (req, res) => {
+app.get('/api/admin/members', requireAdmin, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM members ORDER BY id DESC');
         const decryptedData = result.rows.map(m => ({
@@ -195,7 +207,7 @@ app.get('/api/admin/members', async (req, res) => {
 });
 
 // 2.1 Admin: Get all events
-app.get('/api/admin/events', async (req, res) => {
+app.get('/api/admin/events', requireAdmin, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM events ORDER BY event_date DESC');
         res.json(result.rows);
@@ -205,7 +217,7 @@ app.get('/api/admin/events', async (req, res) => {
 });
 
 // 2.2 Admin: Get registrations for a specific event
-app.get('/api/admin/registrations/:eventId', async (req, res) => {
+app.get('/api/admin/registrations/:eventId', requireAdmin, async (req, res) => {
     const { eventId } = req.params;
     try {
         const query = (eventId === 'all' || !eventId)
@@ -239,7 +251,7 @@ app.get('/api/content/:page', async (req, res) => {
 });
 
 // 4. Admin: Update CMS content
-app.post('/api/admin/content/update', async (req, res) => {
+app.post('/api/admin/content/update', requireAdmin, async (req, res) => {
     const { page_key, section_key, content, content_type } = req.body;
     try {
         const query = `
@@ -338,7 +350,7 @@ app.delete('/api/event/registration/:id', async (req, res) => {
 
 
 // 6. Admin: Management - Expenses
-app.get('/api/admin/expenses/:eventId', async (req, res) => {
+app.get('/api/admin/expenses/:eventId', requireAdmin, async (req, res) => {
     const { eventId } = req.params;
     try {
         const query = (eventId === 'all')
@@ -352,7 +364,7 @@ app.get('/api/admin/expenses/:eventId', async (req, res) => {
     }
 });
 
-app.post('/api/admin/expenses', async (req, res) => {
+app.post('/api/admin/expenses', requireAdmin, async (req, res) => {
     const { event_id, description, amount, category, expense_date } = req.body;
     try {
         const query = `INSERT INTO event_expenses (event_id, description, amount, category, expense_date) 
@@ -364,7 +376,7 @@ app.post('/api/admin/expenses', async (req, res) => {
     }
 });
 
-app.delete('/api/admin/expenses/:id', async (req, res) => {
+app.delete('/api/admin/expenses/:id', requireAdmin, async (req, res) => {
     try {
         await pool.query('DELETE FROM event_expenses WHERE id = $1', [req.params.id]);
         res.json({ message: "Expense deleted" });
@@ -374,7 +386,7 @@ app.delete('/api/admin/expenses/:id', async (req, res) => {
 });
 
 // 7. Admin: Management - Tasks
-app.get('/api/admin/tasks/:eventId', async (req, res) => {
+app.get('/api/admin/tasks/:eventId', requireAdmin, async (req, res) => {
     const { eventId } = req.params;
     try {
         const query = (eventId === 'all')
@@ -388,7 +400,7 @@ app.get('/api/admin/tasks/:eventId', async (req, res) => {
     }
 });
 
-app.post('/api/admin/tasks', async (req, res) => {
+app.post('/api/admin/tasks', requireAdmin, async (req, res) => {
     const { event_id, task_name, due_date, priority } = req.body;
     try {
         const query = `INSERT INTO event_tasks (event_id, task_name, due_date, priority) 
@@ -400,7 +412,7 @@ app.post('/api/admin/tasks', async (req, res) => {
     }
 });
 
-app.patch('/api/admin/tasks/:id', async (req, res) => {
+app.patch('/api/admin/tasks/:id', requireAdmin, async (req, res) => {
     const { status } = req.body;
     try {
         const result = await pool.query('UPDATE event_tasks SET status = $1 WHERE id = $2 RETURNING *', [status, req.params.id]);
@@ -410,7 +422,7 @@ app.patch('/api/admin/tasks/:id', async (req, res) => {
     }
 });
 
-app.delete('/api/admin/tasks/:id', async (req, res) => {
+app.delete('/api/admin/tasks/:id', requireAdmin, async (req, res) => {
     try {
         await pool.query('DELETE FROM event_tasks WHERE id = $1', [req.params.id]);
         res.json({ message: "Task deleted" });

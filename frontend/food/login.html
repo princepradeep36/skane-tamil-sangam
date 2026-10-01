@@ -127,6 +127,7 @@
             color: #aaa;
         }
     </style>
+<link rel="stylesheet" href="../responsive.css">
 </head>
 
 <body>
@@ -176,6 +177,7 @@
                 const data = await res.json();
 
                 sessionStorage.setItem("user_role", data.role);
+                sessionStorage.setItem("auth_token", data.token);
                 sessionStorage.setItem("vendor_id", data.vendor_id || "");
 
                 if (data.role === 'admin') {

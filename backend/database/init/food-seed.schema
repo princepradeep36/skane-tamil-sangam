@@ -1,4 +1,2 @@
--- Local Docker verification account only. Change/remove for production.
-INSERT INTO users (username, password, role, vendor_id)
-VALUES ('admin', 'admin123', 'admin', NULL)
-ON CONFLICT (username) DO NOTHING;
+-- Production database intentionally contains no default credentials.
+-- Create the first administrator securely after deployment.

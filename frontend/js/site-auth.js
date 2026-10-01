@@ -1,0 +1,2 @@
+function siteToken(){return localStorage.getItem('authToken');}
+async function siteAuthFetch(url,options={}){const token=siteToken();if(!token){localStorage.clear();location.href='login.html';throw new Error('Authentication required');}const headers=new Headers(options.headers||{});headers.set('Authorization',`Bearer ${token}`);const r=await fetch(url,{...options,headers});if(r.status===401||r.status===403){localStorage.clear();location.href='login.html';throw new Error('Session expired or access denied');}return r;}

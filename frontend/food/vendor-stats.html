@@ -139,6 +139,7 @@
       font-weight: bold;
     }
   </style>
+<link rel="stylesheet" href="../responsive.css">
 </head>
 
 <body>
@@ -185,13 +186,13 @@
       try {
         // If vendor, we need to know our name to filter the summary data (which uses name)
         if (role === 'vendor') {
-          const vRes = await fetch(`${API}/vendors-dropdown`);
+          const vRes = await authFetch(`${API}/vendors-dropdown`);
           const vData = await vRes.json();
           const me = vData.find(v => v.id == myId);
           if (me) myName = me.name;
         }
 
-        const res = await fetch(`${API}/vendor-summary`);
+        const res = await authFetch(`${API}/vendor-summary`);
         const data = await res.json();
 
         if (data.length === 0) {

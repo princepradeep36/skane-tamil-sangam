@@ -168,6 +168,7 @@
     }
   </style>
   <script src="validation.js"></script>
+<link rel="stylesheet" href="../responsive.css">
 </head>
 
 <body>
@@ -218,7 +219,7 @@
 
     async function loadVendors() {
       try {
-        const res = await fetch(`${API}/vendors`);
+        const res = await authFetch(`${API}/vendors`);
         const data = await res.json();
 
         vendorsDiv.innerHTML = "";
@@ -274,7 +275,7 @@
       if (!Validation.isValidPhone(phone)) return alert("Invalid Phone Number (Must be 10 digits, not repeated/sequential)");
 
       try {
-        const res = await fetch(`${API}/admin/vendor-full`, {
+        const res = await authFetch(`${API}/admin/vendor-full`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, phone, swish })
@@ -302,7 +303,7 @@
 
     function deleteVendor(id) {
       if (confirm("Delete this entire vendor and their items?")) {
-        fetch(`${API}/admin/vendor/${id}`, { method: "DELETE" }).then(loadVendors);
+        authFetch(`${API}/admin/vendor/${id}`, { method: "DELETE" }).then(loadVendors);
       }
     }
 
@@ -313,7 +314,7 @@
 
       if (!item_name || price <= 0) return alert("Invalid entry");
 
-      fetch(`${API}/admin/menu`, {
+      authFetch(`${API}/admin/menu`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ vendor_id: vendorId, item_name, price, max_quantity })
@@ -325,7 +326,7 @@
       const price = Number(document.getElementById(`price_${id}`).value);
       const max_quantity = Number(document.getElementById(`max_${id}`).value);
 
-      fetch(`${API}/admin/menu/${id}`, {
+      authFetch(`${API}/admin/menu/${id}`, {
         method: "PUT",
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ item_name, price, max_quantity })
@@ -334,7 +335,7 @@
 
     function deleteMenu(id) {
       if (confirm("Delete item?")) {
-        fetch(`${API}/admin/menu/${id}`, { method: "DELETE" })
+        authFetch(`${API}/admin/menu/${id}`, { method: "DELETE" })
           .then(res => res.ok ? loadVendors() : res.text().then(alert));
       }
     }

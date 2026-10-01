@@ -87,6 +87,7 @@
             color: #666;
         }
     </style>
+<link rel="stylesheet" href="../responsive.css">
 </head>
 
 <body>
@@ -166,7 +167,7 @@
             if (!oldPwd || !newPwd) return alert("Please fill all fields");
 
             try {
-                const res = await fetch(`${API}/change-password`, {
+                const res = await authFetch(`${API}/change-password`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ vendorId: vendorId, oldPassword: oldPwd, newPassword: newPwd })

@@ -1,43 +1,22 @@
-/**
- * Authentication Helper
- * Handles session validation and logout.
- */
-
+/** JWT authentication helper for staff pages. */
 function checkAuth(requiredRole) {
-    // Handle Page Show (Back Button Cache)
-    window.addEventListener('pageshow', function (event) {
-        if (event.persisted || window.performance && window.performance.navigation.type === 2) {
-            validateSession(requiredRole);
-        }
-    });
-
-    // Initial check
-    validateSession(requiredRole);
+  window.addEventListener("pageshow", e => { if (e.persisted) validateSession(requiredRole); });
+  validateSession(requiredRole);
 }
-
 function validateSession(requiredRole) {
-    const role = sessionStorage.getItem("user_role");
-    const vendorId = sessionStorage.getItem("vendor_id");
-
-    if (!role) {
-        window.location.replace("login.html");
-        return;
-    }
-
-    if (requiredRole && role !== requiredRole) {
-        // Allow Admin to access Vendor pages? Usually yes, but depends.
-        // For now strict check unless role is 'any'
-        if (requiredRole !== 'any' && role !== 'admin') {
-            // If I am admin, I can usually access everything. 
-            // If I am vendor, I can only access vendor stuff.
-            if (requiredRole === 'admin' && role !== 'admin') {
-                window.location.replace("login.html");
-            }
-        }
-    }
+  const role=sessionStorage.getItem("user_role");
+  const token=sessionStorage.getItem("auth_token");
+  if (!role || !token) return logout();
+  if (requiredRole === "admin" && role !== "admin") return logout();
+  if (requiredRole === "vendor" && !["vendor","admin"].includes(role)) return logout();
 }
-
-function logout() {
-    sessionStorage.clear();
-    window.location.replace("login.html");
+async function authFetch(url, options={}) {
+  const token=sessionStorage.getItem("auth_token");
+  if (!token) { logout(); throw new Error("Authentication required"); }
+  const headers=new Headers(options.headers || {});
+  headers.set("Authorization", `Bearer ${token}`);
+  const response=await fetch(url,{...options,headers});
+  if (response.status===401 || response.status===403) { sessionStorage.clear(); window.location.replace("login.html"); throw new Error("Session expired or access denied"); }
+  return response;
 }
+function logout(){ sessionStorage.clear(); window.location.replace("login.html"); }

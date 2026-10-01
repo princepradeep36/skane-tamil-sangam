@@ -116,6 +116,8 @@
             display: none;
         }
     </style>
+<link rel="stylesheet" href="responsive.css">
+<script src="js/site-auth.js"></script>
 </head>
 
 <body class="animate-fade-in">
@@ -332,7 +334,7 @@
 
         async function init() {
             try {
-                const resp = await fetch(`${API_BASE_URL}/admin/events`);
+                const resp = await siteAuthFetch(`${API_BASE_URL}/admin/events`);
                 events = await resp.json();
             } catch (err) { console.error(err); }
             showSection('dashboard');
@@ -356,7 +358,7 @@
             const list = document.getElementById('members-list');
             list.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:3rem;">Loading directory...</td></tr>';
             try {
-                const response = await fetch(`${API_BASE_URL}/admin/members`);
+                const response = await siteAuthFetch(`${API_BASE_URL}/admin/members`);
                 const members = await response.json();
                 list.innerHTML = members.map(m => `
                     <tr>
@@ -392,7 +394,7 @@
             const list = document.getElementById('event-detail-list');
             list.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:3rem;">Fetching bookings...</td></tr>';
             try {
-                const response = await fetch(`${API_BASE_URL}/admin/registrations/${eventId}`);
+                const response = await siteAuthFetch(`${API_BASE_URL}/admin/registrations/${eventId}`);
                 const regs = await response.json();
                 list.innerHTML = regs.map(r => `
                     <tr>
@@ -429,7 +431,7 @@
             if (newPassword !== confirm) { msg.className = 'alert alert-error'; msg.textContent = "Passwords do not match"; return; }
 
             try {
-                const response = await fetch(`${API_BASE_URL}/user/change-password`, {
+                const response = await siteAuthFetch(`${API_BASE_URL}/user/change-password`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: user.email, oldPassword, newPassword })

@@ -8,6 +8,8 @@
     <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@300;400;600;700;800&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="responsive.css">
+<script src="js/site-auth.js"></script>
 </head>
 
 <body class="animate-fade-in" style="background: #f8fafc; min-height: 100vh;">
@@ -141,7 +143,7 @@
             status.textContent = 'Saving...';
 
             try {
-                const response = await fetch(`${API_BASE_URL}/admin/content/update`, {
+                const response = await siteAuthFetch(`${API_BASE_URL}/admin/content/update`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

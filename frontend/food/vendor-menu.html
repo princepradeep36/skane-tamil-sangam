@@ -81,6 +81,7 @@
         }
     </style>
     <script src="validation.js"></script>
+<link rel="stylesheet" href="../responsive.css">
 </head>
 
 <body>
@@ -120,7 +121,7 @@
 
         async function loadMenu() {
             try {
-                const res = await fetch(`${API}/vendors`);
+                const res = await authFetch(`${API}/vendors`);
                 const vendors = await res.json();
                 const myVendor = vendors.find(v => v.id == vendorId);
 
@@ -151,7 +152,7 @@
 
             if (!item_name || !price) return alert("Enter name and price");
 
-            await fetch(`${API}/vendor/menu`, {
+            await authFetch(`${API}/vendor/menu`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ vendor_id: vendorId, item_name, price, max_quantity })
@@ -165,7 +166,7 @@
 
         async function delItem(id) {
             if (confirm("Remove item?")) {
-                await fetch(`${API}/admin/menu/${id}`, { method: 'DELETE' });
+                await authFetch(`${API}/vendor/menu/${id}`, { method: 'DELETE' });
                 loadMenu();
             }
         }

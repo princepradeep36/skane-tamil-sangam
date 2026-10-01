@@ -2,18 +2,46 @@ require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const pool = require("./db");
 const initializeDatabase = require("./init-db");
+
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error("JWT_SECRET environment variable is required");
 
 const app = express();
 
 app.use(cors({
   origin: "*",
   methods: ["GET", "POST", "PUT", "DELETE"],
-  allowedHeaders: ["Content-Type"]
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
 app.use(bodyParser.json());
+
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) return res.status(401).json({ error: "Authentication required" });
+  try {
+    req.user = jwt.verify(authHeader.substring(7), JWT_SECRET);
+    next();
+  } catch (_) {
+    return res.status(401).json({ error: "Invalid or expired token" });
+  }
+}
+function requireAdmin(req, res, next) {
+  authenticateToken(req, res, () => req.user.role === "admin" ? next() : res.status(403).json({ error: "Admin access required" }));
+}
+function requireVendor(req, res, next) {
+  authenticateToken(req, res, () => ["vendor", "admin"].includes(req.user.role) ? next() : res.status(403).json({ error: "Vendor access required" }));
+}
+function vendorScope(req, requestedVendorId) {
+  if (req.user.role === "admin") return Number(requestedVendorId);
+  if (!req.user.vendorId) return null;
+  return Number(req.user.vendorId);
+}
 
 app.get("/health", (req, res) => res.json({ status: "ok", service: "food-backend" }));
 
@@ -25,24 +53,24 @@ app.post("/login", async (req, res) => {
     const user = await pool.query("SELECT * FROM users WHERE username=$1", [username]);
     if (user.rows.length === 0) return res.status(401).json({ error: "Invalid credentials" });
 
-    // In a real app, use bcrypt.compare here
-    if (user.rows[0].password !== password) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
+    const passwordMatches = await bcrypt.compare(password, user.rows[0].password);
+    if (!passwordMatches) return res.status(401).json({ error: "Invalid credentials" });
 
-    const { role, vendor_id } = user.rows[0];
-    res.json({ role, vendor_id });
+    const { id, role, vendor_id } = user.rows[0];
+    const token = jwt.sign({ userId: id, username, role, vendorId: vendor_id }, JWT_SECRET, { expiresIn: "8h" });
+    res.json({ role, vendor_id, token });
   } catch (err) {
     res.status(500).send(err.message);
   }
 });
 
-app.post("/admin/users", async (req, res) => {
+app.post("/admin/users", requireAdmin, async (req, res) => {
   const { username, password, role, vendor_id } = req.body;
   try {
+    const hashedPassword = await bcrypt.hash(password, 12);
     await pool.query(
       "INSERT INTO users(username, password, role, vendor_id) VALUES($1, $2, $3, $4)",
-      [username, password, role, vendor_id]
+      [username, hashedPassword, role, vendor_id]
     );
     res.json({ success: true });
   } catch (err) {
@@ -52,7 +80,7 @@ app.post("/admin/users", async (req, res) => {
 
 /* ================= ADMIN ROUTES (Crucial - Do not remove) ================= */
 
-app.post("/admin/vendor", async (req, res) => {
+app.post("/admin/vendor", requireAdmin, async (req, res) => {
   const { name, phone, swish } = req.body;
   try {
     await pool.query("INSERT INTO vendors(name, phone, swish) VALUES($1,$2,$3)", [name, phone, swish]);
@@ -60,7 +88,7 @@ app.post("/admin/vendor", async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-app.post("/admin/vendor-full", async (req, res) => {
+app.post("/admin/vendor-full", requireAdmin, async (req, res) => {
   const { name, phone, swish } = req.body;
   try {
     // 1. Create Vendor
@@ -72,27 +100,42 @@ app.post("/admin/vendor-full", async (req, res) => {
 
     // 2. Generate Credentials
     const cleanName = name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-    const randomSuffix = Math.floor(100 + Math.random() * 900);
+    const randomSuffix = crypto.randomInt(100, 1000);
     const username = `${cleanName}${randomSuffix}`;
-    const password = Math.random().toString(36).slice(-6);
+    const password = crypto.randomBytes(9).toString('base64url');
+    const hashedPassword = await bcrypt.hash(password, 12);
 
     // 3. Create User
     await pool.query(
       "INSERT INTO users(username, password, role, vendor_id) VALUES($1, $2, 'vendor', $3)",
-      [username, password, vendorId]
+      [username, hashedPassword, vendorId]
     );
 
     res.json({ success: true, username, password });
   } catch (err) { res.status(500).send(err.message); }
 });
 
-app.post("/admin/menu", async (req, res) => {
+app.post("/admin/menu", requireAdmin, async (req, res) => {
   const { vendor_id, item_name, price, max_quantity } = req.body;
   try {
     await pool.query("INSERT INTO menu_items(vendor_id,item_name,price,max_quantity) VALUES($1,$2,$3,$4)",
       [vendor_id, item_name, price, max_quantity]);
     res.send("Menu item added");
   } catch (err) { res.status(500).send(err.message); }
+});
+
+app.put("/admin/menu/:id", requireAdmin, async (req,res) => {
+  const { item_name, price, max_quantity } = req.body;
+  const q=await pool.query("UPDATE menu_items SET item_name=$1,price=$2,max_quantity=$3 WHERE id=$4 RETURNING id",[item_name,price,max_quantity,req.params.id]);
+  if(!q.rows.length) return res.status(404).json({error:"Menu item not found"});
+  res.json({success:true});
+});
+
+app.delete("/admin/vendor/:id", requireAdmin, async (req,res) => {
+  try {
+    await pool.query("DELETE FROM vendors WHERE id=$1",[req.params.id]);
+    res.json({success:true});
+  } catch(err) { res.status(409).json({error:"Vendor cannot be deleted while related orders exist. Deactivate menu items instead."}); }
 });
 
 app.get("/vendors", async (req, res) => {
@@ -127,19 +170,27 @@ app.get("/vendors", async (req, res) => {
   res.json(vendors.rows);
 });
 
-app.delete("/admin/menu/:id", async (req, res) => {
+app.delete("/admin/menu/:id", requireAdmin, async (req, res) => {
   // Soft delete to preserve order history constraints
   await pool.query("UPDATE menu_items SET is_active = FALSE WHERE id=$1", [req.params.id]);
   res.send("Deleted (Soft)");
 });
 
-app.post("/vendor/menu", async (req, res) => {
-  const { vendor_id, item_name, price, max_quantity } = req.body;
+app.post("/vendor/menu", requireVendor, async (req, res) => {
+  const { item_name, price, max_quantity } = req.body;
+  const vendorId = vendorScope(req, req.body.vendor_id);
+  if (!vendorId) return res.status(403).json({ error: "Vendor account is not linked" });
   try {
-    await pool.query("INSERT INTO menu_items(vendor_id,item_name,price,max_quantity) VALUES($1,$2,$3,$4)",
-      [vendor_id, item_name, price, max_quantity]);
+    await pool.query("INSERT INTO menu_items(vendor_id,item_name,price,max_quantity) VALUES($1,$2,$3,$4)", [vendorId, item_name, price, max_quantity]);
     res.json({ success: true });
   } catch (err) { res.status(500).send(err.message); }
+});
+
+app.delete("/vendor/menu/:id", requireVendor, async (req, res) => {
+  const vendorId = vendorScope(req, req.query.vendor_id);
+  const result = await pool.query("UPDATE menu_items SET is_active=FALSE WHERE id=$1 AND vendor_id=$2 RETURNING id", [req.params.id, vendorId]);
+  if (!result.rows.length) return res.status(404).json({ error: "Menu item not found" });
+  res.json({ success: true });
 });
 
 /* ================= CUSTOMER & ORDER ROUTES ================= */
@@ -207,32 +258,43 @@ app.get("/vendors-dropdown", async (req, res) => {
   res.json(result.rows);
 });
 
-app.get("/vendor-orders/:vendorId", async (req, res) => {
+app.get("/vendor-orders/:vendorId", requireVendor, async (req, res) => {
+  const vendorId = vendorScope(req, req.params.vendorId);
+  if (req.user.role !== "admin" && Number(req.params.vendorId) !== vendorId) return res.status(403).json({ error: "Cannot access another vendor" });
   const data = await pool.query(`
     SELECT o.id AS order_id, o.delivery_status, c.name AS customer_name, c.phone AS customer_phone, m.item_name, oi.quantity
     FROM orders o JOIN customers c ON o.customer_id = c.id
     JOIN order_items oi ON o.id = oi.order_id
     JOIN menu_items m ON oi.menu_item_id = m.id
-    WHERE o.vendor_id = $1 AND o.payment_status = 'PAID' ORDER BY o.id DESC`, [req.params.vendorId]);
+    WHERE o.vendor_id = $1 AND o.payment_status = 'PAID' ORDER BY o.id DESC`, [vendorId]);
   res.json(data.rows);
 });
 
-app.get("/vendor-summary", async (req, res) => {
+app.get("/vendor-summary", requireVendor, async (req, res) => {
+  const requested = req.query.vendorId;
+  const vendorId = vendorScope(req, requested);
+  const params = [];
+  let vendorFilter = "";
+  if (req.user.role !== "admin" || requested) { params.push(vendorId); vendorFilter = " AND o.vendor_id = $1"; }
   const data = await pool.query(`
     SELECT v.name AS vendor_name, v.phone, m.item_name, SUM(oi.quantity) AS total_quantity, SUM(oi.quantity * m.price) AS total_amount
     FROM orders o JOIN vendors v ON o.vendor_id = v.id
     JOIN order_items oi ON o.id = oi.order_id
     JOIN menu_items m ON oi.menu_item_id = m.id
-    WHERE o.payment_status = 'PAID'
-    GROUP BY v.id, v.name, v.phone, m.item_name`);
+    WHERE o.payment_status = 'PAID'${vendorFilter}
+    GROUP BY v.id, v.name, v.phone, m.item_name`, params);
   res.json(data.rows);
 });
 
-app.put("/order/:id/delivery", async (req, res) => {
+app.put("/order/:id/delivery", requireVendor, async (req, res) => {
   const { status } = req.body;
   // If status is provided, use it. Otherwise toggle for backward compatibility if needed (though we will use explicit status now)
   if (status) {
-    await pool.query("UPDATE orders SET delivery_status = $1 WHERE id = $2", [status, req.params.id]);
+    const params = [status, req.params.id];
+    let query = "UPDATE orders SET delivery_status = $1 WHERE id = $2";
+    if (req.user.role !== "admin") { query += " AND vendor_id = $3"; params.push(req.user.vendorId); }
+    const result = await pool.query(query + " RETURNING id", params);
+    if (!result.rows.length) return res.status(404).json({ error: "Order not found" });
   } else {
     // Fallback toggle logic (Pending <-> Delivered) - strictly speaking we might not need this if frontend sends status
     // But for safety let's just error or require status.
@@ -241,24 +303,17 @@ app.put("/order/:id/delivery", async (req, res) => {
   res.json({ success: true });
 });
 
-app.put("/change-password", async (req, res) => {
-  const { vendorId, oldPassword, newPassword } = req.body;
+app.put("/change-password", authenticateToken, async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  if (!newPassword || newPassword.length < 8) return res.status(400).json({ error: "New password must be at least 8 characters" });
   try {
-    // Verify old password
-    const userRes = await pool.query("SELECT * FROM users WHERE vendor_id = $1 AND role = 'vendor'", [vendorId]);
-    if (userRes.rows.length === 0) return res.status(404).json({ error: "User not found" });
-
-    const user = userRes.rows[0];
-    if (user.password !== oldPassword) {
-       return res.status(401).json({ error: "Incorrect old password" });
-    }
-
-    // Update password
-    await pool.query("UPDATE users SET password = $1 WHERE id = $2", [newPassword, user.id]);
+    const userRes = await pool.query("SELECT * FROM users WHERE id=$1", [req.user.userId]);
+    if (!userRes.rows.length) return res.status(404).json({ error: "User not found" });
+    if (!await bcrypt.compare(oldPassword, userRes.rows[0].password)) return res.status(401).json({ error: "Incorrect old password" });
+    const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+    await pool.query("UPDATE users SET password=$1 WHERE id=$2", [hashedNewPassword, req.user.userId]);
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
+  } catch (err) { res.status(500).send(err.message); }
 });
 
 /* ================= EVENT REGISTRATION ROUTES ================= */
@@ -441,7 +496,7 @@ app.delete("/event/registration/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get("/admin/event-registrations", async (req, res) => {
+app.get("/admin/event-registrations", requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(`SELECT r.*, a.swish_number, a.label AS swish_label, (r.adults_count+r.kids_6_12_count+r.kids_below_6_count) AS total_participants
       FROM event_registrations r LEFT JOIN event_swish_accounts a ON a.id=r.swish_account_id ORDER BY r.created_at DESC`);
@@ -449,7 +504,7 @@ app.get("/admin/event-registrations", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get("/admin/event-registration-summary", async (req, res) => {
+app.get("/admin/event-registration-summary", requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(`SELECT COUNT(*)::int AS total_registrations,
       COALESCE(SUM(adults_count),0)::int AS total_adults,
@@ -467,7 +522,7 @@ app.get("/admin/event-registration-summary", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put("/admin/event-registration/:id/payment", async (req, res) => {
+app.put("/admin/event-registration/:id/payment", requireAdmin, async (req, res) => {
   const { status } = req.body;
   if (!['PENDING','PAID'].includes(status)) return res.status(400).json({ error: "Invalid payment status" });
   try {
@@ -479,12 +534,12 @@ app.put("/admin/event-registration/:id/payment", async (req, res) => {
 
 
 /* ================= EVENT SWISH ADMIN ================= */
-app.get('/admin/event-swish-accounts', async (req,res)=>{try{const q=await pool.query(`SELECT a.*,
+app.get('/admin/event-swish-accounts', requireAdmin, async (req,res)=>{try{const q=await pool.query(`SELECT a.*,
   COALESCE(SUM(r.total_amount),0)::int allocated_amount,
   COALESCE(SUM(r.total_amount) FILTER(WHERE r.payment_status='PAID'),0)::int paid_amount
   FROM event_swish_accounts a LEFT JOIN event_registrations r ON r.swish_account_id=a.id AND r.registration_status <> 'CANCELLED'
   GROUP BY a.id ORDER BY a.priority,a.id`);res.json(q.rows)}catch(e){res.status(500).json({error:e.message})}});
-app.post('/admin/event-swish-accounts', async (req,res)=>{
+app.post('/admin/event-swish-accounts', requireAdmin, async (req,res)=>{
   const {label,swishNumber,limitAmount,priority=1,active=true}=req.body;
   if(!/^\d{10}$/.test(String(swishNumber||''))||Number(limitAmount)<=0) return res.status(400).json({error:'Swish number must be 10 digits and limit must be greater than 0.'});
   const client=await pool.connect();
@@ -496,7 +551,7 @@ app.post('/admin/event-swish-accounts', async (req,res)=>{
     res.status(201).json({...q.rows[0],pending_registrations_assigned:assigned});
   } catch(e) { await client.query('ROLLBACK'); res.status(e.code==='23505'?409:500).json({error:e.message}); } finally { client.release(); }
 });
-app.put('/admin/event-swish-accounts/:id', async (req,res)=>{
+app.put('/admin/event-swish-accounts/:id', requireAdmin, async (req,res)=>{
   const {label,swishNumber,limitAmount,priority=1,active=true}=req.body;
   if(!/^\d{10}$/.test(String(swishNumber||''))||Number(limitAmount)<=0) return res.status(400).json({error:'Swish number must be 10 digits and limit must be greater than 0.'});
   const client=await pool.connect();
@@ -509,7 +564,7 @@ app.put('/admin/event-swish-accounts/:id', async (req,res)=>{
     res.json({...q.rows[0],pending_registrations_assigned:assigned});
   } catch(e) { await client.query('ROLLBACK'); res.status(e.code==='23505'?409:500).json({error:e.message}); } finally { client.release(); }
 });
-app.delete('/admin/event-swish-accounts/:id', async (req,res)=>{try{const used=await pool.query("SELECT COUNT(*)::int c FROM event_registrations WHERE swish_account_id=$1 AND registration_status <> 'CANCELLED'",[req.params.id]);if(used.rows[0].c>0)return res.status(409).json({error:'This Swish number is already assigned to registrations. Deactivate it instead.'});await pool.query('DELETE FROM event_swish_accounts WHERE id=$1',[req.params.id]);res.json({success:true})}catch(e){res.status(500).json({error:e.message})}});
+app.delete('/admin/event-swish-accounts/:id', requireAdmin, async (req,res)=>{try{const used=await pool.query("SELECT COUNT(*)::int c FROM event_registrations WHERE swish_account_id=$1 AND registration_status <> 'CANCELLED'",[req.params.id]);if(used.rows[0].c>0)return res.status(409).json({error:'This Swish number is already assigned to registrations. Deactivate it instead.'});await pool.query('DELETE FROM event_swish_accounts WHERE id=$1',[req.params.id]);res.json({success:true})}catch(e){res.status(500).json({error:e.message})}});
 
 const PORT = process.env.PORT || 3000;
 
@@ -528,7 +583,7 @@ async function recalcOrderTotal(orderId) {
   await pool.query("UPDATE orders SET total = $1 WHERE id = $2", [newTotal, orderId]);
 }
 
-app.get("/admin/orders", async (req, res) => {
+app.get("/admin/orders", requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT o.id, o.total, o.payment_status, o.delivery_status, o.created_at,
@@ -542,14 +597,14 @@ app.get("/admin/orders", async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-app.delete("/admin/order/:id", async (req, res) => {
+app.delete("/admin/order/:id", requireAdmin, async (req, res) => {
   try {
     await pool.query("DELETE FROM orders WHERE id=$1", [req.params.id]);
     res.json({ success: true });
   } catch (err) { res.status(500).send(err.message); }
 });
 
-app.delete("/admin/order-item/:id", async (req, res) => {
+app.delete("/admin/order-item/:id", requireAdmin, async (req, res) => {
   try {
     const del = await pool.query("DELETE FROM order_items WHERE id=$1 RETURNING order_id", [req.params.id]);
     if (del.rows.length > 0) {
@@ -561,7 +616,7 @@ app.delete("/admin/order-item/:id", async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-app.put("/admin/order-item/:id", async (req, res) => {
+app.put("/admin/order-item/:id", requireAdmin, async (req, res) => {
   const { quantity } = req.body;
   if (quantity < 1) return res.status(400).send("Qty must be positive");
   try {
@@ -575,7 +630,7 @@ app.put("/admin/order-item/:id", async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-app.put("/admin/order/:id/payment", async (req, res) => {
+app.put("/admin/order/:id/payment", requireAdmin, async (req, res) => {
   const { status } = req.body; // 'PAID' or 'UNPAID'
   if (!['PAID', 'UNPAID'].includes(status)) return res.status(400).send("Invalid status");
   
