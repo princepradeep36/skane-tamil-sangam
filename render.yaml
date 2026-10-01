@@ -16,7 +16,7 @@ services:
       - key: DB_SSL
         value: "true"
       - key: FRONTEND_URL
-        sync: false
+        value: "*"
 
   - type: pserv
     name: skane-food-backend
