@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Manage your Skåne Tamil Sangam account settings and security.">
+    <title>Account Settings | Skåne Tamil Sangam</title>
+    <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@300;400;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <script>
+        if (!localStorage.getItem('user')) {
+            window.location.href = 'login.html';
+        }
+    </script>
+</head>
+
+<body class="animate-fade-in">
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container nav-container">
+            <a href="index.html" class="nav-brand">
+                <img src="logo.png" alt="Skåne Tamil Sangam Logo" style="height:100px;">
+                <div class="brand-text">
+                    <span class="brand-en">SKÅNE TAMIL SANGAM</span>
+                    <span class="brand-ta">சுகோனே தமிழ் சங்கம்</span>
+                </div>
+            </a>
+            <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle menu">☰</button>
+            <ul class="nav-links" id="nav-links">
+                <li><a href="index.html" class="nav-link">Home</a></li>
+                <li><a href="about.html" class="nav-link">About Us</a></li>
+                <li><a href="events.html" class="nav-link">Events</a></li>
+                <li><a href="contact.html" class="nav-link">Contact</a></li>
+                <li><a href="settings.html" class="nav-link active">My Profile</a></li>
+                <li><button onclick="logout()" class="btn btn-outline"
+                        style="padding: 0.6rem 1.25rem; font-size: 0.9rem;">Logout</button></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <header class="page-hero bg-surface animate-fade-in">
+        <div class="container">
+            <span class="section-label">Account Management</span>
+            <h1>Profile Settings</h1>
+            <p>Manage your personal information and security credentials.</p>
+        </div>
+    </header>
+
+    <section class="section bg-warm" style="padding: 4rem 0 6rem;">
+        <div class="container">
+            <div class="grid grid-2" style="align-items: start; gap: 4rem;">
+
+                <!-- Profile Info Card -->
+                <div class="card glass animate-fade-in" style="padding: 3.5rem; animation-delay: 0.1s;">
+                    <div style="display: flex; align-items: center; gap: 1.5rem; margin-bottom: 2.5rem;">
+                        <div style="width: 64px; height: 64px; background: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 800;"
+                            id="user-initial">
+                            ?
+                        </div>
+                        <div>
+                            <h2 class="text-primary" style="margin-bottom: 0.25rem;">Personal Profile</h2>
+                            <span class="card-tag"
+                                style="background: #e6f7ff; color: #004d99; font-weight: 800; font-size: 0.8rem; margin: 0;">Verified
+                                Member</span>
+                        </div>
+                    </div>
+
+                    <div id="profile-display">
+                        <div style="margin-bottom: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem;">
+                            <label class="text-muted"
+                                style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 800; display: block; margin-bottom: 0.5rem;">Full
+                                Name</label>
+                            <div id="user-name" style="font-size: 1.4rem; font-weight: 700; color: var(--foreground);">
+                                Loading...</div>
+                        </div>
+                        <div style="margin-bottom: 1rem;">
+                            <label class="text-muted"
+                                style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 800; display: block; margin-bottom: 0.5rem;">Email
+                                Address</label>
+                            <div id="user-email" style="font-size: 1.4rem; font-weight: 700; color: var(--foreground);">
+                                Loading...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security Form Card -->
+                <div class="card animate-fade-in" style="padding: 3.5rem; animation-delay: 0.2s;">
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 2.5rem;">
+                        <span style="font-size: 2rem;">🔒</span>
+                        <h2 class="text-primary" style="margin: 0;">Update Password</h2>
+                    </div>
+
+                    <form id="password-form">
+                        <div class="form-group">
+                            <label class="form-label">Current Password</label>
+                            <input type="password" id="old-password" class="form-input" placeholder="••••••••" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">New Password</label>
+                            <input type="password" id="new-password" class="form-input" placeholder="Min. 8 characters"
+                                required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Confirm New Password</label>
+                            <input type="password" id="confirm-password" class="form-input"
+                                placeholder="Repeat new password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary"
+                            style="width: 100%; margin-top: 1rem; padding: 1.15rem; font-size: 1.05rem;"
+                            id="password-btn">
+                            Save New Password
+                        </button>
+                    </form>
+                    <div id="msg"></div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-col">
+                    <h3>Skåne Tamil Sangam</h3>
+                    <p>Non-profit organization dedicated to serving and uniting the Tamil community in Southern Sweden
+                        since 2011.</p>
+                </div>
+                <div class="footer-col">
+                    <h3>Quick Links</h3>
+                    <ul class="footer-links">
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="about.html">About Us</a></li>
+                        <li><a href="events.html">Events</a></li>
+                        <li><a href="contact.html">Contact</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col" style="text-align: right;">
+                    <button onclick="logout()" class="btn btn-outline"
+                        style="border-color: rgba(255,255,255,0.3); color: white;">Logout from Account</button>
+                </div>
+            </div>
+            <div class="copyright">
+                © 2026 Skåne Tamil Sangam. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const API_BASE_URL = '/api';
+        const user = JSON.parse(localStorage.getItem('user'));
+
+        if (user) {
+            document.getElementById('user-name').textContent = `${user.firstName} ${user.lastName}`;
+            document.getElementById('user-email').textContent = user.email;
+            document.getElementById('user-initial').textContent = user.firstName.charAt(0).toUpperCase();
+        }
+
+        document.getElementById('password-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const oldPassword = document.getElementById('old-password').value;
+            const newPassword = document.getElementById('new-password').value;
+            const confirm = document.getElementById('confirm-password').value;
+            const msg = document.getElementById('msg');
+            const btn = document.getElementById('password-btn');
+
+            msg.className = '';
+            msg.textContent = '';
+
+            if (newPassword !== confirm) {
+                msg.className = 'alert alert-error';
+                msg.textContent = 'Passwords do not match';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Updating...';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/user/change-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: user.email, oldPassword, newPassword })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    msg.className = 'alert alert-success';
+                    msg.textContent = '✓ Password updated successfully!';
+                    e.target.reset();
+                } else {
+                    throw new Error(data.error || "Update failed");
+                }
+            } catch (err) {
+                msg.className = 'alert alert-error';
+                msg.textContent = err.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Save New Password';
+            }
+        });
+
+        function logout() { localStorage.clear(); window.location.href = 'index.html'; }
+    </script>
+    <script src="js/main.js"></script>
+</body>
+
+</html>

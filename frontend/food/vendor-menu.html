@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Menu - Click2Eat Vendor</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #f4f7f9;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .back-link {
+            display: block;
+            margin-bottom: 20px;
+            color: #666;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .add-box {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+
+        input {
+            padding: 10px;
+            margin-right: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        button {
+            padding: 10px 15px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .menu-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .del-btn {
+            background: #dc3545;
+            font-size: 0.8rem;
+        }
+
+        .logout-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+    <script src="validation.js"></script>
+</head>
+
+<body>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+    <div class="container">
+        <a href="#" id="back-link" class="back-link">⬅️ Back to Hub</a>
+
+        <h1>Manage Menu</h1>
+
+        <div class="add-box">
+            <h3>Add New Item</h3>
+            <div style="display:flex; flex-wrap:wrap;">
+                <input id="vname" placeholder="Item Name" style="flex:2;">
+                <input id="vprice" type="number" placeholder="Price" style="flex:1;">
+                <input id="vmax" type="number" placeholder="Max Qty (0=unlim)" style="flex:1;">
+                <button onclick="addItem()">Add</button>
+            </div>
+        </div>
+
+        <div id="list">Loading...</div>
+    </div>
+
+    <script src="auth.js"></script>
+    <script>
+        checkAuth('vendor');
+        const API = '/food-api';
+
+        const params = new URLSearchParams(window.location.search);
+        let vendorId = params.get("vendor_id") || sessionStorage.getItem("vendor_id");
+
+        if (!vendorId) {
+            alert("Please login first");
+            window.location.href = "login.html";
+        }
+
+        document.getElementById("back-link").href = `vendor.html?vendor_id=${vendorId}`;
+
+        async function loadMenu() {
+            try {
+                const res = await fetch(`${API}/vendors`);
+                const vendors = await res.json();
+                const myVendor = vendors.find(v => v.id == vendorId);
+
+                const list = document.getElementById("list");
+                list.innerHTML = "";
+
+                if (!myVendor) return list.innerHTML = "Vendor not found";
+
+                myVendor.menu.forEach(item => {
+                    const div = document.createElement("div");
+                    div.className = "menu-item";
+                    div.innerHTML = `
+                        <div>
+                            <strong>${Validation.escapeHtml(item.item_name)}</strong> (${item.price}kr)
+                            <span style="color:#666; font-size:0.8rem; margin-left:5px;">Max: ${item.max_quantity || '∞'}</span>
+                        </div>
+                        <button class="del-btn" onclick="delItem(${item.id})">Delete</button>
+                    `;
+                    list.appendChild(div);
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        async function addItem() {
+            const item_name = document.getElementById("vname").value;
+            const price = document.getElementById("vprice").value;
+            const max_quantity = document.getElementById("vmax").value || 0;
+
+            if (!item_name || !price) return alert("Enter name and price");
+
+            await fetch(`${API}/vendor/menu`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ vendor_id: vendorId, item_name, price, max_quantity })
+            });
+
+            document.getElementById("vname").value = "";
+            document.getElementById("vprice").value = "";
+            document.getElementById("vmax").value = "";
+            loadMenu();
+        }
+
+        async function delItem(id) {
+            if (confirm("Remove item?")) {
+                await fetch(`${API}/admin/menu/${id}`, { method: 'DELETE' });
+                loadMenu();
+            }
+        }
+
+        loadMenu();
+    </script>
+</body>
+
+</html>

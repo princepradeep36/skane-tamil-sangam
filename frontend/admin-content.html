@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CMS Admin | Skåne Tamil Sangam</title>
+    <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@300;400;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body class="animate-fade-in" style="background: #f8fafc; min-height: 100vh;">
+    <div class="container" style="padding-top: 5rem; padding-bottom: 5rem;">
+        <div class="registration-card animate-fade-in"
+            style="max-width: 1000px; padding: 4.5rem; margin: 0 auto; animation-delay: 0.1s;">
+            <div
+                style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 3.5rem; border-bottom: 2px solid var(--border); padding-bottom: 2rem;">
+                <div>
+                    <span class="section-label"
+                        style="background: var(--primary-light); color: var(--primary); margin-bottom: 1rem;">Admin
+                        Tool</span>
+                    <h1 class="text-primary" style="font-size: 3rem; margin-bottom: 0.5rem; letter-spacing: -1px;">CMS
+                        Manager</h1>
+                    <p class="text-muted" style="font-size: 1.15rem;">Modify website content dynamically without
+                        touching code.</p>
+                </div>
+                <a href="admin-hub.html" class="btn btn-outline"
+                    style="text-decoration: none; padding: 0.75rem 1.5rem; font-weight: 800;">← Dashboard</a>
+            </div>
+
+            <div class="page-selector"
+                style="margin-bottom: 4rem; background: var(--surface-alt); padding: 2.5rem; border-radius: var(--radius-lg); border-left: 5px solid var(--primary);">
+                <label class="form-label"
+                    style="font-size: 1.05rem; margin-bottom: 1rem; color: var(--primary-dark); font-weight: 800;">Select
+                    Page to Edit:</label>
+                <select id="page-select" class="form-select"
+                    style="max-width: 400px; border-color: var(--primary); box-shadow: var(--shadow-sm);">
+                    <option value="index">🏠 Home Page</option>
+                    <option value="about">ℹ️ About Us</option>
+                    <option value="events">🎟️ Events (General)</option>
+                    <option value="contact">📞 Contact Page</option>
+                    <option value="event-registration">📝 Event Registration Form</option>
+                </select>
+            </div>
+
+            <div id="content-list" class="animate-slide-up">
+                <!-- Dynamic elements will be loaded here -->
+                <p class="text-center text-muted" style="padding: 4rem;">Loading editor interface...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = '/api';
+        const pageSelect = document.getElementById('page-select');
+        const contentList = document.getElementById('content-list');
+
+        const pageConfigs = {
+            index: [
+                { key: 'hero-title', label: 'Hero Main Title' },
+                { key: 'hero-description', label: 'Hero Description' },
+                { key: 'vision-1-title', label: 'Pillar 1: Community (Title)' },
+                { key: 'vision-1-desc', label: 'Pillar 1: Community (Description)' },
+                { key: 'vision-2-title', label: 'Pillar 2: Culture (Title)' },
+                { key: 'vision-2-desc', label: 'Pillar 2: Culture (Description)' },
+                { key: 'vision-3-title', label: 'Pillar 3: Language (Title)' },
+                { key: 'vision-3-desc', label: 'Pillar 3: Language (Description)' }
+            ],
+            about: [
+                { key: 'hero-title', label: 'Hero Title' },
+                { key: 'hero-description', label: 'Hero Description' },
+                { key: 'team-title', label: 'Team Section: Main Title' },
+                { key: 'team-subtitle', label: 'Team Section: Subtitle' },
+                { key: 'team-image', label: 'Team Group Photo URL' },
+                { key: 'team-header', label: 'Team Photo Card: Header' },
+                { key: 'team-desc', label: 'Team Photo Card: Description' }
+            ],
+            contact: [
+                { key: 'title', label: 'Contact Hero Title' },
+                { key: 'subtitle', label: 'Contact Subtitle' }
+            ],
+            events: [
+                { key: 'title', label: 'Events Page Title' },
+                { key: 'subtitle', label: 'Events Subtitle' }
+            ],
+            'event-registration': [
+                { key: 'title', label: 'Registration Page Title' },
+                { key: 'description', label: 'Form Introduction Text' }
+            ]
+        };
+
+        async function loadEditor() {
+            const pageKey = pageSelect.value;
+            contentList.innerHTML = '<div style="text-align:center; padding: 4rem;"><div class="animate-fade-in">Fetching current content...</div></div>';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/content/${pageKey}`);
+                const currentContent = await response.json();
+                const config = pageConfigs[pageKey] || [];
+
+                if (config.length === 0) {
+                    contentList.innerHTML = '<div class="card glass" style="padding:4rem; text-align:center;"><p class="text-muted">No editable sections defined for this page yet.</p></div>';
+                    return;
+                }
+
+                contentList.innerHTML = '';
+                config.forEach((item, index) => {
+                    const div = document.createElement('div');
+                    div.style.marginBottom = '3rem';
+                    div.style.paddingBottom = '3rem';
+                    if (index !== config.length - 1) div.style.borderBottom = '1px solid var(--border)';
+                    div.className = 'animate-fade-in';
+                    div.style.animationDelay = `${index * 0.1}s`;
+
+                    const value = (currentContent[item.key] && currentContent[item.key].content) ? currentContent[item.key].content : '';
+
+                    div.innerHTML = `
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" style="font-size: 0.9rem; color: var(--primary); font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">${item.label}</label>
+                            <textarea id="input-${item.key}" class="form-textarea" rows="4" style="margin-bottom: 1.5rem; font-size: 1.05rem;">${value}</textarea>
+                            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 1.5rem;">
+                                <div id="status-${item.key}" style="font-size: 0.95rem; font-weight: 800;"></div>
+                                <button class="btn btn-primary" style="padding: 0.75rem 1.5rem; font-size: 0.9rem;" onclick="updateContent('${pageKey}', '${item.key}')">Apply Change</button>
+                            </div>
+                        </div>
+                    `;
+                    contentList.appendChild(div);
+                });
+            } catch (err) {
+                contentList.innerHTML = '<div class="alert alert-error">Failed to connect to the management API. Please ensure the backend is running.</div>';
+            }
+        }
+
+        async function updateContent(pageKey, sectionKey) {
+            const input = document.getElementById(`input-${sectionKey}`);
+            const status = document.getElementById(`status-${sectionKey}`);
+            const content = input.value;
+
+            status.style.color = 'var(--muted)';
+            status.textContent = 'Saving...';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/admin/content/update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        page_key: pageKey,
+                        section_key: sectionKey,
+                        content: content,
+                        content_type: 'text'
+                    })
+                });
+
+                if (response.ok) {
+                    status.style.color = '#52c41a';
+                    status.textContent = 'Saved! ✨';
+                    setTimeout(() => status.textContent = '', 3000);
+                } else {
+                    throw new Error('Save failed');
+                }
+            } catch (err) {
+                status.style.color = '#ff4d4f';
+                status.textContent = 'Error: ' + err.message;
+            }
+        }
+
+        pageSelect.addEventListener('change', loadEditor);
+        loadEditor();
+    </script>
+</body>
+
+</html>

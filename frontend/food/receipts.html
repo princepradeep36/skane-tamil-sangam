@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Orders - Click2Eat</title>
+  <style>
+    :root {
+      --primary: #007bff;
+      --bg: #f4f7f9;
+      --card: #ffffff;
+      --text: #333;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 15px;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    .header-box {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .search-section {
+      background: var(--card);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      margin-bottom: 20px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 16px;
+      /* Prevents iOS zoom on focus */
+      box-sizing: border-box;
+    }
+
+    button.primary-btn {
+      width: 100%;
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    /* Receipt Card Style */
+    .receipt-card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      border-top: 4px solid var(--primary);
+    }
+
+    .vendor-name {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: var(--primary);
+      margin-bottom: 12px;
+      border-bottom: 1px dashed #ddd;
+      padding-bottom: 8px;
+    }
+
+    /* Flexbox Table for Items */
+    .item-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      font-size: 0.95rem;
+    }
+
+    .item-info {
+      flex: 2;
+    }
+
+    .item-qty {
+      flex: 1;
+      text-align: center;
+      color: #666;
+    }
+
+    .item-price {
+      flex: 1;
+      text-align: right;
+      font-weight: 500;
+    }
+
+    .total-section {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 2px solid #eee;
+      display: flex;
+      justify-content: space-between;
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+
+    .status-badge {
+      font-size: 0.75rem;
+      background: #e1f5fe;
+      color: #0288d1;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+  </style>
+  <script src="validation.js"></script>
+</head>
+
+<body>
+
+  <div class="container">
+    <div class="header-box">
+      <!-- Back to Home moved to bottom -->
+      <h2 style="color: #476cff; margin: 0;">Click2Eat</h2>
+      <h4 style="color: #ff47b5; margin: 5px 0;">My Receipts</h4>
+    </div>
+
+    <div class="search-section">
+      <input type="tel" id="phone" placeholder="Enter 10-digit Phone Number">
+      <button class="primary-btn" onclick="loadOrders()">View My Receipts</button>
+    </div>
+
+    <div id="orders"></div>
+
+    <div style="text-align: center; margin-top: 30px;">
+      <a href="index.html" style="color: #666; text-decoration: none; font-size: 0.9rem;">🏠 Back to Home</a>
+    </div>
+  </div>
+
+  <script>
+    const API = '/food-api';
+
+    const ordersDiv = document.getElementById("orders");
+
+    // Auto-load if phone is in URL
+    window.onload = () => {
+      const params = new URLSearchParams(window.location.search);
+      const phone = params.get("phone");
+      if (phone) {
+        document.getElementById("phone").value = phone;
+        loadOrders();
+      }
+    };
+
+    async function loadOrders() {
+      const phone = document.getElementById("phone").value.trim();
+      if (!Validation.isValidPhone(phone)) return alert("Please enter a valid 10-digit phone number.");
+
+      try {
+        const res = await fetch(`${API}/orders/${phone}`);
+        const data = await res.json();
+
+        ordersDiv.innerHTML = "";
+        if (data.length === 0) {
+          ordersDiv.innerHTML = `<div style="text-align:center; padding:20px;">No orders found for this number.</div>`;
+          return;
+        }
+
+        const paidOrders = data.filter(o => o.payment_status === 'PAID');
+
+        if (paidOrders.length === 0) {
+          ordersDiv.innerHTML = `<div style="text-align:center; padding:20px;">No paid receipts found.<br><br><a href="payment.html?phone=${phone}" style="color:var(--primary)">Check Pending Payments</a></div>`;
+          return;
+        }
+
+        for (const order of paidOrders) {
+          const status = order.delivery_status || 'Pending';
+          let statusText = 'Pending Acceptance';
+          let statusColor = '#ff9800'; // Orange
+          let statusBg = '#fff3e0';
+
+          if (status === 'Accepted') {
+            statusText = 'Order Accepted';
+            statusColor = '#2196f3'; // Blue
+            statusBg = '#e3f2fd';
+          } else if (status === 'Delivered') {
+            statusText = 'Delivered';
+            statusColor = '#4caf50'; // Green
+            statusBg = '#e8f5e9';
+          }
+
+          const card = document.createElement("div");
+          card.className = "receipt-card";
+          card.innerHTML = `
+          <div class="vendor-name" style="display:flex; justify-content:space-between; align-items:center;">
+             <span>${order.vendor}</span>
+             <span class="status-badge" style="background:${statusBg}; color:${statusColor};">${statusText}</span>
+          </div>
+          <div id="items_${order.id}" style="min-height: 40px;">
+            <p style="color: #999; font-size: 0.8rem;">Loading items...</p>
+          </div>
+          <div class="total-section">
+            <span>Total Paid</span>
+            <span>${order.total}kr</span>
+          </div>
+        `;
+          ordersDiv.appendChild(card);
+          fetchItems(order.id);
+        }
+      } catch (err) {
+        alert("Error loading orders. Check your connection.");
+      }
+    }
+
+    async function fetchItems(orderId) {
+      try {
+        const res = await fetch(`${API}/order/${orderId}/details`);
+        const items = await res.json();
+        const container = document.getElementById(`items_${orderId}`);
+
+        container.innerHTML = items.map(i => `
+        <div class="item-row">
+          <div class="item-info">${i.item_name}</div>
+          <div class="item-qty">x${i.quantity}</div>
+          <div class="item-price">${i.price * i.quantity}kr</div>
+        </div>
+      `).join('');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  </script>
+
+</body>
+
+</html>

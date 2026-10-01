@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Click2Eat Admin Portal</title>
+    <style>
+        :root {
+            --primary: #007bff;
+            --bg: #f4f7f9;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .logout-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 40px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            text-decoration: none;
+            color: #333;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .title {
+            font-size: 1.25rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: var(--primary);
+        }
+
+        .desc {
+            font-size: 0.9rem;
+            color: #666;
+        }
+    </style>
+</head>
+
+<body>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+    <div class="container">
+        <h1>Click2Eat Admin Portal</h1>
+
+        <div class="grid">
+            <a href="admin-orders.html?admin=true" class="card">
+                <div class="icon">📦</div>
+                <div class="title">Order Manager</div>
+                <div class="desc">View, edit, and delete customer orders</div>
+            </a>
+
+            <a href="admin-vendors.html?admin=true" class="card">
+                <div class="icon">🏪</div>
+                <div class="title">Stall & Menu Admin</div>
+                <div class="desc">Manage vendors and update menu items</div>
+            </a>
+
+            <a href="vendor-live.html?admin=true" class="card">
+                <div class="icon">🔔</div>
+                <div class="title">Live Vendor Dashboard</div>
+                <div class="desc">Real-time incoming orders for display</div>
+            </a>
+
+            <a href="admin-event-registrations.html?admin=true" class="card">
+                <div class="icon">📝</div><div class="title">Event Registrations</div><div class="desc">View registrations and payment status</div>
+            </a>
+
+            <a href="admin-event-summary.html?admin=true" class="card">
+                <div class="icon">👥</div><div class="title">Registration Summary</div><div class="desc">Adults, children and total participant counts</div>
+            </a>
+<a href="admin-event-swish.html?admin=true" class="card">
+                <div class="icon">💳</div><div class="title">Event Swish Routing</div><div class="desc">Configure Swish numbers, limits and routing priority</div>
+            </a>
+
+            <a href="vendor-stats.html?admin=true" class="card">
+                <div class="icon">📊</div>
+                <div class="title">Sales Summary</div>
+                <div class="desc">Total sales report by vendor and item</div>
+            </a>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+    <script>
+        checkAuth('admin');
+
+        const API = '/food-api';
+    </script>
+</body>
+
+</html>

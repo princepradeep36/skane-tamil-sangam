@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Click2Eat - Order Manager</title>
+    <style>
+        :root {
+            --primary: #007bff;
+            --danger: #dc3545;
+            --success: #28a745;
+            --bg: #f4f7f9;
+            --card: #ffffff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 {
+            margin: 0;
+            color: var(--primary);
+            font-size: 1.5rem;
+        }
+
+        .search-bar {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 1rem;
+        }
+
+        .order-card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            border-left: 5px solid var(--primary);
+        }
+
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #eee;
+        }
+
+        .customer-info strong {
+            font-size: 1.1rem;
+        }
+
+        .customer-info span {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .order-meta {
+            text-align: right;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .item-list {
+            margin-bottom: 15px;
+        }
+
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #f9f9f9;
+        }
+
+        .item-row:last-child {
+            border: none;
+        }
+
+        .qty-controls {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .qty-btn {
+            width: 24px;
+            height: 24px;
+            border: 1px solid #ddd;
+            background: #fff;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .delete-item-btn {
+            background: none;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            padding: 5px;
+            margin-left: 10px;
+        }
+
+        .delete-item-btn:hover {
+            color: var(--danger);
+        }
+
+        .order-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 2px solid #eee;
+        }
+
+        .total-price {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .btn-delete-order {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+
+        .logout-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+
+    <button class="logout-btn" onclick="logout()">Logout</button>
+    <div class="container">
+        <header>
+            <div style="flex:1">
+                <a id="back-link" href="admin.html"
+                    style="text-decoration: none; color: #666; font-size: 0.9rem; font-weight:bold; display:none;">⬅️
+                    Back to Hub</a>
+                <h1 style="margin-top:5px;">Admin Order Manager</h1>
+            </div>
+            <button onclick="loadOrders()" style="padding: 8px 15px; cursor: pointer;">Refresh</button>
+        </header>
+
+        <script src="auth.js"></script>
+        <script>
+            checkAuth('admin');
+            if (new URLSearchParams(window.location.search).get("admin") === "true") {
+                document.getElementById("back-link").style.display = "inline-block";
+            }
+        </script>
+
+        <input class="search-bar" id="search" placeholder="Search by name, phone or vendor..." onkeyup="filterOrders()">
+
+        <div id="orders-list">
+            <div class="loading">Loading Orders...</div>
+        </div>
+    </div>
+
+    <script>
+        const API = '/food-api';
+
+        let allOrders = [];
+
+        async function loadOrders() {
+            try {
+                const res = await fetch(`${API}/admin/orders`);
+                allOrders = await res.json();
+                renderOrders(allOrders);
+            } catch (err) {
+                document.getElementById("orders-list").innerHTML = '<p style="text-align:center; color:red">Failed to load orders.</p>';
+            }
+        }
+
+        function renderOrders(orders) {
+            const container = document.getElementById("orders-list");
+            container.innerHTML = "";
+
+            if (orders.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:#666">No orders found.</p>';
+                return;
+            }
+
+            orders.forEach(order => {
+                const div = document.createElement("div");
+                div.className = "order-card";
+                div.innerHTML = `
+                <div class="order-header">
+                    <div class="customer-info">
+                        <strong>${order.customer_name}</strong><br>
+                        <span>${order.customer_phone}</span>
+                    </div>
+                    <div class="order-meta">
+                        <div>Vendor: <strong>${order.vendor_name}</strong></div>
+                        <div style="font-size:0.8rem; margin-top:4px;">${new Date(order.created_at).toLocaleString()}</div>
+                        <div style="margin-top:5px; font-weight:bold; color:${order.payment_status === 'PAID' ? 'green' : 'orange'}">
+                            ${order.payment_status === 'PAID' ? 'PAID ✅' : 'UNPAID ⏳'}
+                        </div>
+                    </div>
+                </div>
+
+                <div id="items-${order.id}" class="item-list">Loading items...</div>
+
+                <div class="order-footer">
+                    <button class="btn-delete-order" onclick="deleteOrder(${order.id})">Delete Order</button>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <select onchange="updateDeliveryStatus(${order.id}, this.value)" style="padding: 5px; border-radius: 4px;">
+                             <option value="Pending" ${order.delivery_status === 'Pending' ? 'selected' : ''}>Pending</option>
+                             <option value="Accepted" ${order.delivery_status === 'Accepted' ? 'selected' : ''}>Accepted</option>
+                             <option value="Delivered" ${order.delivery_status === 'Delivered' ? 'selected' : ''}>Delivered</option>
+                        </select>
+                        
+                        <button onclick="togglePaymentStatus(${order.id}, '${order.payment_status}')" 
+                                style="background: ${order.payment_status === 'PAID' ? '#ffc107' : '#28a745'}; color: ${order.payment_status === 'PAID' ? '#000' : '#fff'}; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">
+                            ${order.payment_status === 'PAID' ? 'Mark Unpaid' : 'Mark Paid'}
+                        </button>
+                    </div>
+                    <div class="total-price">Total: ${order.total}kr</div>
+                </div>
+            `;
+                container.appendChild(div);
+                loadItems(order.id);
+            });
+        }
+
+        async function loadItems(orderId) {
+            try {
+                const res = await fetch(`${API}/order/${orderId}/details`);
+                const items = await res.json();
+
+                const list = document.getElementById(`items-${orderId}`);
+                list.innerHTML = items.map(i => `
+                <div class="item-row">
+                    <div style="flex:2">
+                        <div>${i.item_name}</div>
+                        <small style="color:#888">${i.price}kr/ea</small>
+                    </div>
+                    <div class="qty-controls">
+                        <button class="qty-btn" onclick="updateQty(${i.id}, ${i.quantity - 1})">-</button>
+                        <span style="width:25px; text-align:center; font-weight:bold;">${i.quantity}</span>
+                        <button class="qty-btn" onclick="updateQty(${i.id}, ${i.quantity + 1})">+</button>
+                    </div>
+                    <div style="flex:1; text-align:right; font-weight:500;">
+                        ${i.price * i.quantity}kr
+                        <button class="delete-item-btn" onclick="deleteItem(${i.id})">✖</button>
+                    </div>
+                </div>
+            `).join('');
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function deleteOrder(id) {
+            if (!confirm("Are you sure you want to DELETE this entire order?")) return;
+            await fetch(`${API}/admin/order/${id}`, { method: 'DELETE' });
+            loadOrders();
+        }
+
+        async function deleteItem(itemId) {
+            if (!confirm("Remove this item?")) return;
+            await fetch(`${API}/admin/order-item/${itemId}`, { method: 'DELETE' });
+            loadOrders(); // Reload to see price update
+        }
+
+        async function updateQty(itemId, newQty) {
+            if (newQty < 1) return; // Don't allow 0 here, use delete for that
+            await fetch(`${API}/admin/order-item/${itemId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ quantity: newQty })
+            });
+            loadOrders(); // Reload to see price update
+        }
+
+        async function updateDeliveryStatus(orderId, status) {
+            try {
+                await fetch(`${API}/order/${orderId}/delivery`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+                // Optional: show toast or tiny notification instead of full reload
+                // loadOrders(); 
+            } catch (err) { console.error(err); alert("Failed to update status"); }
+        }
+
+        async function togglePaymentStatus(orderId, currentStatus) {
+            const newStatus = currentStatus === 'PAID' ? 'UNPAID' : 'PAID';
+            try {
+                await fetch(`${API}/admin/order/${orderId}/payment`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                loadOrders();
+            } catch (err) { console.error(err); alert("Failed to update payment"); }
+        }
+
+        function filterOrders() {
+            const term = document.getElementById("search").value.toLowerCase();
+            const filtered = allOrders.filter(o =>
+                o.customer_name.toLowerCase().includes(term) ||
+                o.customer_phone.includes(term) ||
+                o.vendor_name.toLowerCase().includes(term)
+            );
+            renderOrders(filtered);
+        }
+
+        loadOrders();
+    </script>
+
+</body>
+
+</html>

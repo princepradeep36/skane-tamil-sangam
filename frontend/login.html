@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Login to Skåne Tamil Sangam portal to manage your membership and registrations.">
+    <title>Login | Skåne Tamil Sangam</title>
+    <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@300;400;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body class="animate-fade-in"
+    style="background: linear-gradient(135deg, #fdfaf6 0%, #e6f0ff 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem;">
+
+    <div class="container" style="max-width: 480px; width: 100%;">
+        <div class="registration-card animate-fade-in" style="padding: 3.5rem; margin: 0; animation-delay: 0.1s;">
+            <div class="text-center" style="margin-bottom: 2.5rem;">
+                <a href="index.html" class="nav-brand" style="justify-content: center; margin-bottom: 2rem; gap: 1rem;">
+                    <img src="logo.png" alt="Skåne Tamil Sangam Logo" style="height: 70px;">
+                    <div class="brand-text" style="text-align: left;">
+                        <span class="brand-en"
+                            style="font-size: 1.25rem; color: var(--primary); display: block; line-height: 1;">SKÅNE
+                            TAMIL SANGAM</span>
+                        <span class="brand-ta"
+                            style="font-size: 0.8rem; color: var(--muted); display: block; margin-top: 2px;">சுகோனே
+                            தமிழ் சங்கம்</span>
+                    </div>
+                </a>
+                <h1 class="text-primary" style="font-size: 2.2rem; margin-bottom: 0.5rem; letter-spacing: -0.5px;">
+                    Welcome Back</h1>
+                <p class="text-muted" style="font-size: 1.05rem;">Sign in to access your dashboard.</p>
+            </div>
+
+            <form id="login-form">
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" class="form-input" placeholder="name@example.com" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-input" placeholder="••••••••" required>
+                </div>
+                <div style="text-align: right; margin-bottom: 2rem;">
+                    <a href="forgot-password.html"
+                        style="font-size: 0.95rem; color: var(--primary); font-weight: 700; text-decoration: none;">Forgot
+                        password?</a>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; font-size: 1.1rem; padding: 1.15rem;"
+                    id="login-btn">Sign In</button>
+            </form>
+
+            <div id="status-msg"></div>
+
+            <div class="text-center"
+                style="margin-top: 3rem; font-size: 1rem; border-top: 1px solid var(--border); padding-top: 2rem;">
+                <span class="text-muted">Not a member yet?</span>
+                <a href="join.html"
+                    style="color: var(--primary); font-weight: 800; text-decoration: underline; margin-left: 0.5rem;">Join
+                    the Sangam</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = '/api';
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.querySelector('input[type="email"]').value;
+            const password = document.querySelector('input[type="password"]').value;
+            const statusMsg = document.getElementById('status-msg');
+            const btn = document.getElementById('login-btn');
+
+            btn.disabled = true;
+            btn.textContent = 'Verifying...';
+            statusMsg.className = '';
+            statusMsg.textContent = '';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    statusMsg.className = 'alert alert-success';
+                    statusMsg.textContent = '✓ Login successful! Redirecting...';
+
+                    localStorage.setItem('userRole', data.role);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+
+                    setTimeout(() => {
+                        window.location.href = data.role === 'admin' ? 'admin-hub.html' : 'index.html';
+                    }, 800);
+                } else {
+                    throw new Error(data.error || 'Invalid credentials');
+                }
+            } catch (err) {
+                statusMsg.className = 'alert alert-error';
+                statusMsg.textContent = err.message;
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+            }
+        });
+    </script>
+    <script src="js/main.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Click2Eat | Skåne Tamil Sangam</title>
+  <style>
+    :root{--blue:#0758ad;--gold:#ffbd0a;--ink:#202633;--muted:#667085;--bg:#f5f7fb;--red:#ff4757;--green:#2ed573;--orange:#ffa502}
+    *{box-sizing:border-box}body{margin:0;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+    .topbar{background:#fff;border-bottom:1px solid #e6eaf0;padding:14px 24px}.topbar-inner{max-width:1100px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+    .brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--blue);font-weight:800}.brand img{width:52px;height:52px;object-fit:contain}.back{color:var(--blue);text-decoration:none;font-weight:700}
+    main{max-width:980px;margin:48px auto;padding:0 20px}.hero{text-align:center;margin-bottom:34px}.hero .icon{font-size:54px}.hero h1{font-size:2.4rem;margin:8px 0;color:var(--blue)}.hero p{color:var(--muted);font-size:1.05rem;line-height:1.6}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}.card{background:#fff;border-radius:20px;padding:28px;text-decoration:none;color:inherit;box-shadow:0 10px 28px rgba(16,24,40,.07);border:1px solid #e8edf4;transition:.2s}.card:hover{transform:translateY(-3px);box-shadow:0 15px 35px rgba(16,24,40,.11)}.card .emoji{font-size:34px}.card h2{margin:15px 0 8px;font-size:1.25rem}.card p{color:var(--muted);line-height:1.5;margin:0}.order{border-top:5px solid var(--red)}.pay{border-top:5px solid var(--orange)}.receipts{border-top:5px solid var(--green)}
+    .staff{margin-top:28px;background:#eef5ff;border:1px solid #d7e7ff;border-radius:16px;padding:18px 22px;display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap}.staff p{margin:4px 0;color:var(--muted)}.login{background:var(--blue);color:#fff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:800}
+    .footer{text-align:center;color:#98a2b3;font-size:.85rem;margin:35px 0}
+    @media(max-width:760px){.grid{grid-template-columns:1fr}.hero h1{font-size:2rem}main{margin-top:30px}}
+  </style>
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../index.html"><img src="../logo.png" alt="Skåne Tamil Sangam"><span>SKÅNE TAMIL SANGAM</span></a>
+  <a class="back" href="../events.html">← Back to Events</a>
+</div></header>
+<main>
+  <section class="hero"><div class="icon">🍛</div><h1>Click2Eat</h1><p>Food pre-ordering for Skåne Tamil Sangam events.<br>Choose what you want to do below.</p></section>
+  <section class="grid">
+    <a href="menu.html" class="card order"><div class="emoji">🍽️</div><h2>Create New Order</h2><p>Browse available vendors and menu items and place a food pre-order.</p></a>
+    <a href="payment.html" class="card pay"><div class="emoji">💳</div><h2>Pending Payments</h2><p>Find your food orders and complete any pending payment.</p></a>
+    <a href="receipts.html" class="card receipts"><div class="emoji">🧾</div><h2>My Receipts</h2><p>Find previously paid orders and view your receipts.</p></a>
+  </section>
+  <section class="staff"><div><strong>Vendor or administrator?</strong><p>Sign in to manage vendors, orders, event registrations and reporting.</p></div><a class="login" href="login.html">Staff Login →</a></section>
+  <div class="footer">Click2Eat · Skåne Tamil Sangam</div>
+</main>
+</body>
+</html>

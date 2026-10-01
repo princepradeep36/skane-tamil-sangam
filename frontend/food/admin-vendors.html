@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - Click2Eat</title>
+  <style>
+    :root {
+      --primary: #007bff;
+      --danger: #dc3545;
+      --success: #28a745;
+      --bg: #f4f7f9;
+      --card: #ffffff;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      margin: 0;
+      padding: 15px;
+      color: #333;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    h1 {
+      color: var(--primary);
+      margin-bottom: 5px;
+    }
+
+    p {
+      color: #666;
+      margin-top: 0;
+    }
+
+    /* Admin Section Cards */
+    .admin-card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 25px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .card-title {
+      font-size: 1.2rem;
+      font-weight: bold;
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--primary);
+    }
+
+    /* Form Styles */
+    .form-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    input {
+      padding: 12px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 15px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    button {
+      padding: 12px 20px;
+      border-radius: 8px;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    button:active {
+      opacity: 0.8;
+    }
+
+    .btn-add {
+      background: var(--primary);
+      color: white;
+      width: 100%;
+    }
+
+    .btn-update {
+      background: var(--success);
+      color: white;
+      padding: 8px 15px;
+    }
+
+    .btn-delete {
+      background: var(--danger);
+      color: white;
+      padding: 8px 15px;
+    }
+
+    .btn-delete-vendor {
+      background: #6c757d;
+      color: white;
+      font-size: 0.8rem;
+      padding: 5px 10px;
+    }
+
+    /* Menu Item List */
+    .menu-list {
+      margin-top: 15px;
+      border-top: 1px solid #eee;
+      padding-top: 15px;
+    }
+
+    .menu-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr auto auto;
+      gap: 8px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #f9f9f9;
+    }
+
+    /* Mobile Adaptations */
+    @media (max-width: 600px) {
+      .form-group {
+        grid-template-columns: 1fr;
+      }
+
+      .menu-row {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        padding: 15px 0;
+      }
+
+      .menu-row input:first-child {
+        grid-column: span 2;
+      }
+
+      /* Name takes full width */
+      .menu-row button {
+        grid-column: span 1;
+      }
+    }
+
+    .logout-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+  </style>
+  <script src="validation.js"></script>
+</head>
+
+<body>
+  <button class="logout-btn" onclick="logout()">Logout</button>
+  <div class="container">
+    <header>
+      <div style="text-align: left; margin-bottom: 15px;">
+        <a id="back-link" href="admin.html"
+          style="text-decoration: none; color: #666; font-weight: bold; display:none;">⬅️ Back to Hub</a>
+      </div>
+      <h1>Click2Eat Admin Control</h1>
+      <p>Manage Event Vendors & Menu Items</p>
+    </header>
+
+    <script src="auth.js"></script>
+    <script>
+      checkAuth('admin');
+      if (new URLSearchParams(window.location.search).get("admin") === "true") {
+        document.getElementById("back-link").style.display = "inline-block";
+      }
+    </script>
+
+    <div class="admin-card">
+      <div class="card-title">Create New Vendor</div>
+      <div class="form-group">
+        <input id="vname" placeholder="Vendor Name (e.g. Dosa Corner)">
+        <input id="vphone" placeholder="Phone Number">
+        <input id="vswish" placeholder="Swish Number">
+      </div>
+      <button class="btn-add" onclick="createVendor()">Create Vendor & Generate Login</button>
+
+      <div id="result"
+        style="margin-top: 15px; padding: 15px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 8px; display: none; text-align: left;">
+        <h3 style="margin:0 0 10px 0; color:#2e7d32;">Success!</h3>
+        <p><strong>Username:</strong> <span id="res-user"></span></p>
+        <p><strong>Password:</strong> <span id="res-pass"></span></p>
+        <p style="font-size:0.8rem; color:#666;">Please copy these credentials and share them with the vendor.</p>
+      </div>
+    </div>
+
+    <div id="vendors"></div>
+  </div>
+
+  <script>
+    const API = '/food-api';
+
+    const vendorsDiv = document.getElementById("vendors");
+
+    async function loadVendors() {
+      try {
+        const res = await fetch(`${API}/vendors`);
+        const data = await res.json();
+
+        vendorsDiv.innerHTML = "";
+        data.forEach(v => {
+          const card = document.createElement("div");
+          card.className = "admin-card";
+
+          let menuHtml = v.menu.map(m => `
+        <div class="menu-row">
+          <input id="name_${m.id}" value="${Validation.escapeHtml(m.item_name)}">
+          <input id="price_${m.id}" value="${m.price}" type="number" placeholder="Price">
+          <input id="max_${m.id}" value="${m.max_quantity}" type="number" placeholder="Max Qty">
+          <button class="btn-update" onclick="updateMenu(${m.id})">Save</button>
+          <button class="btn-delete" onclick="deleteMenu(${m.id})">✖</button>
+        </div>
+      `).join('');
+
+          card.innerHTML = `
+        <div class="card-title">
+          <span>${v.name} <small style="font-weight:normal; color:#888; font-size:0.8rem;">(${v.swish})</small></span>
+          <button class="btn-delete-vendor" onclick="deleteVendor(${v.id})">Delete Stall</button>
+        </div>
+
+        <div style="background: #fcfcfc; padding: 15px; border-radius: 8px; border: 1px dashed #ddd;">
+          <div style="font-weight:bold; margin-bottom:10px; font-size:0.9rem;">Add Menu Item</div>
+          <div class="form-group" style="margin-bottom:10px;">
+            <input id="item_${v.id}" placeholder="Item Name">
+            <input id="price_${v.id}_new" placeholder="Price (kr)" type="number">
+            <input id="max_${v.id}_new" placeholder="Max Qty" type="number">
+          </div>
+          <button class="btn-add" style="padding: 8px;" onclick="addMenu(${v.id})">Add Item to Menu</button>
+        </div>
+
+        <div class="menu-list">
+          <div style="font-weight:bold; font-size:0.9rem; margin-bottom:5px;">Existing Menu</div>
+          ${menuHtml || '<p style="color:#999; font-size:0.9rem;">No items yet.</p>'}
+        </div>
+      `;
+          vendorsDiv.appendChild(card);
+        });
+      } catch (err) {
+        console.error("Load Failed:", err);
+      }
+    }
+
+    // Logic functions (Same as original but with slightly cleaner handling)
+    async function createVendor() {
+      const name = document.getElementById("vname").value;
+      const phone = document.getElementById("vphone").value;
+      const swish = document.getElementById("vswish").value;
+
+      if (!name || !phone || !swish) return alert("All fields are required");
+      if (!Validation.isValidPhone(phone)) return alert("Invalid Phone Number (Must be 10 digits, not repeated/sequential)");
+
+      try {
+        const res = await fetch(`${API}/admin/vendor-full`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, phone, swish })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById("result").style.display = "block";
+          document.getElementById("res-user").innerText = data.username;
+          document.getElementById("res-pass").innerText = data.password;
+
+          // Refresh list but keep result visible? No, refresh clears DOM.
+          // Let's reload vendors list in background but keep result visible.
+          loadVendors();
+
+          // Clear inputs
+          document.getElementById("vname").value = "";
+          document.getElementById("vphone").value = "";
+          document.getElementById("vswish").value = "";
+        } else {
+          alert("Error: " + JSON.stringify(data));
+        }
+      } catch (e) { alert("Failed to connect"); }
+    }
+
+    function deleteVendor(id) {
+      if (confirm("Delete this entire vendor and their items?")) {
+        fetch(`${API}/admin/vendor/${id}`, { method: "DELETE" }).then(loadVendors);
+      }
+    }
+
+    function addMenu(vendorId) {
+      const item_name = document.getElementById(`item_${vendorId}`).value.trim();
+      const price = Number(document.getElementById(`price_${vendorId}_new`).value);
+      const max_quantity = Number(document.getElementById(`max_${vendorId}_new`).value);
+
+      if (!item_name || price <= 0) return alert("Invalid entry");
+
+      fetch(`${API}/admin/menu`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vendor_id: vendorId, item_name, price, max_quantity })
+      }).then(loadVendors);
+    }
+
+    function updateMenu(id) {
+      const item_name = document.getElementById(`name_${id}`).value.trim();
+      const price = Number(document.getElementById(`price_${id}`).value);
+      const max_quantity = Number(document.getElementById(`max_${id}`).value);
+
+      fetch(`${API}/admin/menu/${id}`, {
+        method: "PUT",
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_name, price, max_quantity })
+      }).then(res => res.ok ? alert("Updated") : alert("Failed"));
+    }
+
+    function deleteMenu(id) {
+      if (confirm("Delete item?")) {
+        fetch(`${API}/admin/menu/${id}`, { method: "DELETE" })
+          .then(res => res.ok ? loadVendors() : res.text().then(alert));
+      }
+    }
+
+    loadVendors();
+  </script>
+
+</body>
+
+</html>

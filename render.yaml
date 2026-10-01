@@ -1,0 +1,67 @@
+services:
+  - type: pserv
+    name: skane-site-backend
+    runtime: docker
+    plan: 0.5c-512mb
+    region: frankfurt
+    dockerfilePath: ./backend/site/Dockerfile
+    dockerContext: ./backend/site
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: skane-tamil-db
+          property: connectionString
+      - key: DB_SCHEMA
+        value: site
+      - key: DB_SSL
+        value: "true"
+      - key: FRONTEND_URL
+        sync: false
+
+  - type: pserv
+    name: skane-food-backend
+    runtime: docker
+    plan: 0.5c-512mb
+    region: frankfurt
+    dockerfilePath: ./backend/food/Dockerfile
+    dockerContext: ./backend/food
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: skane-tamil-db
+          property: connectionString
+      - key: DB_SCHEMA
+        value: food
+      - key: DB_SSL
+        value: "true"
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+
+  - type: web
+    name: skane-tamil-sangam
+    runtime: docker
+    plan: 0.5c-512mb
+    region: frankfurt
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    healthCheckPath: /
+    envVars:
+      - key: SITE_BACKEND_HOSTPORT
+        fromService:
+          type: pserv
+          name: skane-site-backend
+          property: hostport
+      - key: FOOD_BACKEND_HOSTPORT
+        fromService:
+          type: pserv
+          name: skane-food-backend
+          property: hostport
+
+databases:
+  - name: skane-tamil-db
+    plan: 0.1c-256mb
+    region: frankfurt
+    postgresMajorVersion: "16"
+    ipAllowList: []

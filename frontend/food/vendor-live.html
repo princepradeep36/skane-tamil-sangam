@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vendor Dashboard - Click2Eat</title>
+  <style>
+    :root {
+      --primary: #007bff;
+      --secondary: #ff47b5;
+      --success: #28a745;
+      --warning: #ffc107;
+      --bg: #f8f9fa;
+      --card: #ffffff;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      margin: 0;
+      padding-bottom: 50px;
+    }
+
+    /* Modern Header matching index.html */
+    .app-header {
+      background: linear-gradient(135deg, var(--primary), #0056b3);
+      color: white;
+      padding: 25px 15px;
+      text-align: center;
+      border-radius: 0 0 25px 25px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+    }
+
+    .app-header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+    }
+
+    .app-header p {
+      margin: 5px 0 0;
+      opacity: 0.9;
+      font-size: 0.9rem;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 15px;
+    }
+
+    /* Control Box */
+    .controls {
+      background: var(--card);
+      padding: 15px;
+      border-radius: 15px;
+      margin-top: -20px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+      margin-bottom: 20px;
+    }
+
+    select {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #eee;
+      font-size: 16px;
+      background: #fdfdfd;
+    }
+
+    /* Customer Order Cards */
+    .customer-card {
+      background: var(--card);
+      border-radius: 18px;
+      padding: 18px;
+      margin-bottom: 15px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+      border-left: 5px solid var(--primary);
+    }
+
+    .customer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #f0f0f0;
+      padding-bottom: 10px;
+    }
+
+    .customer-name {
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+
+    .customer-phone {
+      color: #666;
+      font-size: 0.9rem;
+    }
+
+    .item-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      font-size: 0.95rem;
+    }
+
+    .item-qty {
+      font-weight: bold;
+      color: var(--primary);
+    }
+
+    .status-btn {
+      width: 100%;
+      margin-top: 15px;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      font-weight: bold;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .status-btn:active {
+      opacity: 0.8;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+    }
+
+    .logout-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      z-index: 100;
+    }
+  </style>
+</head>
+
+<body>
+  <button class="logout-btn" onclick="logout()">Logout</button>
+  <header class="app-header">
+    <div style="text-align: left; margin-bottom: 10px;">
+      <a id="back-link" href="admin.html"
+        style="color: rgba(255,255,255,0.9); text-decoration: none; font-weight: bold; display:none;">⬅️ Back
+        to Hub</a>
+    </div>
+    <h1>Click2Eat</h1>
+    <p>✨ Live Dashboard • Click2Eat 🚀</p>
+  </header>
+  <script src="auth.js"></script>
+  <script>
+    checkAuth('any');
+    const params = new URLSearchParams(window.location.search);
+    const backLink = document.getElementById("back-link");
+
+
+    const vendorIdParam = params.get("vendor_id");
+    const isAdmin = params.get("admin") === "true";
+
+    if (isAdmin) {
+      backLink.href = "admin.html";
+      backLink.style.display = "inline-block";
+    } else if (vendorIdParam || params.get("hub") === "vendor") {
+      backLink.href = `vendor.html?vendor_id=${vendorIdParam || myId}`;
+      backLink.style.display = "inline-block";
+    }
+  </script>
+
+  <div class="container">
+    <div class="controls">
+      <select id="vendorSelect">
+        <option value="">Choose Your Stall</option>
+      </select>
+    </div>
+
+    <div id="orders">
+      <div class="empty-state">Select a vendor to see incoming orders</div>
+    </div>
+  </div>
+
+  <script>
+    const API = '/food-api';
+
+    const vendorSelect = document.getElementById("vendorSelect");
+    const ordersDiv = document.getElementById("orders");
+
+    // Load Vendors for dropdown
+    const role = sessionStorage.getItem("user_role");
+    const myId = sessionStorage.getItem("vendor_id");
+
+    if (role === 'vendor') {
+      // Hide controls and load only my orders
+      document.querySelector('.controls').style.display = 'none';
+      loadVendorOrders(myId);
+    } else {
+      // Admin: Load dropdown
+      fetch(`${API}/vendors-dropdown`)
+        .then(res => res.json())
+        .then(data => {
+          data.forEach(v => {
+            let opt = document.createElement("option");
+            opt.value = v.id;
+            opt.textContent = v.name;
+            vendorSelect.appendChild(opt);
+          });
+        });
+
+      vendorSelect.addEventListener("change", () => loadVendorOrders(vendorSelect.value));
+    }
+
+    function updateStatus(orderId, newStatus) {
+      fetch(`${API}/order/${orderId}/delivery`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus })
+      }).then(() => loadVendorOrders(role === 'vendor' ? myId : vendorSelect.value));
+    }
+
+    function loadVendorOrders(vendorId) {
+      if (!vendorId) {
+        ordersDiv.innerHTML = '<div class="empty-state">Select a vendor to see incoming orders</div>';
+        return;
+      }
+
+      ordersDiv.innerHTML = '<div class="empty-state">Loading orders...</div>';
+
+      fetch(`${API}/vendor-orders/${vendorId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.length === 0) {
+            ordersDiv.innerHTML = '<div class="empty-state">No orders found for this stall.</div>';
+            return;
+          }
+
+          const orders = {};
+          data.forEach(row => {
+            if (!orders[row.order_id]) {
+              orders[row.order_id] = {
+                id: row.order_id,
+                name: row.customer_name,
+                phone: row.customer_phone,
+                status: row.delivery_status || 'Pending',
+                items: []
+              };
+            }
+            orders[row.order_id].items.push(row);
+          });
+
+          ordersDiv.innerHTML = "";
+          Object.values(orders).forEach(order => {
+            const status = order.status;
+            let btnHtml = '';
+
+            // Status Flow: Pending -> Accepted -> Delivered
+            if (status === 'Pending') {
+              btnHtml = `<button onclick="updateStatus('${order.id}', 'Accepted')" class="status-btn" style="background:var(--warning); color:black;">Accept Order</button>`;
+            } else if (status === 'Accepted') {
+              btnHtml = `<button onclick="updateStatus('${order.id}', 'Delivered')" class="status-btn" style="background:var(--primary); color:white;">Mark as Delivered</button>`;
+            } else if (status === 'Delivered') {
+              btnHtml = `<button onclick="updateStatus('${order.id}', 'Accepted')" class="status-btn" style="background:var(--success); color:white;">✓ Delivered (Undo)</button>`;
+            }
+
+            const card = document.createElement("div");
+            card.className = "customer-card";
+            card.innerHTML = `
+          <div class="customer-header">
+            <span class="customer-name">${order.name} <span style="font-weight:normal; font-size:0.8em; margin-left:10px; padding:2px 6px; border-radius:4px; background:#eee;">${status}</span></span>
+            <span class="customer-phone">${order.phone}</span>
+          </div>
+          <div class="item-list">
+            ${order.items.map(i => `
+              <div class="item-row">
+                <span>${i.item_name}</span>
+                <span class="item-qty">x${i.quantity}</span>
+              </div>
+            `).join('')}
+          </div>
+          ${btnHtml}`;
+            ordersDiv.appendChild(card);
+          });
+        })
+        .catch(() => { ordersDiv.innerHTML = '<div class="empty-state">Error loading orders.</div>'; });
+    }
+  </script>
+</body>
+
+</html>

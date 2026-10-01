@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Join Skåne Tamil Sangam – become part of our vibrant Tamil community in Southern Sweden.">
+    <title>Join Us | Skåne Tamil Sangam</title>
+    <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@300;400;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body class="animate-fade-in" style="background: linear-gradient(135deg, #fdfaf6 0%, #e6f0ff 100%); min-height: 100vh;">
+
+    <!-- Simple Header for Auth -->
+    <div style="padding: 3rem 0 1.5rem; text-align: center;">
+        <a href="index.html" class="nav-brand" style="justify-content: center; gap: 1.25rem;">
+            <img src="logo.png" alt="Skåne Tamil Sangam Logo" style="height: 80px;">
+            <div class="brand-text" style="text-align: left;">
+                <span class="brand-en"
+                    style="color: var(--primary); font-size: 1.5rem; display: block; line-height: 1;">SKÅNE TAMIL
+                    SANGAM</span>
+                <span class="brand-ta"
+                    style="font-size: 0.9rem; color: var(--muted); display: block; margin-top: 4px;">சுகோனே தமிழ்
+                    சங்கம்</span>
+            </div>
+        </a>
+    </div>
+
+    <div class="container" style="padding-bottom: 6rem;">
+        <div
+            style="display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: start; max-width: 1000px; margin: 0 auto;">
+
+            <!-- Benefits Panel -->
+            <div class="animate-fade-in" style="animation-delay: 0.1s; padding-top: 1.5rem;">
+                <span class="section-label">Why Join?</span>
+                <h2 class="text-primary" style="font-size: 2.2rem; margin-top: 0.75rem;">Be Part of Something Bigger
+                </h2>
+                <p class="text-muted" style="font-size: 1.05rem;">Membership gives you access to our events, community
+                    network, and a family far away from home.</p>
+
+                <div style="display: flex; flex-direction: column; gap: 1.5rem; margin-top: 2rem;">
+                    <div style="display: flex; align-items: flex-start; gap: 1rem;">
+                        <div
+                            style="width: 44px; height: 44px; background: var(--primary-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 1.25rem;">
+                            🎉</div>
+                        <div>
+                            <div style="font-weight: 800; margin-bottom: 0.25rem;">Priority Event Access</div>
+                            <div class="text-muted" style="font-size: 0.95rem;">Get early access and discounts on all
+                                Sangam events and festivals.</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: flex-start; gap: 1rem;">
+                        <div
+                            style="width: 44px; height: 44px; background: var(--primary-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 1.25rem;">
+                            🤝</div>
+                        <div>
+                            <div style="font-weight: 800; margin-bottom: 0.25rem;">Community Network</div>
+                            <div class="text-muted" style="font-size: 0.95rem;">Connect with 200+ Tamil families across
+                                Skåne region.</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: flex-start; gap: 1rem;">
+                        <div
+                            style="width: 44px; height: 44px; background: var(--primary-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 1.25rem;">
+                            🎭</div>
+                        <div>
+                            <div style="font-weight: 800; margin-bottom: 0.25rem;">Cultural Workshops</div>
+                            <div class="text-muted" style="font-size: 0.95rem;">Participate in classical music, dance,
+                                and traditional art workshops.</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: flex-start; gap: 1rem;">
+                        <div
+                            style="width: 44px; height: 44px; background: var(--primary-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 1.25rem;">
+                            🗳️</div>
+                        <div>
+                            <div style="font-weight: 800; margin-bottom: 0.25rem;">Vote & Have a Voice</div>
+                            <div class="text-muted" style="font-size: 0.95rem;">Participate in Annual General Meetings
+                                and shape our community's future.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Registration Form -->
+            <div class="registration-card animate-fade-in" style="padding: 3rem; margin: 0; animation-delay: 0.2s;">
+                <div style="margin-bottom: 2.5rem;">
+                    <h1 class="text-primary" style="font-size: 2rem; margin-bottom: 0.35rem; letter-spacing: -0.5px;">
+                        Create Account</h1>
+                    <p class="text-muted" style="font-size: 1rem; margin-bottom: 0;">Preserving heritage, fostering
+                        unity across Skåne.</p>
+                </div>
+
+                <form id="join-form" novalidate>
+                    <div class="grid grid-2" style="gap: 1.5rem;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" for="first-name">First Name <span
+                                    class="required-star">*</span></label>
+                            <input type="text" id="first-name" name="firstName" class="form-input"
+                                placeholder="e.g. Thugil" required>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" for="last-name">Last Name <span
+                                    class="required-star">*</span></label>
+                            <input type="text" id="last-name" name="lastName" class="form-input"
+                                placeholder="e.g. Kumar" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 1.5rem;">
+                        <label class="form-label" for="join-email">Email Address <span
+                                class="required-star">*</span></label>
+                        <input type="email" id="join-email" name="email" class="form-input"
+                            placeholder="e.g. name@example.com" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="join-phone">Phone Number</label>
+                        <input type="tel" id="join-phone" name="phone" class="form-input"
+                            placeholder="e.g. +46 70 000 00 00">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="membership-type">Membership Type <span
+                                class="required-star">*</span></label>
+                        <select id="membership-type" name="membershipType" class="form-select" required>
+                            <option value="">Select a type...</option>
+                            <option value="individual">Individual Membership</option>
+                            <option value="family">Family Membership</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="join-password">Password <span
+                                class="required-star">*</span></label>
+                        <input type="password" id="join-password" name="password" class="form-input"
+                            placeholder="Create a strong password" required>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="join-btn"
+                        style="width: 100%; font-size: 1.05rem; padding: 1.2rem; margin-top: 0.5rem;">
+                        Create My Account
+                    </button>
+
+                    <div id="join-status"></div>
+                </form>
+
+                <div class="text-center"
+                    style="margin-top: 2.5rem; font-size: 0.95rem; border-top: 1px solid var(--border); padding-top: 1.75rem;">
+                    <span class="text-muted">Already a member?</span>
+                    <a href="login.html"
+                        style="color: var(--primary); font-weight: 800; text-decoration: underline; margin-left: 0.5rem;">Sign
+                        in here</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = '/api';
+
+        document.getElementById('join-form').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const statusEl = document.getElementById('join-status');
+            const btn = document.getElementById('join-btn');
+
+            const firstName = document.getElementById('first-name').value.trim();
+            const lastName = document.getElementById('last-name').value.trim();
+            const email = document.getElementById('join-email').value.trim();
+            const phone = document.getElementById('join-phone').value.trim();
+            const membershipType = document.getElementById('membership-type').value;
+            const password = document.getElementById('join-password').value;
+
+            statusEl.className = '';
+            statusEl.textContent = '';
+
+            if (!firstName || !lastName || !email || !membershipType || !password) {
+                statusEl.className = 'alert alert-error';
+                statusEl.textContent = 'Please fill in all required fields.';
+                return;
+            }
+
+            if (password.length < 6) {
+                statusEl.className = 'alert alert-error';
+                statusEl.textContent = 'Password must be at least 6 characters long.';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Creating your account...';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ firstName, lastName, email, phone, membershipType, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    statusEl.className = 'alert alert-success';
+                    statusEl.textContent = '✓ Account created! Redirecting you to login...';
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 1500);
+                } else {
+                    throw new Error(data.error || 'Something went wrong. Please try again.');
+                }
+            } catch (err) {
+                statusEl.className = 'alert alert-error';
+                statusEl.textContent = err.message;
+                btn.disabled = false;
+                btn.textContent = 'Create My Account';
+            }
+        });
+    </script>
+    <script src="js/main.js"></script>
+</body>
+
+</html>
