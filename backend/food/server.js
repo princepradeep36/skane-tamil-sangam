@@ -327,8 +327,17 @@ function eventTotal(adults, children) {
 function validCount(value) {
   return Number.isInteger(value) && value >= 0;
 }
-function validTenDigitPhone(value) {
-  return typeof value === "string" && /^\d{10}$/.test(value.trim());
+function normalizeInternationalPhone(value) {
+  if (typeof value !== "string") return null;
+  let phone = value.trim().replace(/[\s().-]/g, "");
+  if (phone.startsWith("00")) phone = "+" + phone.slice(2);
+  // Backward-friendly Swedish local mobile/phone format. New UI asks for country code.
+  if (/^0\d{9}$/.test(phone)) phone = "+46" + phone.slice(1);
+  if (!/^\+[1-9]\d{7,14}$/.test(phone)) return null;
+  return phone;
+}
+function legacySwedishPhone(value) {
+  return /^\+46\d{9}$/.test(value || "") ? "0" + value.slice(3) : null;
 }
 
 // Migration-safe lifecycle fields. This runs on every backend start, so existing Docker
@@ -373,16 +382,19 @@ async function assignPendingUnroutedRegistrations(client) {
 app.post("/event/register", async (req, res) => {
   const { firstName, lastName, email, phone, whatsapp, adultsCount, kids6to12Count,
     kidsBelow6Count, volunteerInterest, culturalInterest, photoConsent } = req.body;
-  if (!firstName || !lastName || !email || !validTenDigitPhone(phone) || !validTenDigitPhone(whatsapp) || !photoConsent ||
+  const normalizedPhone = normalizeInternationalPhone(phone);
+  const normalizedWhatsapp = normalizeInternationalPhone(whatsapp);
+  if (!firstName || !lastName || !email || !normalizedPhone || !normalizedWhatsapp || !photoConsent ||
       !validCount(adultsCount) || !validCount(kids6to12Count) || !validCount(kidsBelow6Count) ||
       adultsCount + kids6to12Count + kidsBelow6Count < 1) {
-    return res.status(400).json({ error: "Please complete all mandatory fields, use exactly 10 digits for phone and WhatsApp numbers, accept the consent, and register at least one participant." });
+    return res.status(400).json({ error: "Please complete all mandatory fields, enter phone and WhatsApp numbers with country code (for example +46701234567 or +919876543210), accept the consent, and register at least one participant." });
   }
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const amount = eventTotal(adultsCount, kids6to12Count);
-    const existing = await client.query(`SELECT id,registration_status FROM event_registrations WHERE phone=$1 FOR UPDATE`, [phone.trim()]);
+    const legacyPhone = legacySwedishPhone(normalizedPhone);
+    const existing = await client.query(`SELECT id,registration_status FROM event_registrations WHERE phone=$1 OR ($2::text IS NOT NULL AND phone=$2) FOR UPDATE`, [normalizedPhone, legacyPhone]);
     const swish = await allocateSwishAccount(client, amount, existing.rows[0]?.id || null);
     if (existing.rows.length && existing.rows[0].registration_status === 'CANCELLED') {
       const revived = await client.query(`UPDATE event_registrations SET
@@ -390,35 +402,38 @@ app.post("/event/register", async (req, res) => {
         volunteer_interest=$9,cultural_interest=$10,photo_consent=$11,total_amount=$12,swish_account_id=$13,
         payment_status='PENDING',registration_status='ACTIVE',cancelled_at=NULL,created_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
         WHERE id=$14 RETURNING id`,
-        [firstName.trim(),lastName.trim(),email.trim(),phone.trim(),whatsapp.trim(),adultsCount,kids6to12Count,kidsBelow6Count,!!volunteerInterest,!!culturalInterest,!!photoConsent,amount,swish?.id || null,existing.rows[0].id]);
+        [firstName.trim(),lastName.trim(),email.trim(),normalizedPhone,normalizedWhatsapp,adultsCount,kids6to12Count,kidsBelow6Count,!!volunteerInterest,!!culturalInterest,!!photoConsent,amount,swish?.id || null,existing.rows[0].id]);
       const saved = await registrationWithSwish(client, revived.rows[0].id);
       await client.query('COMMIT');
       return res.status(201).json(saved);
     }
     if (existing.rows.length) {
       await client.query('ROLLBACK');
-      return res.status(409).json({ error: "A registration already exists for this phone number. Use Find Booking to modify it." });
+      return res.status(409).json({ code: "BOOKING_EXISTS", error: "You are already booked with this phone number. Please use Find Booking above to view or update your registration." });
     }
     const result = await client.query(`INSERT INTO event_registrations
       (first_name,last_name,email,phone,whatsapp,adults_count,kids_6_12_count,kids_below_6_count,volunteer_interest,cultural_interest,photo_consent,total_amount,swish_account_id)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
-      [firstName.trim(),lastName.trim(),email.trim(),phone.trim(),whatsapp.trim(),adultsCount,kids6to12Count,kidsBelow6Count,!!volunteerInterest,!!culturalInterest,!!photoConsent,amount,swish?.id || null]);
+      [firstName.trim(),lastName.trim(),email.trim(),normalizedPhone,normalizedWhatsapp,adultsCount,kids6to12Count,kidsBelow6Count,!!volunteerInterest,!!culturalInterest,!!photoConsent,amount,swish?.id || null]);
     const saved = await registrationWithSwish(client, result.rows[0].id);
     await client.query('COMMIT');
     res.status(201).json(saved);
   } catch (err) {
     await client.query('ROLLBACK');
-    if (err.code === '23505') return res.status(409).json({ error: "A registration already exists for this phone number. Use Find Booking to modify it." });
+    if (err.code === '23505') return res.status(409).json({ code: "BOOKING_EXISTS", error: "You are already booked with this phone number. Please use Find Booking above to view or update your registration." });
     res.status(500).json({ error: err.message });
   } finally { client.release(); }
 });
 
 app.get("/event/registration/:phone", async (req, res) => {
+  const normalizedPhone = normalizeInternationalPhone(req.params.phone);
+  if (!normalizedPhone) return res.status(400).json({ error: "Enter a valid phone number with country code, for example +46701234567 or +919876543210." });
+  const legacyPhone = legacySwedishPhone(normalizedPhone);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const found = await client.query(`SELECT id,total_amount,payment_status,swish_account_id
-      FROM event_registrations WHERE phone=$1 AND registration_status <> 'CANCELLED' FOR UPDATE`, [req.params.phone.trim()]);
+      FROM event_registrations WHERE (phone=$1 OR ($2::text IS NOT NULL AND phone=$2)) AND registration_status <> 'CANCELLED' FOR UPDATE`, [normalizedPhone, legacyPhone]);
     if (!found.rows.length) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: "Registration not found" });
@@ -448,8 +463,10 @@ app.get("/event/registration/:phone", async (req, res) => {
 
 app.put("/event/registration/:id", async (req, res) => {
   const { firstName, lastName, email, phone, whatsapp, adultsCount, kids6to12Count, kidsBelow6Count, volunteerInterest, culturalInterest, photoConsent } = req.body;
-  if (!firstName || !lastName || !email || !validTenDigitPhone(phone) || !validTenDigitPhone(whatsapp) || !photoConsent || !validCount(adultsCount) || !validCount(kids6to12Count) || !validCount(kidsBelow6Count) || adultsCount + kids6to12Count + kidsBelow6Count < 1)
-    return res.status(400).json({ error: "Please complete all mandatory fields, use exactly 10 digits for phone and WhatsApp numbers, accept the consent, and register at least one participant." });
+  const normalizedPhone = normalizeInternationalPhone(phone);
+  const normalizedWhatsapp = normalizeInternationalPhone(whatsapp);
+  if (!firstName || !lastName || !email || !normalizedPhone || !normalizedWhatsapp || !photoConsent || !validCount(adultsCount) || !validCount(kids6to12Count) || !validCount(kidsBelow6Count) || adultsCount + kids6to12Count + kidsBelow6Count < 1)
+    return res.status(400).json({ error: "Please complete all mandatory fields, enter phone and WhatsApp numbers with country code (for example +46701234567 or +919876543210), accept the consent, and register at least one participant." });
   const client=await pool.connect();
   try {
     await client.query('BEGIN');
@@ -457,7 +474,7 @@ app.put("/event/registration/:id", async (req, res) => {
     const swish=await allocateSwishAccount(client, amount, Number(req.params.id));
     const result=await client.query(`UPDATE event_registrations SET first_name=$1,last_name=$2,email=$3,phone=$4,whatsapp=$5,adults_count=$6,kids_6_12_count=$7,kids_below_6_count=$8,volunteer_interest=$9,cultural_interest=$10,photo_consent=$11,total_amount=$12,swish_account_id=$13,
       payment_status=CASE WHEN adults_count<>$6 OR kids_6_12_count<>$7 OR kids_below_6_count<>$8 THEN 'PENDING' ELSE payment_status END,registration_status='ACTIVE',cancelled_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=$14 AND registration_status <> 'CANCELLED' RETURNING id`,
-      [firstName.trim(),lastName.trim(),email.trim(),phone.trim(),whatsapp.trim(),adultsCount,kids6to12Count,kidsBelow6Count,!!volunteerInterest,!!culturalInterest,!!photoConsent,amount,swish?.id || null,req.params.id]);
+      [firstName.trim(),lastName.trim(),email.trim(),normalizedPhone,normalizedWhatsapp,adultsCount,kids6to12Count,kidsBelow6Count,!!volunteerInterest,!!culturalInterest,!!photoConsent,amount,swish?.id || null,req.params.id]);
     if(!result.rows.length){await client.query('ROLLBACK');return res.status(404).json({error:'Registration not found'});}
     const saved=await registrationWithSwish(client,result.rows[0].id); await client.query('COMMIT'); res.json(saved);
   } catch(err){await client.query('ROLLBACK'); if(err.code==='23505') return res.status(409).json({error:'That phone number is already used by another registration.'}); res.status(500).json({error:err.message});}
@@ -482,17 +499,17 @@ app.put("/event/registration/:id/pay", async (req, res) => {
   }
 });
 
-app.delete("/event/registration/:id", async (req, res) => {
+app.delete("/admin/event-registration/:id", requireAdmin, async (req, res) => {
   try {
-    // Keep the row for audit/history, but immediately remove it from all live totals
-    // and release its Swish allocation.
+    // Soft-cancel for audit history. Summary queries exclude CANCELLED rows and
+    // clearing swish_account_id immediately releases that allocation.
     const result = await pool.query(`UPDATE event_registrations
       SET registration_status='CANCELLED', cancelled_at=CURRENT_TIMESTAMP,
           swish_account_id=NULL, updated_at=CURRENT_TIMESTAMP
       WHERE id=$1 AND registration_status <> 'CANCELLED'
       RETURNING id,payment_status,total_amount`, [req.params.id]);
     if (!result.rows.length) return res.status(404).json({ error: "Registration not found or already cancelled" });
-    res.json({ success: true, registration_status: 'CANCELLED', payment_status: result.rows[0].payment_status, total_amount: result.rows[0].total_amount });
+    res.json({ success: true, registration_status: 'CANCELLED' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

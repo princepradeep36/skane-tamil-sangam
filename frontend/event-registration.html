@@ -57,10 +57,10 @@
             <div class="card glass" id="lookup-panel"
                 style="margin-bottom: 3rem; padding: 2rem; border-color: var(--primary-light);">
                 <label class="form-label" style="margin-bottom: 1rem; font-weight: 800; color: var(--primary);">Already
-                    registered? Enter phone to manage your booking:</label>
+                    registered? Enter the phone number used during registration to manage your booking:</label>
                 <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
                     <input type="tel" id="lookupPhone" class="form-input" style="flex: 1; min-width: 250px;"
-                        placeholder="Enter 10-digit phone number" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" title="Enter exactly 10 digits">
+                        placeholder="e.g. +46701234567 or +919876543210" inputmode="tel" autocomplete="tel" title="Enter phone number with country code">
                     <button type="button" class="btn btn-primary" style="padding: 0 2rem;"
                         onclick="lookupRegistration()">Find Booking</button>
                 </div>
@@ -96,11 +96,11 @@
                 <div class="grid grid-2">
                     <div class="form-group">
                         <label class="form-label">Phone Number <span class="required-star">*</span></label>
-                        <input type="tel" id="phone" class="form-input" placeholder="10 digits, e.g. 0701234567" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" title="Enter exactly 10 digits, e.g. 0701234567" required>
+                        <input type="tel" id="phone" class="form-input" placeholder="e.g. +46701234567 or +919876543210" inputmode="tel" autocomplete="tel" pattern="\+[1-9][0-9]{7,14}" title="Use country code, e.g. +46701234567 or +919876543210" required>
                     </div>
                     <div class="form-group">
                         <label class="form-label">WhatsApp Number <span class="required-star">*</span></label>
-                        <input type="tel" id="whatsapp" class="form-input" placeholder="10 digits, e.g. 0701234567" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" title="Enter exactly 10 digits, e.g. 0701234567" required>
+                        <input type="tel" id="whatsapp" class="form-input" placeholder="e.g. +46701234567 or +919876543210" inputmode="tel" autocomplete="tel" pattern="\+[1-9][0-9]{7,14}" title="Use country code, e.g. +46701234567 or +919876543210" required>
                     </div>
                 </div>
 
@@ -168,10 +168,6 @@
                         style="width: 100%; font-size: 1.2rem; padding: 1.25rem; opacity: .5; cursor: not-allowed;">
                         Confirm My Registration
                     </button>
-                    <button type="button" class="btn btn-outline hidden" id="cancel-btn" onclick="cancelRegistration()"
-                        style="border-color: #ff4d4f; color: #ff4d4f;">
-                        Cancel My Booking
-                    </button>
                 </div>
 
                 <div id="status-msg" role="status" aria-live="polite"></div>
@@ -205,14 +201,23 @@
         const submitButton = document.getElementById('submit-btn');
         const phoneFields = ['phone', 'whatsapp', 'lookupPhone'];
 
-        // Accept digits only and keep Swedish-style local numbers to exactly 10 digits.
+        // International phone format: keep one leading + and digits only (E.164 max 15 digits).
         phoneFields.forEach(id => {
             const field = document.getElementById(id);
             field.addEventListener('input', () => {
-                field.value = field.value.replace(/\D/g, '').slice(0, 10);
+                let value = field.value.replace(/[^+\d]/g, '');
+                value = (value.startsWith('+') ? '+' : '') + value.replace(/\+/g, '').slice(0, 15);
+                field.value = value;
                 if (id !== 'lookupPhone') updateSubmitState();
             });
         });
+
+        function normalizePhoneForRequest(value) {
+            let phone = String(value || '').trim().replace(/[\s().-]/g, '');
+            if (phone.startsWith('00')) phone = '+' + phone.slice(2);
+            if (/^0\d{9}$/.test(phone)) phone = '+46' + phone.slice(1);
+            return /^\+[1-9]\d{7,14}$/.test(phone) ? phone : null;
+        }
 
         function updateSubmitState() {
             const enabled = registrationForm.checkValidity() && document.getElementById('photoConsent').checked;
@@ -317,15 +322,16 @@
         }
 
         async function lookupRegistration() {
-            const phone = document.getElementById('lookupPhone').value;
-            if (!/^\d{10}$/.test(phone)) return alert('Please enter exactly 10 digits for the phone number.');
+            const phone = normalizePhoneForRequest(document.getElementById('lookupPhone').value);
+            if (!phone) return alert('Please enter a valid phone number with country code, e.g. +46701234567 or +919876543210.');
+            document.getElementById('lookupPhone').value = phone;
             const statusMsg = document.getElementById('status-msg');
             statusMsg.className = 'alert alert-info';
             statusMsg.textContent = 'Searching for your registration...';
             statusMsg.style.display = 'block';
 
             try {
-                const response = await fetch(`${API_BASE_URL}/event/registration/${phone}`);
+                const response = await fetch(`${API_BASE_URL}/event/registration/${encodeURIComponent(phone)}`);
                 const data = await response.json();
                 if (response.ok) {
                     currentRegistrationId = data.id;
@@ -347,7 +353,6 @@
                     document.getElementById('modify-alert').classList.remove('hidden');
                     document.getElementById('modify-name').textContent = `Booking found for ${data.first_name} ${data.last_name}.`;
                     document.getElementById('submit-btn').textContent = 'Update My Registration';
-                    document.getElementById('cancel-btn').classList.remove('hidden');
                     document.getElementById('lookup-panel').classList.add('hidden');
                     statusMsg.style.display = 'none';
                     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -366,20 +371,11 @@
             document.getElementById('reg-form').reset();
             document.getElementById('modify-alert').classList.add('hidden');
             document.getElementById('submit-btn').textContent = 'Confirm My Registration';
-            document.getElementById('cancel-btn').classList.add('hidden');
             document.getElementById('lookup-panel').classList.remove('hidden');
             document.getElementById('status-msg').style.display = 'none';
             document.getElementById('payment-panel').classList.add('hidden');
             updateEventPrice();
             updateSubmitState();
-        }
-
-        async function cancelRegistration() {
-            if (!confirm('Are you SURE you want to cancel your registration?')) return;
-            try {
-                const resp = await fetch(`${API_BASE_URL}/event/registration/${currentRegistrationId}`, { method: 'DELETE' });
-                if (resp.ok) { alert('Successfully cancelled.'); resetForm(); }
-            } catch (err) { console.error(err); }
         }
 
         document.getElementById('reg-form').addEventListener('submit', async (e) => {
@@ -394,8 +390,8 @@
                 firstName: document.getElementById('firstName').value,
                 lastName: document.getElementById('lastName').value,
                 email: document.getElementById('email').value,
-                phone: document.getElementById('phone').value,
-                whatsapp: document.getElementById('whatsapp').value,
+                phone: normalizePhoneForRequest(document.getElementById('phone').value),
+                whatsapp: normalizePhoneForRequest(document.getElementById('whatsapp').value),
                 adultsCount: parseInt(document.getElementById('adultsCount').value),
                 kids6to12Count: parseInt(document.getElementById('kids6to12Count').value),
                 kidsBelow6Count: parseInt(document.getElementById('kidsBelow6Count').value),
@@ -423,11 +419,20 @@
                     currentRegistrationId = saved.id;
                     showSavedPayment(saved);
                     document.getElementById('submit-btn').textContent = 'Update My Registration';
-                    document.getElementById('cancel-btn').classList.remove('hidden');
                     document.getElementById('modify-alert').classList.remove('hidden');
                     document.getElementById('modify-name').textContent = `Booking for ${saved.first_name} ${saved.last_name}.`;
                     document.getElementById('lookup-panel').classList.add('hidden');
-                } else { throw new Error('Failed to save.'); }
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    if (response.status === 409 && errorData.code === 'BOOKING_EXISTS') {
+                        const bookingPhone = normalizePhoneForRequest(document.getElementById('phone').value);
+                        if (bookingPhone) document.getElementById('lookupPhone').value = bookingPhone;
+                        document.getElementById('lookup-panel').classList.remove('hidden');
+                        document.getElementById('lookup-panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        throw new Error(errorData.error || 'You are already booked. Please use Find Booking above.');
+                    }
+                    throw new Error(errorData.error || 'Failed to save.');
+                }
             } catch (err) {
                 statusMsg.className = 'alert alert-error';
                 statusMsg.textContent = 'Error: ' + err.message;
