@@ -22,6 +22,8 @@
       .festival-hero{position:relative;overflow:hidden;margin:-1rem -1rem 2.6rem;padding:2.2rem 1.5rem 2rem;border-radius:20px;background:linear-gradient(135deg,#fff7df 0%,#fff 45%,#eef6ff 100%);border:1px solid #fde3a7}.festival-hero:before,.festival-hero:after{content:"✦ ✧ ✦";position:absolute;color:#f59e0b;font-size:1.8rem;letter-spacing:.35rem;opacity:.65}.festival-hero:before{top:18px;left:22px}.festival-hero:after{right:22px;bottom:18px}.diwali-icons{font-size:2.1rem;margin-bottom:.45rem;letter-spacing:.5rem}.section-label{display:inline-block;background:#fff0c2;color:#9a5200;border:1px solid #ffd166;border-radius:999px;padding:.45rem .9rem;font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.festival-title{font-size:2.8rem;margin:.8rem 0 .55rem;letter-spacing:-1px}.festival-subtitle{font-size:1.12rem;max-width:620px;margin:0 auto;line-height:1.55}.festival-strip{display:flex;justify-content:center;gap:1.2rem;margin-top:1.25rem;font-size:1.45rem}.participants-box{background:linear-gradient(135deg,#eef6ff,#fff9e9)!important;border:1px solid #dbeafe}
       body{margin:0;background:radial-gradient(circle at 10% 12%,rgba(245,158,11,.11),transparent 23%),radial-gradient(circle at 90% 15%,rgba(7,91,184,.09),transparent 25%),linear-gradient(135deg,#fffaf0 0%,#eef6ff 100%)!important;min-height:100vh}
       .qr-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.58);display:flex;align-items:center;justify-content:center;padding:20px;z-index:9999}.qr-modal{width:min(480px,100%);background:#fff;border-radius:20px;padding:28px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.28)}#eventQrCode{display:flex;justify-content:center;margin:18px 0}#eventQrCode img,#eventQrCode canvas{max-width:100%;height:auto!important}
+      .event-banner-wrap{width:100%;margin:-1rem -1rem 2.6rem;width:calc(100% + 2rem);overflow:hidden;border-radius:20px;border:1px solid #f6c85f;background:#071d3f}.event-banner{display:block;width:100%;height:auto;aspect-ratio:2048/682;object-fit:contain;background:#071d3f}
+      @media(max-width:700px){.event-banner-wrap{margin:-.2rem -.2rem 2rem;width:calc(100% + .4rem);border-radius:14px}.event-banner{width:100%;height:auto;object-fit:contain}}
       @media(max-width:700px){.registration-card{padding:22px!important}.grid-2,.grid-3{grid-template-columns:1fr}.brand-logo{width:58px;height:58px}.brand-en{font-size:1.1rem}.festival-title{font-size:2.15rem}.festival-hero{margin:-.2rem -.2rem 2rem}.festival-hero:before,.festival-hero:after{font-size:1.1rem}}
     </style>
 <link rel="stylesheet" href="responsive.css">
@@ -44,13 +46,10 @@
         <div class="registration-card animate-fade-in"
             style="max-width: 850px; margin: 0 auto; padding: 4rem; animation-delay: 0.1s;">
 
-            <div class="festival-hero text-center">
-                <div class="diwali-icons" aria-hidden="true">🪔 ✨ 🪔</div>
-                <span class="section-label" id="event-badge">Diwali Celebration 2026</span>
-                <h1 class="text-primary festival-title" id="page-title">Diwali Celebration 2026</h1>
-                <p id="page-desc" class="text-muted festival-subtitle">
-                    Celebrate the Festival of Lights with Skåne Tamil Sangam. Register your family for our Diwali Celebration 2026.</p>
-                <div class="festival-strip" aria-hidden="true"><span>🎆</span><span>🪔</span><span>✨</span><span>🎇</span><span>🪔</span></div>
+            <div class="event-banner-wrap">
+                <img src="diwali-2026-banner.png"
+                    alt="Skåne Tamil Sangam Diwali 2026 — Sunday 15 November 2026 at Tryckeriet, from 10:00 AM"
+                    class="event-banner">
             </div>
 
             <!-- Lookup Section -->
@@ -174,8 +173,8 @@
                         style="width: 22px; height: 22px; margin-top: 4px; flex-shrink: 0;">
                     <label for="photoConsent"
                         style="color: #856404; font-size: 0.95rem; line-height: 1.5; cursor: pointer; font-weight: 600;">
-                        I consent to Skåne Tamil Sangam using photos/videos of me and my family from the Diwali Celebration 2026 for
-                        community social media and newsletters.
+                        I consent to Skåne Tamil Sangam photographing me and/or my children/family during this event and sharing these photos on Skåne Tamil Sangam’s social media channels and website.<br><br>
+                        Photos will first be uploaded to our shared drive. If I would like any specific photo of myself or my children/family to be removed, I can request its removal by sending a WhatsApp message to <strong>+46 73 057 91 31</strong>.
                     </label>
                 </div>
 
