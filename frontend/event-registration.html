@@ -131,6 +131,7 @@
                     <div style="display:flex;justify-content:space-between;margin-bottom:7px;"><span>Kids (6–12) × 60 kr</span><strong id="childSubtotal">0 kr</strong></div>
                     <div style="display:flex;justify-content:space-between;margin-bottom:12px;"><span>Kids under 6 (Free)</span><strong>0 kr</strong></div>
                     <div style="border-top:1px solid #e5cb85;padding-top:12px;display:flex;justify-content:space-between;align-items:center;"><strong>Total payable</strong><strong id="totalPayable" style="font-size:1.7rem;color:#124c97;">100 kr</strong></div>
+                    <div id="paymentLinkPendingNotice" class="hidden" style="margin-top:14px;padding-top:12px;border-top:1px dashed #e5cb85;color:#856404;font-weight:600;line-height:1.45;">ℹ️ Payment link will be shared later.</div>
                 </div>
 
                 <div class="grid grid-2" style="margin-bottom: 1.5rem;">
@@ -215,6 +216,21 @@
         const registrationForm = document.getElementById('reg-form');
         const submitButton = document.getElementById('submit-btn');
         const phoneFields = ['phone', 'whatsapp', 'lookupPhone'];
+
+        async function updatePaymentAvailabilityNotice() {
+            const notice = document.getElementById('paymentLinkPendingNotice');
+            try {
+                const response = await fetch(`${API_BASE_URL}/event/payment-availability`);
+                if (!response.ok) throw new Error('Unable to check payment availability');
+                const data = await response.json();
+                notice.classList.toggle('hidden', data.swishConfigured === true);
+            } catch (error) {
+                // Do not show a possibly incorrect payment message when the status cannot be checked.
+                notice.classList.add('hidden');
+            }
+        }
+
+        updatePaymentAvailabilityNotice();
 
         // International phone format: keep one leading + and digits only (E.164 max 15 digits).
         phoneFields.forEach(id => {

@@ -391,6 +391,18 @@ function normalizeRegistrationComments(value) {
   return text ? text.slice(0, 1000) : null;
 }
 
+// Public status only: tells the registration page whether a Swish payment
+// account has been configured, without exposing the Swish number itself.
+app.get("/event/payment-availability", async (req, res) => {
+  try {
+    const result = await pool.query(`SELECT EXISTS(SELECT 1 FROM event_swish_accounts WHERE active=TRUE) AS configured`);
+    res.json({ swishConfigured: result.rows[0].configured === true });
+  } catch (error) {
+    console.error("Failed to check event payment availability", error);
+    res.status(500).json({ error: "Unable to check payment availability" });
+  }
+});
+
 app.post("/event/register", async (req, res) => {
   const { firstName, lastName, email, phone, whatsapp, adultsCount, kids6to12Count,
     kidsBelow6Count, volunteerInterest, culturalInterest, culturalActivityType, comments, photoConsent } = req.body;
