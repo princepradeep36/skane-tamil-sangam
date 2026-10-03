@@ -152,6 +152,22 @@
                     </div>
                 </div>
 
+                <div id="culturalActivityDetails" class="form-group hidden" style="margin-top:-0.5rem;margin-bottom:1.5rem;padding:18px;border:1px solid #f5d778;border-radius:14px;background:#fff9e7;">
+                    <label class="form-label" for="culturalActivityType">Which cultural activity are you interested in?</label>
+                    <select id="culturalActivityType" class="form-select">
+                        <option value="">Select an activity</option>
+                        <option value="GROUP_DANCE">Group Dance</option>
+                        <option value="GROUP_SINGING">Group Singing</option>
+                    </select>
+                    <p style="margin:10px 0 0;color:#856404;font-size:.9rem;font-weight:600;">At least 4 participants are required for a group cultural activity.</p>
+                </div>
+
+                <div class="form-group" style="margin-bottom:1.5rem;">
+                    <label class="form-label" for="comments">Do you want to tell us something?</label>
+                    <textarea id="comments" class="form-input" rows="4" maxlength="1000" placeholder="Optional comments, requests or information for the organizers"></textarea>
+                    <small style="display:block;margin-top:6px;color:#6b7280;">Optional — maximum 1000 characters.</small>
+                </div>
+
                 <div class="form-group"
                     style="display: flex; align-items: flex-start; gap: 1rem; background: #fffbe6; padding: 1.5rem; border-radius: var(--radius-md); border: 1px solid #ffe58f; margin-bottom: 2.5rem;">
                     <input type="checkbox" id="photoConsent" required
@@ -218,6 +234,20 @@
             if (/^0\d{9}$/.test(phone)) phone = '+46' + phone.slice(1);
             return /^\+[1-9]\d{7,14}$/.test(phone) ? phone : null;
         }
+
+        function updateCulturalActivityFields() {
+            const interested = document.getElementById('culturalInterest').value === 'true';
+            const details = document.getElementById('culturalActivityDetails');
+            const activity = document.getElementById('culturalActivityType');
+            details.classList.toggle('hidden', !interested);
+            activity.required = interested;
+            if (!interested) activity.value = '';
+        }
+
+        document.getElementById('culturalInterest').addEventListener('change', () => {
+            updateCulturalActivityFields();
+            updateSubmitState();
+        });
 
         function updateSubmitState() {
             const enabled = registrationForm.checkValidity() && document.getElementById('photoConsent').checked;
@@ -295,6 +325,7 @@
                 document.getElementById('savedPaymentStatus').textContent = 'Payment link will be shared soon.'; actions.classList.add('hidden');
             }
         }
+        updateCulturalActivityFields();
         updateEventPrice();
         updateSubmitState();
 
@@ -345,6 +376,9 @@
                     document.getElementById('kidsBelow6Count').value = data.kids_below_6_count;
                     document.getElementById('volunteerInterest').value = data.volunteer_interest.toString();
                     document.getElementById('culturalInterest').value = data.cultural_interest.toString();
+                    updateCulturalActivityFields();
+                    document.getElementById('culturalActivityType').value = data.cultural_activity_type || '';
+                    document.getElementById('comments').value = data.comments || '';
                     document.getElementById('photoConsent').checked = data.photo_consent;
                     updateEventPrice();
                     updateSubmitState();
@@ -374,6 +408,7 @@
             document.getElementById('lookup-panel').classList.remove('hidden');
             document.getElementById('status-msg').style.display = 'none';
             document.getElementById('payment-panel').classList.add('hidden');
+            updateCulturalActivityFields();
             updateEventPrice();
             updateSubmitState();
         }
@@ -397,6 +432,8 @@
                 kidsBelow6Count: parseInt(document.getElementById('kidsBelow6Count').value),
                 volunteerInterest: document.getElementById('volunteerInterest').value === 'true',
                 culturalInterest: document.getElementById('culturalInterest').value === 'true',
+                culturalActivityType: document.getElementById('culturalInterest').value === 'true' ? document.getElementById('culturalActivityType').value : null,
+                comments: document.getElementById('comments').value.trim(),
                 photoConsent: document.getElementById('photoConsent').checked
             };
 

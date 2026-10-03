@@ -64,6 +64,8 @@ CREATE TABLE IF NOT EXISTS event_registrations (
     kids_below_6_count INTEGER NOT NULL DEFAULT 0 CHECK (kids_below_6_count >= 0),
     volunteer_interest BOOLEAN NOT NULL DEFAULT FALSE,
     cultural_interest BOOLEAN NOT NULL DEFAULT FALSE,
+    cultural_activity_type VARCHAR(30),
+    comments VARCHAR(1000),
     photo_consent BOOLEAN NOT NULL DEFAULT FALSE,
     payment_status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     total_amount INTEGER NOT NULL DEFAULT 0 CHECK (total_amount >= 0),
@@ -91,3 +93,5 @@ ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS swish_account_id INTEGE
 -- Event registration lifecycle (V7.4): cancelled bookings remain for audit but are excluded from live totals.
 ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS registration_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE';
 ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP NULL;
+ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS cultural_activity_type VARCHAR(30) NULL;
+ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS comments VARCHAR(1000) NULL;
