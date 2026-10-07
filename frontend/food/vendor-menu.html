@@ -33,7 +33,7 @@
             margin-bottom: 20px;
         }
 
-        input {
+        input, select {
             padding: 10px;
             margin-right: 10px;
             border: 1px solid #ddd;
@@ -60,6 +60,16 @@
             align-items: center;
             margin-bottom: 10px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .cat-tag {
+            background: #eef2ff;
+            color: #3730a3;
+            font-size: 0.75rem;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 999px;
+            margin-left: 5px;
         }
 
         .del-btn {
@@ -97,6 +107,10 @@
                 <input id="vname" placeholder="Item Name" style="flex:2;">
                 <input id="vprice" type="number" placeholder="Price" style="flex:1;">
                 <input id="vmax" type="number" placeholder="Max Qty (0=unlim)" style="flex:1;">
+                <select id="vcategory" style="flex:1;">
+                    <option value="FOOD">Food</option>
+                    <option value="SNACKS">Snacks</option>
+                </select>
                 <button onclick="addItem()">Add</button>
             </div>
         </div>
@@ -137,6 +151,7 @@
                         <div>
                             <strong>${Validation.escapeHtml(item.item_name)}</strong> (${item.price}kr)
                             <span style="color:#666; font-size:0.8rem; margin-left:5px;">Max: ${item.max_quantity || '∞'}</span>
+                            <span class="cat-tag">${item.category === 'SNACKS' ? 'Snacks' : 'Food'}</span>
                         </div>
                         <button class="del-btn" onclick="delItem(${item.id})">Delete</button>
                     `;
@@ -149,13 +164,14 @@
             const item_name = document.getElementById("vname").value;
             const price = document.getElementById("vprice").value;
             const max_quantity = document.getElementById("vmax").value || 0;
+            const category = document.getElementById("vcategory").value;
 
             if (!item_name || !price) return alert("Enter name and price");
 
             await authFetch(`${API}/vendor/menu`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ vendor_id: vendorId, item_name, price, max_quantity })
+                body: JSON.stringify({ vendor_id: vendorId, item_name, price, max_quantity, category })
             });
 
             document.getElementById("vname").value = "";

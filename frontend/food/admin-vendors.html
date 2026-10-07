@@ -69,7 +69,7 @@
       margin-bottom: 15px;
     }
 
-    input {
+    input, select {
       padding: 12px;
       border: 1.5px solid #ddd;
       border-radius: 8px;
@@ -125,7 +125,7 @@
 
     .menu-row {
       display: grid;
-      grid-template-columns: 2fr 1fr 1fr auto auto;
+      grid-template-columns: 2fr 1fr 1fr 1fr auto auto;
       gap: 8px;
       align-items: center;
       padding: 10px 0;
@@ -232,6 +232,10 @@
           <input id="name_${m.id}" value="${Validation.escapeHtml(m.item_name)}">
           <input id="price_${m.id}" value="${m.price}" type="number" placeholder="Price">
           <input id="max_${m.id}" value="${m.max_quantity}" type="number" placeholder="Max Qty">
+          <select id="cat_${m.id}">
+            <option value="FOOD" ${m.category !== 'SNACKS' ? 'selected' : ''}>Food</option>
+            <option value="SNACKS" ${m.category === 'SNACKS' ? 'selected' : ''}>Snacks</option>
+          </select>
           <button class="btn-update" onclick="updateMenu(${m.id})">Save</button>
           <button class="btn-delete" onclick="deleteMenu(${m.id})">✖</button>
         </div>
@@ -249,6 +253,10 @@
             <input id="item_${v.id}" placeholder="Item Name">
             <input id="price_${v.id}_new" placeholder="Price (kr)" type="number">
             <input id="max_${v.id}_new" placeholder="Max Qty" type="number">
+            <select id="cat_${v.id}_new">
+              <option value="FOOD">Food</option>
+              <option value="SNACKS">Snacks</option>
+            </select>
           </div>
           <button class="btn-add" style="padding: 8px;" onclick="addMenu(${v.id})">Add Item to Menu</button>
         </div>
@@ -311,13 +319,14 @@
       const item_name = document.getElementById(`item_${vendorId}`).value.trim();
       const price = Number(document.getElementById(`price_${vendorId}_new`).value);
       const max_quantity = Number(document.getElementById(`max_${vendorId}_new`).value);
+      const category = document.getElementById(`cat_${vendorId}_new`).value;
 
       if (!item_name || price <= 0) return alert("Invalid entry");
 
       authFetch(`${API}/admin/menu`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vendor_id: vendorId, item_name, price, max_quantity })
+        body: JSON.stringify({ vendor_id: vendorId, item_name, price, max_quantity, category })
       }).then(loadVendors);
     }
 
@@ -325,11 +334,12 @@
       const item_name = document.getElementById(`name_${id}`).value.trim();
       const price = Number(document.getElementById(`price_${id}`).value);
       const max_quantity = Number(document.getElementById(`max_${id}`).value);
+      const category = document.getElementById(`cat_${id}`).value;
 
       authFetch(`${API}/admin/menu/${id}`, {
         method: "PUT",
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ item_name, price, max_quantity })
+        body: JSON.stringify({ item_name, price, max_quantity, category })
       }).then(res => res.ok ? alert("Updated") : alert("Failed"));
     }
 

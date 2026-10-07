@@ -115,18 +115,23 @@ app.post("/admin/vendor-full", requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
+const MENU_CATEGORIES = ['FOOD', 'SNACKS'];
+function normalizeMenuCategory(category) {
+  return MENU_CATEGORIES.includes(category) ? category : 'FOOD';
+}
+
 app.post("/admin/menu", requireAdmin, async (req, res) => {
-  const { vendor_id, item_name, price, max_quantity } = req.body;
+  const { vendor_id, item_name, price, max_quantity, category } = req.body;
   try {
-    await pool.query("INSERT INTO menu_items(vendor_id,item_name,price,max_quantity) VALUES($1,$2,$3,$4)",
-      [vendor_id, item_name, price, max_quantity]);
+    await pool.query("INSERT INTO menu_items(vendor_id,item_name,price,max_quantity,category) VALUES($1,$2,$3,$4,$5)",
+      [vendor_id, item_name, price, max_quantity, normalizeMenuCategory(category)]);
     res.send("Menu item added");
   } catch (err) { res.status(500).send(err.message); }
 });
 
 app.put("/admin/menu/:id", requireAdmin, async (req,res) => {
-  const { item_name, price, max_quantity } = req.body;
-  const q=await pool.query("UPDATE menu_items SET item_name=$1,price=$2,max_quantity=$3 WHERE id=$4 RETURNING id",[item_name,price,max_quantity,req.params.id]);
+  const { item_name, price, max_quantity, category } = req.body;
+  const q=await pool.query("UPDATE menu_items SET item_name=$1,price=$2,max_quantity=$3,category=COALESCE($5,category) WHERE id=$4 RETURNING id",[item_name,price,max_quantity,req.params.id,category === undefined ? null : normalizeMenuCategory(category)]);
   if(!q.rows.length) return res.status(404).json({error:"Menu item not found"});
   res.json({success:true});
 });
@@ -152,6 +157,7 @@ app.get("/vendors", async (req, res) => {
             'item_name', m.item_name, 
             'price', m.price, 
             'max_quantity', m.max_quantity,
+            'category', m.category,
             'sold_quantity', COALESCE(sold.qty, 0)
           ) ORDER BY m.id
         ) FILTER (WHERE m.id IS NOT NULL AND m.is_active = TRUE), 
@@ -177,11 +183,11 @@ app.delete("/admin/menu/:id", requireAdmin, async (req, res) => {
 });
 
 app.post("/vendor/menu", requireVendor, async (req, res) => {
-  const { item_name, price, max_quantity } = req.body;
+  const { item_name, price, max_quantity, category } = req.body;
   const vendorId = vendorScope(req, req.body.vendor_id);
   if (!vendorId) return res.status(403).json({ error: "Vendor account is not linked" });
   try {
-    await pool.query("INSERT INTO menu_items(vendor_id,item_name,price,max_quantity) VALUES($1,$2,$3,$4)", [vendorId, item_name, price, max_quantity]);
+    await pool.query("INSERT INTO menu_items(vendor_id,item_name,price,max_quantity,category) VALUES($1,$2,$3,$4,$5)", [vendorId, item_name, price, max_quantity, normalizeMenuCategory(category)]);
     res.json({ success: true });
   } catch (err) { res.status(500).send(err.message); }
 });
@@ -348,6 +354,7 @@ async function ensureEventRegistrationLifecycle() {
   await pool.query(`ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS cultural_activity_type VARCHAR(30) NULL`);
   await pool.query(`ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS comments VARCHAR(1000) NULL`);
   await pool.query(`UPDATE event_registrations SET registration_status='ACTIVE' WHERE registration_status IS NULL`);
+  await pool.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS category VARCHAR(20) NOT NULL DEFAULT 'FOOD'`);
 }
 
 
