@@ -398,7 +398,20 @@
     let activeCategory = 'FOOD';
     const categoryOf = m => m.category === 'SNACKS' ? 'SNACKS' : 'FOOD';
 
-    // LOAD VENDORS
+    // LOAD VENDORS (unless an admin has closed food ordering)
+    fetch(`${API}/settings`, { cache: 'no-store' })
+      .then(res => res.ok ? res.json() : null)
+      .catch(() => null)
+      .then(settings => {
+        if (settings && settings.food_ordering_enabled === false) {
+          document.getElementById("vendors").innerHTML = `<div style="background:#fff3cd; border:1px solid #ffeeba; color:#856404; padding:20px; border-radius:15px; margin-top:10px; text-align:center;"><strong>Food ordering is closed.</strong><p style="margin-bottom:0">New orders are not being taken right now. You can still pay pending orders and view your receipts.</p></div>`;
+          document.getElementById("checkoutBtn").style.display = "none";
+          return;
+        }
+        loadVendors();
+      });
+
+    function loadVendors() {
     fetch(`${API}/vendors`)
       .then(res => {
         if (!res.ok) throw new Error();
@@ -417,6 +430,7 @@
         document.getElementById("vendors").innerHTML = "";
         document.getElementById("sleep-message").style.display = "block";
       });
+    }
 
     function selectCategory(category) {
       activeCategory = category;

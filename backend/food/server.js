@@ -45,6 +45,59 @@ function vendorScope(req, requestedVendorId) {
 
 app.get("/health", (req, res) => res.json({ status: "ok", service: "food-backend" }));
 
+/* ================= SITE SETTINGS (admin on/off switches) ================= */
+
+const SETTING_DEFAULTS = {
+  event_registration_enabled: true,
+  food_ordering_enabled: true,
+  vendor_menu_edit_enabled: true
+};
+
+async function ensureSiteSettings() {
+  await pool.query(`CREATE TABLE IF NOT EXISTS site_settings (key VARCHAR(100) PRIMARY KEY, value BOOLEAN NOT NULL)`);
+  for (const [key, value] of Object.entries(SETTING_DEFAULTS)) {
+    await pool.query(`INSERT INTO site_settings(key,value) VALUES($1,$2) ON CONFLICT (key) DO NOTHING`, [key, value]);
+  }
+}
+
+async function getSettings() {
+  const result = await pool.query(`SELECT key, value FROM site_settings`);
+  const settings = { ...SETTING_DEFAULTS };
+  result.rows.forEach(r => { if (r.key in settings) settings[r.key] = r.value; });
+  return settings;
+}
+
+function requireSetting(key, message) {
+  return async (req, res, next) => {
+    try {
+      if ((await getSettings())[key]) return next();
+      res.status(423).json({ error: message }); // not 403: staff pages log out on 403
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  };
+}
+
+const requireEventRegistrationOpen = requireSetting("event_registration_enabled", "Event registration is currently closed.");
+const requireFoodOrderingOpen = requireSetting("food_ordering_enabled", "Food ordering is currently closed.");
+async function requireVendorMenuEditing(req, res, next) {
+  if (req.user.role === "admin") return next();
+  return requireSetting("vendor_menu_edit_enabled", "Menu changes by vendors are currently turned off. Please contact the admin.")(req, res, next);
+}
+
+app.get("/settings", async (req, res) => {
+  try { res.json(await getSettings()); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put("/admin/settings", requireAdmin, async (req, res) => {
+  try {
+    for (const key of Object.keys(SETTING_DEFAULTS)) {
+      if (typeof req.body[key] === "boolean") {
+        await pool.query(`INSERT INTO site_settings(key,value) VALUES($1,$2) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value`, [key, req.body[key]]);
+      }
+    }
+    res.json(await getSettings());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 /* ================= AUTHENTICATION ROUTES ================= */
 
 app.post("/login", async (req, res) => {
@@ -182,7 +235,7 @@ app.delete("/admin/menu/:id", requireAdmin, async (req, res) => {
   res.send("Deleted (Soft)");
 });
 
-app.post("/vendor/menu", requireVendor, async (req, res) => {
+app.post("/vendor/menu", requireVendor, requireVendorMenuEditing, async (req, res) => {
   const { item_name, price, max_quantity, category } = req.body;
   const vendorId = vendorScope(req, req.body.vendor_id);
   if (!vendorId) return res.status(403).json({ error: "Vendor account is not linked" });
@@ -192,7 +245,7 @@ app.post("/vendor/menu", requireVendor, async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-app.delete("/vendor/menu/:id", requireVendor, async (req, res) => {
+app.delete("/vendor/menu/:id", requireVendor, requireVendorMenuEditing, async (req, res) => {
   const vendorId = vendorScope(req, req.query.vendor_id);
   const result = await pool.query("UPDATE menu_items SET is_active=FALSE WHERE id=$1 AND vendor_id=$2 RETURNING id", [req.params.id, vendorId]);
   if (!result.rows.length) return res.status(404).json({ error: "Menu item not found" });
@@ -203,7 +256,7 @@ app.delete("/vendor/menu/:id", requireVendor, async (req, res) => {
 
 /* ================= CUSTOMER & ORDER ROUTES ================= */
 
-app.post("/order", async (req, res) => {
+app.post("/order", requireFoodOrderingOpen, async (req, res) => {
   const { name, phone, cart } = req.body;
   let customer = await pool.query("SELECT id FROM customers WHERE phone=$1", [phone]);
   if (customer.rows.length === 0) {
@@ -410,7 +463,7 @@ app.get("/event/payment-availability", async (req, res) => {
   }
 });
 
-app.post("/event/register", async (req, res) => {
+app.post("/event/register", requireEventRegistrationOpen, async (req, res) => {
   const { firstName, lastName, email, phone, whatsapp, adultsCount, kids6to12Count,
     kidsBelow6Count, volunteerInterest, culturalInterest, culturalActivityType, comments, photoConsent } = req.body;
   const normalizedPhone = normalizeInternationalPhone(phone);
@@ -495,7 +548,7 @@ app.get("/event/registration/:phone", async (req, res) => {
   } finally { client.release(); }
 });
 
-app.put("/event/registration/:id", async (req, res) => {
+app.put("/event/registration/:id", requireEventRegistrationOpen, async (req, res) => {
   const { firstName, lastName, email, phone, whatsapp, adultsCount, kids6to12Count, kidsBelow6Count, volunteerInterest, culturalInterest, culturalActivityType, comments, photoConsent } = req.body;
   const normalizedPhone = normalizeInternationalPhone(phone);
   const normalizedWhatsapp = normalizeInternationalPhone(whatsapp);
@@ -699,5 +752,6 @@ app.put("/admin/order/:id/payment", requireAdmin, async (req, res) => {
 
 initializeDatabase()
   .then(() => ensureEventRegistrationLifecycle())
+  .then(() => ensureSiteSettings())
   .then(() => app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`)))
   .catch(err => { console.error('Failed to initialize event registration lifecycle:', err); process.exit(1); });

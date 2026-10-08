@@ -101,7 +101,11 @@
 
         <h1>Manage Menu</h1>
 
-        <div class="add-box">
+        <div id="menu-locked" class="add-box" style="display:none; background:#fff3cd; color:#856404; border:1px solid #ffeeba;">
+            <strong>Menu changes are turned off.</strong> Please contact the admin to add or remove items.
+        </div>
+
+        <div class="add-box" id="add-box">
             <h3>Add New Item</h3>
             <div style="display:flex; flex-wrap:wrap;">
                 <input id="vname" placeholder="Item Name" style="flex:2;">
@@ -133,8 +137,15 @@
 
         document.getElementById("back-link").href = `vendor.html?vendor_id=${vendorId}`;
 
+        let menuEditable = true;
+
         async function loadMenu() {
             try {
+                const settings = await fetch(`${API}/settings`, { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
+                menuEditable = !settings || settings.vendor_menu_edit_enabled !== false || sessionStorage.getItem("user_role") === "admin";
+                document.getElementById("add-box").style.display = menuEditable ? "" : "none";
+                document.getElementById("menu-locked").style.display = menuEditable ? "none" : "";
+
                 const res = await authFetch(`${API}/vendors`);
                 const vendors = await res.json();
                 const myVendor = vendors.find(v => v.id == vendorId);
@@ -153,7 +164,7 @@
                             <span style="color:#666; font-size:0.8rem; margin-left:5px;">Max: ${item.max_quantity || '∞'}</span>
                             <span class="cat-tag">${item.category === 'SNACKS' ? 'Snacks' : 'Food'}</span>
                         </div>
-                        <button class="del-btn" onclick="delItem(${item.id})">Delete</button>
+                        ${menuEditable ? `<button class="del-btn" onclick="delItem(${item.id})">Delete</button>` : ''}
                     `;
                     list.appendChild(div);
                 });
@@ -168,11 +179,16 @@
 
             if (!item_name || !price) return alert("Enter name and price");
 
-            await authFetch(`${API}/vendor/menu`, {
+            const res = await authFetch(`${API}/vendor/menu`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ vendor_id: vendorId, item_name, price, max_quantity, category })
             });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                alert(data.error || "Could not add item");
+                return loadMenu();
+            }
 
             document.getElementById("vname").value = "";
             document.getElementById("vprice").value = "";
@@ -182,7 +198,11 @@
 
         async function delItem(id) {
             if (confirm("Remove item?")) {
-                await authFetch(`${API}/vendor/menu/${id}`, { method: 'DELETE' });
+                const res = await authFetch(`${API}/vendor/menu/${id}`, { method: 'DELETE' });
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    alert(data.error || "Could not remove item");
+                }
                 loadMenu();
             }
         }

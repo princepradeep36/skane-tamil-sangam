@@ -25,11 +25,12 @@
 <main>
   <section class="hero"><div class="icon">🍛</div><h1>Click2Eat</h1><p>Food pre-ordering for Skåne Tamil Sangam events.<br>Choose what you want to do below.</p></section>
   <section class="grid">
-    <a href="menu.html" class="card order"><div class="emoji">🍽️</div><h2>Create New Order</h2><p>Browse available vendors and menu items and place a food pre-order.</p></a>
+    <a href="menu.html" class="card order" id="order-card"><div class="emoji">🍽️</div><h2>Create New Order</h2><p>Browse available vendors and menu items and place a food pre-order.</p></a>
     <a href="payment.html" class="card pay"><div class="emoji">💳</div><h2>Pending Payments</h2><p>Find your food orders and complete any pending payment.</p></a>
     <a href="receipts.html" class="card receipts"><div class="emoji">🧾</div><h2>My Receipts</h2><p>Find previously paid orders and view your receipts.</p></a>
   </section>
   <section class="staff"><div><strong>Vendor or administrator?</strong><p>Sign in to manage vendors, orders, event registrations and reporting.</p></div><a class="login" href="login.html">Staff Login →</a></section>
+  <script>fetch('/food-api/settings',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(s=>{if(!s||s.food_ordering_enabled!==false)return;const c=document.getElementById('order-card');c.removeAttribute('href');c.style.opacity='.6';c.style.pointerEvents='none';c.querySelector('h2').textContent='Ordering Closed';c.querySelector('p').textContent='New food orders are not being taken right now. You can still pay pending orders and view receipts.'}).catch(()=>{});</script>
   <div class="footer">Click2Eat · Skåne Tamil Sangam</div>
 </main>
 </body>

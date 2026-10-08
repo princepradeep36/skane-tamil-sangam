@@ -52,6 +52,10 @@
                     class="event-banner">
             </div>
 
+            <div id="registration-closed" class="alert alert-info hidden" style="text-align:center;font-size:1.1rem;">
+                <strong>Registration is closed.</strong><br>Please contact Skåne Tamil Sangam if you have questions about your registration.
+            </div>
+
             <!-- Lookup Section -->
             <div class="card glass" id="lookup-panel"
                 style="margin-bottom: 3rem; padding: 2rem; border-color: var(--primary-light);">
@@ -231,6 +235,16 @@
         }
 
         updatePaymentAvailabilityNotice();
+
+        fetch(`${API_BASE_URL}/settings`, { cache: 'no-store' })
+            .then(response => response.ok ? response.json() : null)
+            .then(settings => {
+                if (!settings || settings.event_registration_enabled !== false) return;
+                document.getElementById('registration-closed').classList.remove('hidden');
+                document.getElementById('lookup-panel').classList.add('hidden');
+                registrationForm.classList.add('hidden');
+            })
+            .catch(() => {});
 
         // International phone format: keep one leading + and digits only (E.164 max 15 digits).
         phoneFields.forEach(id => {
