@@ -172,19 +172,30 @@ const MENU_CATEGORIES = ['FOOD', 'SNACKS'];
 function normalizeMenuCategory(category) {
   return MENU_CATEGORIES.includes(category) ? category : 'FOOD';
 }
+// Optional free text shown under a menu item (description, ingredients).
+function normalizeMenuText(value) {
+  if (typeof value !== 'string') return null;
+  const text = value.trim().slice(0, 500);
+  return text || null;
+}
 
 app.post("/admin/menu", requireAdmin, async (req, res) => {
-  const { vendor_id, item_name, price, max_quantity, category } = req.body;
+  const { vendor_id, item_name, price, max_quantity, category, description, ingredients } = req.body;
   try {
-    await pool.query("INSERT INTO menu_items(vendor_id,item_name,price,max_quantity,category) VALUES($1,$2,$3,$4,$5)",
-      [vendor_id, item_name, price, max_quantity, normalizeMenuCategory(category)]);
+    await pool.query("INSERT INTO menu_items(vendor_id,item_name,price,max_quantity,category,description,ingredients) VALUES($1,$2,$3,$4,$5,$6,$7)",
+      [vendor_id, item_name, price, max_quantity, normalizeMenuCategory(category), normalizeMenuText(description), normalizeMenuText(ingredients)]);
     res.send("Menu item added");
   } catch (err) { res.status(500).send(err.message); }
 });
 
 app.put("/admin/menu/:id", requireAdmin, async (req,res) => {
-  const { item_name, price, max_quantity, category } = req.body;
-  const q=await pool.query("UPDATE menu_items SET item_name=$1,price=$2,max_quantity=$3,category=COALESCE($5,category) WHERE id=$4 RETURNING id",[item_name,price,max_quantity,req.params.id,category === undefined ? null : normalizeMenuCategory(category)]);
+  const { item_name, price, max_quantity, category, description, ingredients } = req.body;
+  // description/ingredients are only changed when sent, so older clients don't wipe them.
+  const q=await pool.query(`UPDATE menu_items SET item_name=$1,price=$2,max_quantity=$3,category=COALESCE($5,category),
+      description=CASE WHEN $6 THEN $7 ELSE description END, ingredients=CASE WHEN $8 THEN $9 ELSE ingredients END
+      WHERE id=$4 RETURNING id`,
+    [item_name,price,max_quantity,req.params.id,category === undefined ? null : normalizeMenuCategory(category),
+     description !== undefined, normalizeMenuText(description), ingredients !== undefined, normalizeMenuText(ingredients)]);
   if(!q.rows.length) return res.status(404).json({error:"Menu item not found"});
   res.json({success:true});
 });
@@ -211,6 +222,8 @@ app.get("/vendors", async (req, res) => {
             'price', m.price, 
             'max_quantity', m.max_quantity,
             'category', m.category,
+            'description', m.description,
+            'ingredients', m.ingredients,
             'sold_quantity', COALESCE(sold.qty, 0)
           ) ORDER BY m.id
         ) FILTER (WHERE m.id IS NOT NULL AND m.is_active = TRUE), 
@@ -236,11 +249,11 @@ app.delete("/admin/menu/:id", requireAdmin, async (req, res) => {
 });
 
 app.post("/vendor/menu", requireVendor, requireVendorMenuEditing, async (req, res) => {
-  const { item_name, price, max_quantity, category } = req.body;
+  const { item_name, price, max_quantity, category, description, ingredients } = req.body;
   const vendorId = vendorScope(req, req.body.vendor_id);
   if (!vendorId) return res.status(403).json({ error: "Vendor account is not linked" });
   try {
-    await pool.query("INSERT INTO menu_items(vendor_id,item_name,price,max_quantity,category) VALUES($1,$2,$3,$4,$5)", [vendorId, item_name, price, max_quantity, normalizeMenuCategory(category)]);
+    await pool.query("INSERT INTO menu_items(vendor_id,item_name,price,max_quantity,category,description,ingredients) VALUES($1,$2,$3,$4,$5,$6,$7)", [vendorId, item_name, price, max_quantity, normalizeMenuCategory(category), normalizeMenuText(description), normalizeMenuText(ingredients)]);
     res.json({ success: true });
   } catch (err) { res.status(500).send(err.message); }
 });
@@ -408,6 +421,8 @@ async function ensureEventRegistrationLifecycle() {
   await pool.query(`ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS comments VARCHAR(1000) NULL`);
   await pool.query(`UPDATE event_registrations SET registration_status='ACTIVE' WHERE registration_status IS NULL`);
   await pool.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS category VARCHAR(20) NOT NULL DEFAULT 'FOOD'`);
+  await pool.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS description VARCHAR(500) NULL`);
+  await pool.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS ingredients VARCHAR(500) NULL`);
 }
 
 

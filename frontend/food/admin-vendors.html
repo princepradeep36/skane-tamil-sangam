@@ -123,6 +123,10 @@
       padding-top: 15px;
     }
 
+    .menu-text {
+      grid-column: 1 / -1;
+    }
+
     .menu-row {
       display: grid;
       grid-template-columns: 2fr 1fr 1fr 1fr auto auto;
@@ -238,6 +242,8 @@
           </select>
           <button class="btn-update" onclick="updateMenu(${m.id})">Save</button>
           <button class="btn-delete" onclick="deleteMenu(${m.id})">✖</button>
+          <input class="menu-text" id="desc_${m.id}" value="${Validation.escapeHtml(m.description || '')}" placeholder="Description (optional)" maxlength="500">
+          <input class="menu-text" id="ingr_${m.id}" value="${Validation.escapeHtml(m.ingredients || '')}" placeholder="Ingredients (optional)" maxlength="500">
         </div>
       `).join('');
 
@@ -257,6 +263,8 @@
               <option value="FOOD">Food</option>
               <option value="SNACKS">Snacks</option>
             </select>
+            <input class="menu-text" id="desc_${v.id}_new" placeholder="Description (optional)" maxlength="500">
+            <input class="menu-text" id="ingr_${v.id}_new" placeholder="Ingredients (optional)" maxlength="500">
           </div>
           <button class="btn-add" style="padding: 8px;" onclick="addMenu(${v.id})">Add Item to Menu</button>
         </div>
@@ -320,13 +328,15 @@
       const price = Number(document.getElementById(`price_${vendorId}_new`).value);
       const max_quantity = Number(document.getElementById(`max_${vendorId}_new`).value);
       const category = document.getElementById(`cat_${vendorId}_new`).value;
+      const description = document.getElementById(`desc_${vendorId}_new`).value;
+      const ingredients = document.getElementById(`ingr_${vendorId}_new`).value;
 
       if (!item_name || price <= 0) return alert("Invalid entry");
 
       authFetch(`${API}/admin/menu`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vendor_id: vendorId, item_name, price, max_quantity, category })
+        body: JSON.stringify({ vendor_id: vendorId, item_name, price, max_quantity, category, description, ingredients })
       }).then(loadVendors);
     }
 
@@ -335,11 +345,13 @@
       const price = Number(document.getElementById(`price_${id}`).value);
       const max_quantity = Number(document.getElementById(`max_${id}`).value);
       const category = document.getElementById(`cat_${id}`).value;
+      const description = document.getElementById(`desc_${id}`).value;
+      const ingredients = document.getElementById(`ingr_${id}`).value;
 
       authFetch(`${API}/admin/menu/${id}`, {
         method: "PUT",
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ item_name, price, max_quantity, category })
+        body: JSON.stringify({ item_name, price, max_quantity, category, description, ingredients })
       }).then(res => res.ok ? alert("Updated") : alert("Failed"));
     }
 

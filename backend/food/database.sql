@@ -14,7 +14,9 @@ CREATE TABLE menu_items (
     price DECIMAL(10, 2) NOT NULL,
     max_quantity INTEGER DEFAULT 0,
     is_active BOOLEAN DEFAULT TRUE,
-    category VARCHAR(20) NOT NULL DEFAULT 'FOOD'
+    category VARCHAR(20) NOT NULL DEFAULT 'FOOD',
+    description VARCHAR(500),
+    ingredients VARCHAR(500)
 );
 
 -- 3. Users Table (Authentication)

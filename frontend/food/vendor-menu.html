@@ -72,6 +72,12 @@
             margin-left: 5px;
         }
 
+        .item-note {
+            color: #666;
+            font-size: 0.85rem;
+            margin-top: 4px;
+        }
+
         .del-btn {
             background: #dc3545;
             font-size: 0.8rem;
@@ -115,6 +121,8 @@
                     <option value="FOOD">Food</option>
                     <option value="SNACKS">Snacks</option>
                 </select>
+                <input id="vdesc" placeholder="Description (optional), e.g. Crispy dosa with potato masala" maxlength="500" style="flex-basis:100%;">
+                <input id="vingredients" placeholder="Ingredients (optional), e.g. Rice, urad dal, potato, onion" maxlength="500" style="flex-basis:100%;">
                 <button onclick="addItem()">Add</button>
             </div>
         </div>
@@ -163,6 +171,8 @@
                             <strong>${Validation.escapeHtml(item.item_name)}</strong> (${item.price}kr)
                             <span style="color:#666; font-size:0.8rem; margin-left:5px;">Max: ${item.max_quantity || '∞'}</span>
                             <span class="cat-tag">${item.category === 'SNACKS' ? 'Snacks' : 'Food'}</span>
+                            ${item.description ? `<div class="item-note">${Validation.escapeHtml(item.description)}</div>` : ''}
+                            ${item.ingredients ? `<div class="item-note"><b>Ingredients:</b> ${Validation.escapeHtml(item.ingredients)}</div>` : ''}
                         </div>
                         ${menuEditable ? `<button class="del-btn" onclick="delItem(${item.id})">Delete</button>` : ''}
                     `;
@@ -176,13 +186,15 @@
             const price = document.getElementById("vprice").value;
             const max_quantity = document.getElementById("vmax").value || 0;
             const category = document.getElementById("vcategory").value;
+            const description = document.getElementById("vdesc").value;
+            const ingredients = document.getElementById("vingredients").value;
 
             if (!item_name || !price) return alert("Enter name and price");
 
             const res = await authFetch(`${API}/vendor/menu`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ vendor_id: vendorId, item_name, price, max_quantity, category })
+                body: JSON.stringify({ vendor_id: vendorId, item_name, price, max_quantity, category, description, ingredients })
             });
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
@@ -193,6 +205,8 @@
             document.getElementById("vname").value = "";
             document.getElementById("vprice").value = "";
             document.getElementById("vmax").value = "";
+            document.getElementById("vdesc").value = "";
+            document.getElementById("vingredients").value = "";
             loadMenu();
         }
 

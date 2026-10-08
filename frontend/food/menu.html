@@ -94,6 +94,19 @@
       border-bottom: 1px solid #f9f9f9;
     }
 
+    .item-detail {
+      flex: 1;
+      min-width: 0;
+      padding-right: 10px;
+    }
+
+    .item-note {
+      margin: 3px 0 4px;
+      color: #6c757d;
+      font-size: 0.82rem;
+      line-height: 1.35;
+    }
+
     .item-detail h4 {
       margin: 0;
       font-size: 1rem;
@@ -462,6 +475,8 @@
           <div class="menu-item" style="${isSoldOut ? 'opacity: 0.6;' : ''}">
             <div class="item-detail">
               <h4>${m.item_name}</h4>
+              ${m.description ? `<p class="item-note">${Validation.escapeHtml(m.description)}</p>` : ''}
+              ${m.ingredients ? `<p class="item-note"><b>Ingredients:</b> ${Validation.escapeHtml(m.ingredients)}</p>` : ''}
               <span>${m.price}kr</span>
               ${max > 0 ? `<div style="font-size:0.75rem; color:${isSoldOut ? 'red' : '#666'}">${isSoldOut ? 'Sold Out' : `${available} left`}</div>` : ''}
             </div>
