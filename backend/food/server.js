@@ -168,6 +168,35 @@ app.post("/admin/vendor-full", requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
+// Passwords are stored hashed, so admins see usernames and can issue a fresh password to re-share.
+app.get("/admin/vendor-logins", requireAdmin, async (req, res) => {
+  try {
+    const q = await pool.query("SELECT vendor_id, username FROM users WHERE role='vendor' AND vendor_id IS NOT NULL ORDER BY id");
+    res.json(q.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/admin/vendor/:id/reset-password", requireAdmin, async (req, res) => {
+  try {
+    const vendorRes = await pool.query("SELECT id, name FROM vendors WHERE id=$1", [req.params.id]);
+    if (!vendorRes.rows.length) return res.status(404).json({ error: "Vendor not found" });
+    const password = crypto.randomBytes(9).toString('base64url');
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const updated = await pool.query(
+      "UPDATE users SET password=$1 WHERE id=(SELECT id FROM users WHERE role='vendor' AND vendor_id=$2 ORDER BY id LIMIT 1) RETURNING username",
+      [hashedPassword, req.params.id]
+    );
+    let username = updated.rows[0]?.username;
+    if (!username) {
+      // Vendor was created without a login: create one now.
+      const cleanName = vendorRes.rows[0].name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      username = `${cleanName}${crypto.randomInt(100, 1000)}`;
+      await pool.query("INSERT INTO users(username, password, role, vendor_id) VALUES($1, $2, 'vendor', $3)", [username, hashedPassword, req.params.id]);
+    }
+    res.json({ success: true, username, password });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 const MENU_CATEGORIES = ['FOOD', 'SNACKS'];
 function normalizeMenuCategory(category) {
   return MENU_CATEGORIES.includes(category) ? category : 'FOOD';

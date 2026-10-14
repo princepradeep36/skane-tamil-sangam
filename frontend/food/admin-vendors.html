@@ -158,6 +158,35 @@
       }
     }
 
+    .login-box {
+      background: #f1f7ff;
+      border: 1px solid #d6e6ff;
+      border-radius: 8px;
+      padding: 10px 15px;
+      margin-bottom: 15px;
+      font-size: 0.9rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .btn-small {
+      background: var(--primary);
+      color: white;
+      font-size: 0.8rem;
+      padding: 6px 12px;
+    }
+
+    .new-creds {
+      flex-basis: 100%;
+      background: #e8f5e9;
+      border: 1px solid #c8e6c9;
+      border-radius: 6px;
+      padding: 10px;
+    }
+
     .logout-btn {
       position: absolute;
       top: 20px;
@@ -210,6 +239,7 @@
         <p><strong>Username:</strong> <span id="res-user"></span></p>
         <p><strong>Password:</strong> <span id="res-pass"></span></p>
         <p style="font-size:0.8rem; color:#666;">Please copy these credentials and share them with the vendor.</p>
+        <button class="btn-small" onclick="copyCreds(document.getElementById('res-user').innerText, document.getElementById('res-pass').innerText)">Copy login details</button>
       </div>
     </div>
 
@@ -223,8 +253,11 @@
 
     async function loadVendors() {
       try {
-        const res = await authFetch(`${API}/vendors`);
+        const [res, loginRes] = await Promise.all([authFetch(`${API}/vendors`), authFetch(`${API}/admin/vendor-logins`)]);
         const data = await res.json();
+        const logins = loginRes.ok ? await loginRes.json() : [];
+        const loginByVendor = {};
+        logins.forEach(l => { if (!loginByVendor[l.vendor_id]) loginByVendor[l.vendor_id] = l.username; });
 
         vendorsDiv.innerHTML = "";
         data.forEach(v => {
@@ -247,10 +280,17 @@
         </div>
       `).join('');
 
+          const login = loginByVendor[v.id];
           card.innerHTML = `
         <div class="card-title">
           <span>${v.name} <small style="font-weight:normal; color:#888; font-size:0.8rem;">(${v.swish})</small></span>
           <button class="btn-delete-vendor" onclick="deleteVendor(${v.id})">Delete Stall</button>
+        </div>
+
+        <div class="login-box">
+          <span><strong>Login username:</strong> ${login ? Validation.escapeHtml(login) : '<em style="color:#999;">No login yet</em>'}</span>
+          <button class="btn-small" onclick="resetVendorPassword(${v.id})">${login ? 'Reset & show new password' : 'Create login'}</button>
+          <div class="new-creds" id="creds_${v.id}" style="display:none;"></div>
         </div>
 
         <div style="background: #fcfcfc; padding: 15px; border-radius: 8px; border: 1px dashed #ddd;">
@@ -315,6 +355,32 @@
           alert("Error: " + JSON.stringify(data));
         }
       } catch (e) { alert("Failed to connect"); }
+    }
+
+    // Old passwords can't be shown (they are stored hashed), so a new one is issued to share.
+    async function resetVendorPassword(vendorId) {
+      if (!confirm("Create a new password for this vendor? Their old password will stop working.")) return;
+      try {
+        const res = await authFetch(`${API}/admin/vendor/${vendorId}/reset-password`, { method: "POST" });
+        const data = await res.json();
+        if (!data.success) return alert("Error: " + (data.error || "Could not reset password"));
+        await loadVendors();
+        const box = document.getElementById(`creds_${vendorId}`);
+        box.style.display = "block";
+        box.innerHTML = `
+          <div><strong>Username:</strong> <span id="cu_${vendorId}"></span></div>
+          <div><strong>New password:</strong> <span id="cp_${vendorId}"></span></div>
+          <div style="font-size:0.8rem; color:#666; margin:6px 0;">Shown only now. Share it with the vendor.</div>
+          <button class="btn-small" onclick="copyCreds(document.getElementById('cu_${vendorId}').innerText, document.getElementById('cp_${vendorId}').innerText)">Copy login details</button>`;
+        document.getElementById(`cu_${vendorId}`).innerText = data.username;
+        document.getElementById(`cp_${vendorId}`).innerText = data.password;
+      } catch (e) { alert("Failed to connect"); }
+    }
+
+    function copyCreds(username, password) {
+      const text = `Click2Eat vendor login\nLink: ${location.origin}/food/login.html\nUsername: ${username}\nPassword: ${password}`;
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => alert("Copied"), () => prompt("Copy these details:", text));
+      else prompt("Copy these details:", text);
     }
 
     function deleteVendor(id) {
