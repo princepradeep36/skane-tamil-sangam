@@ -170,7 +170,7 @@ table {
        ----------------------------------------------------- */
 
     label:not(.switch):has(input[type="checkbox"]),
-    label:has(input[type="radio"]) {
+    label:not(.switch):has(input[type="radio"]) {
         display: flex !important;
         align-items: flex-start !important;
 
@@ -190,7 +190,7 @@ table {
     /* Allow text inside checkbox labels to wrap */
 
     label:not(.switch):has(input[type="checkbox"]) span,
-    label:has(input[type="radio"]) span {
+    label:not(.switch):has(input[type="radio"]) span {
         flex: 1 1 auto !important;
         min-width: 0 !important;
 
@@ -327,8 +327,8 @@ table {
         flex-basis: 21px !important;
     }
 
-    label:has(input[type="checkbox"]),
-    label:has(input[type="radio"]) {
+    label:not(.switch):has(input[type="checkbox"]),
+    label:not(.switch):has(input[type="radio"]) {
         gap: 10px !important;
         font-size: 15px !important;
         line-height: 1.45 !important;
