@@ -452,6 +452,12 @@ async function ensureEventRegistrationLifecycle() {
   await pool.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS category VARCHAR(20) NOT NULL DEFAULT 'FOOD'`);
   await pool.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS description VARCHAR(500) NULL`);
   await pool.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS ingredients VARCHAR(500) NULL`);
+  // One payment screenshot per registration; a new upload replaces the old one.
+  await pool.query(`CREATE TABLE IF NOT EXISTS event_payment_proofs (
+    registration_id INTEGER PRIMARY KEY REFERENCES event_registrations(id) ON DELETE CASCADE,
+    content_type VARCHAR(50) NOT NULL,
+    image BYTEA NOT NULL,
+    uploaded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)`);
 }
 
 
@@ -617,20 +623,45 @@ app.put("/event/registration/:id", requireEventRegistrationOpen, async (req, res
 
 // Customer payment confirmation, matching the existing Click2Eat food-payment flow.
 // This records the customer's confirmation; it is not a bank-side Swish verification.
-app.put("/event/registration/:id/pay", async (req, res) => {
+// The request body is the Swish payment screenshot (raw image bytes), which admins can view.
+function imageContentType(buf) {
+  if (buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
+  if (buf.length > 8 && buf.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (buf.length > 12 && buf.slice(0, 4).toString() === 'RIFF' && buf.slice(8, 12).toString() === 'WEBP') return 'image/webp';
+  return null;
+}
+app.put("/event/registration/:id/pay", express.raw({ type: 'image/*', limit: '5mb' }), async (req, res) => {
+  const image = Buffer.isBuffer(req.body) ? req.body : null;
+  const contentType = image && imageContentType(image);
+  if (!contentType) return res.status(400).json({ error: "Please upload a screenshot of your Swish payment (JPG, PNG or WebP) before marking as paid." });
+  const client = await pool.connect();
   try {
-    const result = await pool.query(
+    await client.query('BEGIN');
+    const result = await client.query(
       `UPDATE event_registrations
        SET payment_status='PAID', updated_at=CURRENT_TIMESTAMP
        WHERE id=$1 AND registration_status <> 'CANCELLED' RETURNING id`,
       [req.params.id]
     );
-    if (!result.rows.length) return res.status(404).json({ error: "Registration not found" });
-    const saved = await registrationWithSwish(pool, result.rows[0].id);
+    if (!result.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: "Registration not found" }); }
+    await client.query(`INSERT INTO event_payment_proofs(registration_id,content_type,image) VALUES($1,$2,$3)
+      ON CONFLICT (registration_id) DO UPDATE SET content_type=EXCLUDED.content_type, image=EXCLUDED.image, uploaded_at=CURRENT_TIMESTAMP`,
+      [result.rows[0].id, contentType, image]);
+    const saved = await registrationWithSwish(client, result.rows[0].id);
+    await client.query('COMMIT');
     res.json({ success: true, registration: saved });
   } catch (err) {
+    await client.query('ROLLBACK');
     res.status(500).json({ error: err.message });
-  }
+  } finally { client.release(); }
+});
+
+app.get("/admin/event-registration/:id/payment-proof", requireAdmin, async (req, res) => {
+  try {
+    const q = await pool.query("SELECT content_type,image FROM event_payment_proofs WHERE registration_id=$1", [req.params.id]);
+    if (!q.rows.length) return res.status(404).json({ error: "No payment screenshot uploaded" });
+    res.set('Content-Type', q.rows[0].content_type).set('Cache-Control', 'no-store').send(q.rows[0].image);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete("/admin/event-registration/:id", requireAdmin, async (req, res) => {
@@ -649,8 +680,10 @@ app.delete("/admin/event-registration/:id", requireAdmin, async (req, res) => {
 
 app.get("/admin/event-registrations", requireAdmin, async (req, res) => {
   try {
-    const result = await pool.query(`SELECT r.*, a.swish_number, a.label AS swish_label, (r.adults_count+r.kids_6_12_count+r.kids_below_6_count) AS total_participants
-      FROM event_registrations r LEFT JOIN event_swish_accounts a ON a.id=r.swish_account_id ORDER BY r.created_at DESC`);
+    const result = await pool.query(`SELECT r.*, a.swish_number, a.label AS swish_label, (r.adults_count+r.kids_6_12_count+r.kids_below_6_count) AS total_participants,
+      p.uploaded_at AS payment_proof_uploaded_at
+      FROM event_registrations r LEFT JOIN event_swish_accounts a ON a.id=r.swish_account_id
+      LEFT JOIN event_payment_proofs p ON p.registration_id=r.id ORDER BY r.created_at DESC`);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

@@ -17,7 +17,7 @@
       .grid{display:grid;gap:20px}.grid-2{grid-template-columns:repeat(2,1fr)}.grid-3{grid-template-columns:repeat(3,1fr)}
       .form-group{margin-bottom:20px}.form-label{display:block;margin-bottom:8px;font-weight:700}.form-input,.form-select{width:100%;padding:13px;border:1px solid #d0d5dd;border-radius:10px;font-size:16px;background:#fffdfa}.form-input:focus,.form-select:focus{outline:3px solid rgba(245,158,11,.16);border-color:var(--festival)}
       .btn{border:0;border-radius:10px;padding:12px 18px;cursor:pointer;font-weight:700}.btn-primary{background:linear-gradient(135deg,var(--primary),#0b75d1);color:white;box-shadow:0 5px 12px rgba(7,91,184,.18)}.btn-outline{background:white;border:1px solid var(--primary)}.btn-ghost{background:transparent}.hidden{display:none!important}.text-center{text-align:center}.text-primary{color:var(--primary)}.text-muted{color:var(--muted)}
-      .field-hint{margin-top:6px;font-size:.85rem;color:var(--muted)}.field-hint.ok{color:#067647;font-weight:600}.field-hint.error{color:#b42318;font-weight:600}.form-input.input-error{border-color:#d92d20;background:#fff8f7}.same-as{display:flex;align-items:center;gap:6px;margin:-2px 0 8px;font-size:.9rem;font-weight:600;color:var(--muted);cursor:pointer}.same-as input{width:auto;margin:0}.alert{margin-top:16px;padding:14px;border-radius:10px}.alert-success{background:#ecfdf3;color:#067647}.alert-error{background:#fef3f2;color:#b42318}.alert-info{background:#eff8ff;color:#175cd3}.payment-panel{margin-top:16px;padding:18px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;text-align:center}
+      .field-hint{margin-top:6px;font-size:.85rem;color:var(--muted)}.field-hint.ok{color:#067647;font-weight:600}.field-hint.error{color:#b42318;font-weight:600}.form-input.input-error{border-color:#d92d20;background:#fff8f7}.same-as{display:flex;align-items:center;gap:6px;margin:-2px 0 8px;font-size:.9rem;font-weight:600;color:var(--muted);cursor:pointer}.same-as input{width:auto;margin:0}.alert{margin-top:16px;padding:14px;border-radius:10px}.alert-success{background:#ecfdf3;color:#067647}.alert-error{background:#fef3f2;color:#b42318}.alert-info{background:#eff8ff;color:#175cd3}.pay-step{text-align:left;margin:12px 0;padding:12px 14px;background:#fff;border:1px solid #f1e2b0;border-radius:10px}.pay-step p{margin:0 0 6px;line-height:1.45}.pay-step-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin-right:8px;border-radius:50%;background:#124c97;color:#fff;font-size:.85rem;font-weight:700}#paymentProofPreview:not(.hidden){display:block}#markEventPaidBtn:disabled{opacity:.45;cursor:not-allowed}.payment-panel{margin-top:16px;padding:18px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;text-align:center}
       .site-header{padding:2.2rem 1rem 1.2rem;text-align:center}.brand-wrap{display:inline-flex;align-items:center;gap:1rem;text-decoration:none}.brand-logo{width:72px;height:72px;object-fit:contain}.brand-en{color:var(--primary);font-size:1.45rem;font-weight:800;display:block;line-height:1}.brand-ta{font-size:.9rem;color:var(--muted);display:block;margin-top:6px;font-weight:600}
       .festival-hero{position:relative;overflow:hidden;margin:-1rem -1rem 2.6rem;padding:2.2rem 1.5rem 2rem;border-radius:20px;background:linear-gradient(135deg,#fff7df 0%,#fff 45%,#eef6ff 100%);border:1px solid #fde3a7}.festival-hero:before,.festival-hero:after{content:"✦ ✧ ✦";position:absolute;color:#f59e0b;font-size:1.8rem;letter-spacing:.35rem;opacity:.65}.festival-hero:before{top:18px;left:22px}.festival-hero:after{right:22px;bottom:18px}.diwali-icons{font-size:2.1rem;margin-bottom:.45rem;letter-spacing:.5rem}.section-label{display:inline-block;background:#fff0c2;color:#9a5200;border:1px solid #ffd166;border-radius:999px;padding:.45rem .9rem;font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.festival-title{font-size:2.8rem;margin:.8rem 0 .55rem;letter-spacing:-1px}.festival-subtitle{font-size:1.12rem;max-width:620px;margin:0 auto;line-height:1.55}.festival-strip{display:flex;justify-content:center;gap:1.2rem;margin-top:1.25rem;font-size:1.45rem}.participants-box{background:linear-gradient(135deg,#eef6ff,#fff9e9)!important;border:1px solid #dbeafe}
       body{margin:0;background:radial-gradient(circle at 10% 12%,rgba(245,158,11,.11),transparent 23%),radial-gradient(circle at 90% 15%,rgba(7,91,184,.09),transparent 25%),linear-gradient(135deg,#fffaf0 0%,#eef6ff 100%)!important;min-height:100vh}
@@ -200,13 +200,29 @@
                     <p id="savedPaymentStatus">Payment details will appear here after registration.</p>
                     <div id="swishPaymentActions" class="hidden">
                       <p>Swish number: <strong id="savedSwishNumber"></strong></p>
-                      <button type="button" id="paySwishBtn" class="btn" style="background:#e61e6d;color:white;margin:.4rem .35rem 1rem;">Pay with Swish</button>
-                      <button type="button" id="showSwishQrBtn" class="btn btn-outline" style="margin:.4rem .35rem 1rem;">Open QR</button>
-                      <button type="button" id="markEventPaidBtn" class="btn" style="background:#16803a;color:white;margin:.4rem .35rem 1rem;">Mark as Paid</button>
-                      <div id="inlineEventQrWrap" style="margin:1rem auto;max-width:320px;text-align:center;">
-                        <p style="margin:.25rem 0 .75rem;"><strong>Scan with Swish</strong></p>
-                        <div id="inlineEventQr" style="display:flex;justify-content:center;"></div>
-                        <p id="inlineEventQrAmount" style="margin:.75rem 0 0;"></p>
+                      <div class="pay-step">
+                        <p><span class="pay-step-num">1</span><strong>Pay with Swish.</strong> Tap <em>Pay with Swish</em> on your phone, or scan the QR code with the Swish app. Pay the exact amount shown.</p>
+                        <button type="button" id="paySwishBtn" class="btn" style="background:#e61e6d;color:white;margin:.4rem .35rem 1rem;">Pay with Swish</button>
+                        <button type="button" id="showSwishQrBtn" class="btn btn-outline" style="margin:.4rem .35rem 1rem;">Open QR</button>
+                        <div id="inlineEventQrWrap" style="margin:1rem auto;max-width:320px;text-align:center;">
+                          <p style="margin:.25rem 0 .75rem;"><strong>Scan with Swish</strong></p>
+                          <div id="inlineEventQr" style="display:flex;justify-content:center;"></div>
+                          <p id="inlineEventQrAmount" style="margin:.75rem 0 0;"></p>
+                        </div>
+                      </div>
+                      <div class="pay-step">
+                        <p><span class="pay-step-num">2</span><strong>Take a screenshot.</strong> When Swish shows the payment is complete, take a screenshot of that confirmation screen.</p>
+                      </div>
+                      <div class="pay-step">
+                        <p><span class="pay-step-num">3</span><strong>Upload the screenshot.</strong> Come back to this page and choose the screenshot from your photos.</p>
+                        <label for="paymentProofInput" class="btn btn-outline" style="display:inline-block;cursor:pointer;margin:.4rem .35rem .6rem;">Choose screenshot</label>
+                        <input type="file" id="paymentProofInput" accept="image/*" style="display:none">
+                        <p id="paymentProofName" class="field-hint"></p>
+                        <img id="paymentProofPreview" class="hidden" alt="Selected payment screenshot" style="max-width:220px;max-height:320px;margin:.5rem auto;border:1px solid #e5e7eb;border-radius:8px;">
+                      </div>
+                      <div class="pay-step">
+                        <p><span class="pay-step-num">4</span><strong>Mark as Paid.</strong> This button turns on after you choose your screenshot. It sends the screenshot to the organisers with your registration.</p>
+                        <button type="button" id="markEventPaidBtn" class="btn" style="background:#16803a;color:white;margin:.4rem .35rem 1rem;" disabled>Mark as Paid</button>
                       </div>
                     </div>
                     <p style="font-size:.9rem;">You can reopen your registration using your phone number and update your participant counts.</p>
@@ -404,11 +420,12 @@
                 document.getElementById('savedPaymentStatus').innerHTML = '<strong style="color:#16803a;">✓ Payment completed. This registration is already paid.</strong>';
                 actions.classList.add('hidden');
             } else if (registration.swish_number) {
-                document.getElementById('savedPaymentStatus').textContent = 'Payment pending. Scan the QR code below or use Pay with Swish for the exact registration amount.';
+                document.getElementById('savedPaymentStatus').textContent = 'Payment pending. Please follow the 4 steps below: pay with Swish, take a screenshot, upload it, then tap Mark as Paid.';
                 document.getElementById('savedSwishNumber').textContent = registration.swish_number; actions.classList.remove('hidden');
                 document.getElementById('paySwishBtn').onclick = () => { window.location.href = swishPaymentUrl(registration); };
                 document.getElementById('showSwishQrBtn').onclick = () => showEventSwishQR(registration);
                 document.getElementById('markEventPaidBtn').onclick = () => markEventRegistrationPaid(registration);
+                resetPaymentProof();
                 renderInlineEventQR(registration);
             } else {
                 document.getElementById('savedPaymentStatus').textContent = 'Payment link will be shared soon.'; actions.classList.add('hidden');
@@ -418,21 +435,78 @@
         updateEventPrice();
         updateSubmitState();
 
+        let paymentProofBlob = null;
+
+        function resetPaymentProof() {
+            paymentProofBlob = null;
+            document.getElementById('paymentProofInput').value = '';
+            document.getElementById('paymentProofName').textContent = '';
+            document.getElementById('paymentProofName').className = 'field-hint';
+            document.getElementById('paymentProofPreview').classList.add('hidden');
+            document.getElementById('markEventPaidBtn').disabled = true;
+        }
+
+        // Shrink large phone screenshots to a JPEG so the upload is small and fast.
+        function compressScreenshot(file) {
+            return new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = () => {
+                    const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.round(img.naturalWidth * scale);
+                    canvas.height = Math.round(img.naturalHeight * scale);
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    URL.revokeObjectURL(url);
+                    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not read the image.')), 'image/jpeg', 0.8);
+                };
+                img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('That file could not be opened as an image. Please choose a screenshot (JPG or PNG).')); };
+                img.src = url;
+            });
+        }
+
+        document.getElementById('paymentProofInput').addEventListener('change', async (e) => {
+            const file = e.target.files && e.target.files[0];
+            const hint = document.getElementById('paymentProofName');
+            const preview = document.getElementById('paymentProofPreview');
+            paymentProofBlob = null;
+            document.getElementById('markEventPaidBtn').disabled = true;
+            preview.classList.add('hidden');
+            if (!file) { hint.textContent = ''; return; }
+            hint.className = 'field-hint';
+            hint.textContent = 'Preparing screenshot...';
+            try {
+                paymentProofBlob = await compressScreenshot(file);
+                preview.src = URL.createObjectURL(paymentProofBlob);
+                preview.classList.remove('hidden');
+                hint.className = 'field-hint ok';
+                hint.textContent = `✓ Screenshot selected: ${file.name}. Now tap Mark as Paid.`;
+                document.getElementById('markEventPaidBtn').disabled = false;
+            } catch (err) {
+                hint.className = 'field-hint error';
+                hint.textContent = err.message;
+            }
+        });
+
         async function markEventRegistrationPaid(registration) {
             if (!registration || !registration.id) return;
+            if (!paymentProofBlob) { alert('Please upload a screenshot of your Swish payment first.'); return; }
             if (!confirm(`Confirm that you have paid ${registration.total_amount} kr by Swish?`)) return;
             const btn = document.getElementById('markEventPaidBtn');
             btn.disabled = true;
             const originalText = btn.textContent;
-            btn.textContent = 'Updating...';
+            btn.textContent = 'Uploading...';
             try {
-                const response = await fetch(`${API_BASE_URL}/event/registration/${registration.id}/pay`, { method: 'PUT' });
-                const data = await response.json();
+                const response = await fetch(`${API_BASE_URL}/event/registration/${registration.id}/pay`, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: paymentProofBlob });
+                const data = await response.json().catch(() => ({ error: response.status === 413 ? 'The screenshot is too large. Please choose a smaller image.' : 'Could not update payment status.' }));
                 if (!response.ok) throw new Error(data.error || 'Could not update payment status.');
                 showSavedPayment(data.registration);
                 const statusMsg = document.getElementById('status-msg');
                 statusMsg.className = 'alert alert-success';
-                statusMsg.textContent = 'Payment completed! Your registration is marked as paid. ✓';
+                statusMsg.textContent = 'Thank you! Your screenshot was received and your registration is marked as paid. ✓';
                 statusMsg.style.display = 'block';
             } catch (err) {
                 alert('Could not confirm payment: ' + err.message);
