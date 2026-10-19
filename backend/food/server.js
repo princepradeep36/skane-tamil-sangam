@@ -253,6 +253,7 @@ app.get("/vendors", async (req, res) => {
             'category', m.category,
             'description', m.description,
             'ingredients', m.ingredients,
+            'image_updated_at', m.image_updated_at,
             'sold_quantity', COALESCE(sold.qty, 0)
           ) ORDER BY m.id
         ) FILTER (WHERE m.id IS NOT NULL AND m.is_active = TRUE), 
@@ -294,7 +295,48 @@ app.delete("/vendor/menu/:id", requireVendor, requireVendorMenuEditing, async (r
   res.json({ success: true });
 });
 
-/* ================= CUSTOMER & ORDER ROUTES ================= */
+// Item photos: a vendor can change its own items, an admin any item.
+async function findEditableMenuItem(req, res) {
+  const params = [req.params.id];
+  let query = "SELECT id FROM menu_items WHERE id=$1";
+  if (req.user.role !== "admin") { params.push(req.user.vendorId); query += " AND vendor_id=$2"; }
+  const q = await pool.query(query, params);
+  if (!q.rows.length) { res.status(404).json({ error: "Menu item not found" }); return null; }
+  return q.rows[0].id;
+}
+
+app.put("/vendor/menu/:id/image", requireVendor, requireVendorMenuEditing, express.raw({ type: 'image/*', limit: '5mb' }), async (req, res) => {
+  const image = Buffer.isBuffer(req.body) ? req.body : null;
+  const contentType = image && imageContentType(image);
+  if (!contentType) return res.status(400).json({ error: "Please choose a JPG, PNG or WebP photo." });
+  try {
+    const id = await findEditableMenuItem(req, res);
+    if (!id) return;
+    await pool.query(`INSERT INTO menu_item_images(menu_item_id,content_type,image) VALUES($1,$2,$3)
+      ON CONFLICT (menu_item_id) DO UPDATE SET content_type=EXCLUDED.content_type, image=EXCLUDED.image`, [id, contentType, image]);
+    await pool.query("UPDATE menu_items SET image_updated_at=CURRENT_TIMESTAMP WHERE id=$1", [id]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete("/vendor/menu/:id/image", requireVendor, requireVendorMenuEditing, async (req, res) => {
+  try {
+    const id = await findEditableMenuItem(req, res);
+    if (!id) return;
+    await pool.query("DELETE FROM menu_item_images WHERE menu_item_id=$1", [id]);
+    await pool.query("UPDATE menu_items SET image_updated_at=NULL WHERE id=$1", [id]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Public: the menu links here with ?v=<image_updated_at>, so a new photo gets a new URL.
+app.get("/menu-item/:id/image", async (req, res) => {
+  try {
+    const q = await pool.query("SELECT content_type, image FROM menu_item_images WHERE menu_item_id=$1", [req.params.id]);
+    if (!q.rows.length) return res.status(404).json({ error: "No photo" });
+    res.set("Content-Type", q.rows[0].content_type).set("Cache-Control", "public, max-age=604800").send(q.rows[0].image);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 /* ================= CUSTOMER & ORDER ROUTES ================= */
 
@@ -452,6 +494,12 @@ async function ensureEventRegistrationLifecycle() {
   await pool.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS category VARCHAR(20) NOT NULL DEFAULT 'FOOD'`);
   await pool.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS description VARCHAR(500) NULL`);
   await pool.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS ingredients VARCHAR(500) NULL`);
+  // Item photos live in their own table so the menu list never loads image data.
+  await pool.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS image_updated_at TIMESTAMP NULL`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS menu_item_images (
+    menu_item_id INTEGER PRIMARY KEY REFERENCES menu_items(id) ON DELETE CASCADE,
+    content_type VARCHAR(50) NOT NULL,
+    image BYTEA NOT NULL)`);
   // One payment screenshot per registration; a new upload replaces the old one.
   await pool.query(`CREATE TABLE IF NOT EXISTS event_payment_proofs (
     registration_id INTEGER PRIMARY KEY REFERENCES event_registrations(id) ON DELETE CASCADE,

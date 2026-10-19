@@ -217,6 +217,7 @@
     </header>
 
     <script src="auth.js"></script>
+    <script src="item-photo.js"></script>
     <script>
       checkAuth('admin');
       if (new URLSearchParams(window.location.search).get("admin") === "true") {
@@ -277,6 +278,7 @@
           <button class="btn-delete" onclick="deleteMenu(${m.id})">✖</button>
           <input class="menu-text" id="desc_${m.id}" value="${Validation.escapeHtml(m.description || '')}" placeholder="Description (optional)" maxlength="500">
           <input class="menu-text" id="ingr_${m.id}" value="${Validation.escapeHtml(m.ingredients || '')}" placeholder="Ingredients (optional)" maxlength="500">
+          <div class="menu-text">${ItemPhoto.controls(m, 'loadVendors')}</div>
         </div>
       `).join('');
 

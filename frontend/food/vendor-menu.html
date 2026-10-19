@@ -131,6 +131,7 @@
     </div>
 
     <script src="auth.js"></script>
+    <script src="item-photo.js"></script>
     <script>
         checkAuth('vendor');
         const API = '/food-api';
@@ -173,6 +174,7 @@
                             <span class="cat-tag">${item.category === 'SNACKS' ? 'Snacks' : 'Food'}</span>
                             ${item.description ? `<div class="item-note">${Validation.escapeHtml(item.description)}</div>` : ''}
                             ${item.ingredients ? `<div class="item-note"><b>Ingredients:</b> ${Validation.escapeHtml(item.ingredients)}</div>` : ''}
+                            <div style="margin-top:8px">${ItemPhoto.controls(item, 'loadMenu', menuEditable)}</div>
                         </div>
                         ${menuEditable ? `<button class="del-btn" onclick="delItem(${item.id})">Delete</button>` : ''}
                     `;
