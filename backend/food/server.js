@@ -330,7 +330,7 @@ app.delete("/vendor/menu/:id/image", requireVendor, requireVendorMenuEditing, as
 });
 
 // Description and ingredients: a vendor can edit its own items, an admin any item.
-app.put("/vendor/menu/:id/details", requireVendor, requireVendorMenuEditing, async (req, res) => {
+app.put("/vendor/menu/:id/details", requireVendor, async (req, res) => {
   try {
     const id = await findEditableMenuItem(req, res);
     if (!id) return;

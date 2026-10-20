@@ -6,7 +6,7 @@ const API='/food-api';
 const SETTINGS=[
 {key:'event_registration_enabled',title:'Event registration',desc:'Shows the "Register" button on the Events page and accepts new registrations and changes. When off, the registration page shows "Registration is closed".',on:'Open',off:'Closed'},
 {key:'food_ordering_enabled',title:'Click2Eat food ordering',desc:'Shows the Click2Eat link on the Events page and accepts new food orders. When off, customers can still pay pending orders and view receipts.',on:'Open',off:'Closed'},
-{key:'vendor_menu_edit_enabled',title:'Vendors can add or remove menu items',desc:'When off, vendors can only view their menu. Admins can still change menus from Stall & Menu Admin.',on:'Allowed',off:'Not allowed'}
+{key:'vendor_menu_edit_enabled',title:'Vendors can add or remove menu items',desc:'When off, vendors cannot add or remove items or change photos, but they can still edit each item\'s description and ingredients. Admins can still change menus from Stall & Menu Admin.',on:'Allowed',off:'Not allowed'}
 ];
 let current={};
 function render(){document.getElementById('settings').innerHTML=SETTINGS.map(s=>`<div class="row"><div><h3>${s.title}</h3><p>${s.desc}</p><div class="state ${current[s.key]?'on':'off'}">${current[s.key]?s.on:s.off}</div></div><label class="switch"><input type="checkbox" id="${s.key}" ${current[s.key]?'checked':''} onchange="save('${s.key}',this)"><span class="slider"></span></label></div>`).join('')}

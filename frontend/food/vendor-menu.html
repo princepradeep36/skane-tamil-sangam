@@ -140,7 +140,7 @@
         <h1>Manage Menu</h1>
 
         <div id="menu-locked" class="add-box" style="display:none; background:#fff3cd; color:#856404; border:1px solid #ffeeba;">
-            <strong>Menu changes are turned off.</strong> Please contact the admin to add or remove items.
+            <strong>Adding and removing items is turned off.</strong> You can still edit each item's description and ingredients below. Please contact the admin to add or remove items.
         </div>
 
         <div class="add-box" id="add-box">
@@ -207,7 +207,7 @@
                             ${item.description ? `<div class="item-note">${Validation.escapeHtml(item.description)}</div>` : ''}
                             ${item.ingredients ? `<div class="item-note"><b>Ingredients:</b> ${Validation.escapeHtml(item.ingredients)}</div>` : ''}
                             <div style="margin-top:8px">${ItemPhoto.controls(item, 'loadMenu', menuEditable)}</div>
-                            ${menuEditable ? `<button class="edit-btn" onclick="toggleDetails(${item.id})">✏️ Edit description &amp; ingredients</button>
+                            ${`<button class="edit-btn" onclick="toggleDetails(${item.id})">✏️ Edit description &amp; ingredients</button>
                             <div class="details-form" id="details-${item.id}" style="display:none">
                                 <label for="desc-${item.id}">Description</label>
                                 <textarea id="desc-${item.id}" rows="3" maxlength="500" placeholder="e.g. Crispy dosa with potato masala">${Validation.escapeHtml(item.description || '')}</textarea>
@@ -215,7 +215,7 @@
                                 <textarea id="ingr-${item.id}" rows="2" maxlength="500" placeholder="e.g. Rice, urad dal, potato, onion">${Validation.escapeHtml(item.ingredients || '')}</textarea>
                                 <button onclick="saveDetails(${item.id})">Save</button>
                                 <button class="edit-btn" style="margin-top:0" onclick="toggleDetails(${item.id})">Cancel</button>
-                            </div>` : ''}
+                            </div>`}
                         </div>
                         ${menuEditable ? `<button class="del-btn" onclick="delItem(${item.id})">Delete</button>` : ''}
                     `;
