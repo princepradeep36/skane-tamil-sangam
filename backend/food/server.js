@@ -329,6 +329,17 @@ app.delete("/vendor/menu/:id/image", requireVendor, requireVendorMenuEditing, as
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Description and ingredients: a vendor can edit its own items, an admin any item.
+app.put("/vendor/menu/:id/details", requireVendor, requireVendorMenuEditing, async (req, res) => {
+  try {
+    const id = await findEditableMenuItem(req, res);
+    if (!id) return;
+    await pool.query("UPDATE menu_items SET description=$1, ingredients=$2 WHERE id=$3",
+      [normalizeMenuText(req.body.description), normalizeMenuText(req.body.ingredients), id]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Public: the menu links here with ?v=<image_updated_at>, so a new photo gets a new URL.
 app.get("/menu-item/:id/image", async (req, res) => {
   try {
@@ -340,8 +351,35 @@ app.get("/menu-item/:id/image", async (req, res) => {
 
 /* ================= CUSTOMER & ORDER ROUTES ================= */
 
+// Food orders are only for people whose event registration is paid. The food page
+// asks for a 10-digit phone (07...), while registrations store +46..., or +<code>
+// for other countries, so a 10-digit number also matches the same digits after any code.
+async function foodOrderEligibility(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  const notRegistered = { eligible: false, code: "NOT_REGISTERED",
+    error: "We couldn't find an event registration for this phone number. Food orders are only for registered guests who have paid. Please register for the event first, or use the phone number you registered with." };
+  if (!digits) return notRegistered;
+  const normalized = normalizeInternationalPhone(String(phone));
+  const q = await pool.query(`SELECT payment_status FROM event_registrations
+    WHERE registration_status <> 'CANCELLED'
+      AND (phone = $1 OR phone = $2 OR (length($3) = 10 AND left($3, 1) <> '0' AND phone LIKE '+%' AND right(phone, 10) = $3))
+    ORDER BY (payment_status = 'PAID') DESC, id LIMIT 1`,
+    [normalized, legacySwedishPhone(normalized) || digits, digits]);
+  if (!q.rows.length) return notRegistered;
+  if (q.rows[0].payment_status !== "PAID") return { eligible: false, code: "NOT_PAID",
+    error: "Your event registration isn't paid yet. Please pay your event fee and mark it as paid on the event registration page, then come back to order food." };
+  return { eligible: true };
+}
+
+app.get("/food-eligibility/:phone", async (req, res) => {
+  try { res.json(await foodOrderEligibility(req.params.phone)); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post("/order", requireFoodOrderingOpen, async (req, res) => {
   const { name, phone, cart } = req.body;
+  const eligibility = await foodOrderEligibility(phone).catch(err => ({ eligible: false, error: err.message }));
+  if (!eligibility.eligible) return res.status(403).json(eligibility);
   let customer = await pool.query("SELECT id FROM customers WHERE phone=$1", [phone]);
   if (customer.rows.length === 0) {
     customer = await pool.query("INSERT INTO customers(name,phone) VALUES($1,$2) RETURNING id", [name, phone]);

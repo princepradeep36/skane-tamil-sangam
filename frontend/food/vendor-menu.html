@@ -78,6 +78,38 @@
             margin-top: 4px;
         }
 
+        .edit-btn {
+            background: #fff;
+            color: #1f2937;
+            border: 1px solid #d1d5db;
+            font-size: 0.8rem;
+            margin-top: 8px;
+        }
+
+        .details-form {
+            margin-top: 10px;
+        }
+
+        .details-form label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: #374151;
+            margin-bottom: 4px;
+        }
+
+        .details-form textarea {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font: inherit;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+            resize: vertical;
+        }
+
         .del-btn {
             background: #dc3545;
             font-size: 0.8rem;
@@ -168,13 +200,22 @@
                     const div = document.createElement("div");
                     div.className = "menu-item";
                     div.innerHTML = `
-                        <div>
+                        <div style="flex:1; min-width:0;">
                             <strong>${Validation.escapeHtml(item.item_name)}</strong> (${item.price}kr)
                             <span style="color:#666; font-size:0.8rem; margin-left:5px;">Max: ${item.max_quantity || '∞'}</span>
                             <span class="cat-tag">${item.category === 'SNACKS' ? 'Snacks' : 'Food'}</span>
                             ${item.description ? `<div class="item-note">${Validation.escapeHtml(item.description)}</div>` : ''}
                             ${item.ingredients ? `<div class="item-note"><b>Ingredients:</b> ${Validation.escapeHtml(item.ingredients)}</div>` : ''}
                             <div style="margin-top:8px">${ItemPhoto.controls(item, 'loadMenu', menuEditable)}</div>
+                            ${menuEditable ? `<button class="edit-btn" onclick="toggleDetails(${item.id})">✏️ Edit description &amp; ingredients</button>
+                            <div class="details-form" id="details-${item.id}" style="display:none">
+                                <label for="desc-${item.id}">Description</label>
+                                <textarea id="desc-${item.id}" rows="3" maxlength="500" placeholder="e.g. Crispy dosa with potato masala">${Validation.escapeHtml(item.description || '')}</textarea>
+                                <label for="ingr-${item.id}">Ingredients</label>
+                                <textarea id="ingr-${item.id}" rows="2" maxlength="500" placeholder="e.g. Rice, urad dal, potato, onion">${Validation.escapeHtml(item.ingredients || '')}</textarea>
+                                <button onclick="saveDetails(${item.id})">Save</button>
+                                <button class="edit-btn" style="margin-top:0" onclick="toggleDetails(${item.id})">Cancel</button>
+                            </div>` : ''}
                         </div>
                         ${menuEditable ? `<button class="del-btn" onclick="delItem(${item.id})">Delete</button>` : ''}
                     `;
@@ -209,6 +250,26 @@
             document.getElementById("vmax").value = "";
             document.getElementById("vdesc").value = "";
             document.getElementById("vingredients").value = "";
+            loadMenu();
+        }
+
+        function toggleDetails(id) {
+            const form = document.getElementById(`details-${id}`);
+            form.style.display = form.style.display === "none" ? "" : "none";
+        }
+
+        async function saveDetails(id) {
+            const description = document.getElementById(`desc-${id}`).value;
+            const ingredients = document.getElementById(`ingr-${id}`).value;
+            const res = await authFetch(`${API}/vendor/menu/${id}/details`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ description, ingredients })
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                return alert(data.error || "Could not save the details");
+            }
             loadMenu();
         }
 
