@@ -23,6 +23,8 @@
       body{margin:0;background:radial-gradient(circle at 10% 12%,rgba(245,158,11,.11),transparent 23%),radial-gradient(circle at 90% 15%,rgba(7,91,184,.09),transparent 25%),linear-gradient(135deg,#fffaf0 0%,#eef6ff 100%)!important;min-height:100vh}
       .qr-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.58);display:flex;align-items:center;justify-content:center;padding:20px;z-index:9999}.qr-modal{width:min(480px,100%);background:#fff;border-radius:20px;padding:28px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.28)}#eventQrCode{display:flex;justify-content:center;margin:18px 0}#eventQrCode img,#eventQrCode canvas{max-width:100%;height:auto!important}
       .event-banner-wrap{width:100%;margin:-1rem -1rem 2.6rem;width:calc(100% + 2rem);overflow:hidden;border-radius:20px;border:1px solid #f6c85f;background:#071d3f}.event-banner{display:block;width:100%;height:auto;aspect-ratio:2048/682;object-fit:contain;background:#071d3f}
+      .partner-strip{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;margin:-1.4rem 0 2.4rem;padding:14px 18px;border-radius:16px;background:linear-gradient(135deg,#fff7df,#fff 50%,#eef6ff);border:1px solid #fde3a7}.partner-label{font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--festival-dark)}.partner-logo{width:96px;height:96px;border-radius:50%;box-shadow:0 6px 18px rgba(15,23,42,.18)}.partner-name{font-weight:800;color:#1f2937;font-size:1.05rem}
+      @media(max-width:700px){.partner-strip{flex-direction:column;gap:8px;margin:-1rem 0 2rem;padding:14px}.partner-logo{width:84px;height:84px}}
       @media(max-width:700px){.event-banner-wrap{margin:-.2rem -.2rem 2rem;width:calc(100% + .4rem);border-radius:14px}.event-banner{width:100%;height:auto;object-fit:contain}}
       @media(max-width:700px){.registration-card{padding:22px!important}.grid-2,.grid-3{grid-template-columns:1fr}.brand-logo{width:58px;height:58px}.brand-en{font-size:1.1rem}.festival-title{font-size:2.15rem}.festival-hero{margin:-.2rem -.2rem 2rem}.festival-hero:before,.festival-hero:after{font-size:1.1rem}}
     </style>
@@ -50,6 +52,12 @@
                 <img src="diwali-2026-banner.png"
                     alt="Skåne Tamil Sangam Diwali 2026 — Sunday 15 November 2026 at Tryckeriet, from 10:00 AM"
                     class="event-banner">
+            </div>
+
+            <div class="partner-strip">
+                <span class="partner-label">In collaboration with</span>
+                <img src="prime-tone-logo.webp" alt="Prime Tone Productions" class="partner-logo" width="96" height="96" decoding="async">
+                <span class="partner-name">Prime Tone Productions</span>
             </div>
 
             <div id="registration-closed" class="alert alert-info hidden" style="text-align:center;font-size:1.1rem;">
