@@ -529,6 +529,9 @@ async function ensureEventRegistrationLifecycle() {
   await pool.query(`ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS cultural_activity_type VARCHAR(30) NULL`);
   await pool.query(`ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS comments VARCHAR(1000) NULL`);
   await pool.query(`UPDATE event_registrations SET registration_status='ACTIVE' WHERE registration_status IS NULL`);
+  // How much of the fee has been paid, so adding people later only asks for the difference.
+  await pool.query(`ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS paid_amount INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`UPDATE event_registrations SET paid_amount=total_amount WHERE payment_status='PAID' AND paid_amount=0`);
   await pool.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS category VARCHAR(20) NOT NULL DEFAULT 'FOOD'`);
   await pool.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS description VARCHAR(500) NULL`);
   await pool.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS ingredients VARCHAR(500) NULL`);
@@ -558,7 +561,8 @@ async function allocateSwishAccount(client, amount, excludeRegistrationId = null
 }
 
 async function registrationWithSwish(client, id) {
-  const q = await client.query(`SELECT r.*, a.swish_number, a.label AS swish_label, a.limit_amount AS swish_limit
+  const q = await client.query(`SELECT r.*, GREATEST(r.total_amount - r.paid_amount, 0) AS amount_due,
+      a.swish_number, a.label AS swish_label, a.limit_amount AS swish_limit
     FROM event_registrations r LEFT JOIN event_swish_accounts a ON a.id=r.swish_account_id WHERE r.id=$1`, [id]);
   return q.rows[0];
 }
@@ -623,7 +627,7 @@ app.post("/event/register", requireEventRegistrationOpen, async (req, res) => {
       const revived = await client.query(`UPDATE event_registrations SET
         first_name=$1,last_name=$2,email=$3,phone=$4,whatsapp=$5,adults_count=$6,kids_6_12_count=$7,kids_below_6_count=$8,
         volunteer_interest=$9,cultural_interest=$10,cultural_activity_type=$11,comments=$12,photo_consent=$13,total_amount=$14,swish_account_id=$15,
-        payment_status='PENDING',registration_status='ACTIVE',cancelled_at=NULL,created_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+        payment_status='PENDING',paid_amount=0,registration_status='ACTIVE',cancelled_at=NULL,created_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
         WHERE id=$16 RETURNING id`,
         [firstName.trim(),lastName.trim(),email.trim(),normalizedPhone,normalizedWhatsapp,adultsCount,kids6to12Count,kidsBelow6Count,!!volunteerInterest,!!culturalInterest,normalizedCulturalActivity,normalizedComments,!!photoConsent,amount,swish?.id || null,existing.rows[0].id]);
       const saved = await registrationWithSwish(client, revived.rows[0].id);
@@ -699,7 +703,8 @@ app.put("/event/registration/:id", requireEventRegistrationOpen, async (req, res
     const amount=eventTotal(adultsCount,kids6to12Count);
     const swish=await allocateSwishAccount(client, amount, Number(req.params.id));
     const result=await client.query(`UPDATE event_registrations SET first_name=$1,last_name=$2,email=$3,phone=$4,whatsapp=$5,adults_count=$6,kids_6_12_count=$7,kids_below_6_count=$8,volunteer_interest=$9,cultural_interest=$10,cultural_activity_type=$11,comments=$12,photo_consent=$13,total_amount=$14,swish_account_id=$15,
-      payment_status=CASE WHEN adults_count<>$6 OR kids_6_12_count<>$7 OR kids_below_6_count<>$8 THEN 'PENDING' ELSE payment_status END,registration_status='ACTIVE',cancelled_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=$16 AND registration_status <> 'CANCELLED' RETURNING id`,
+      payment_status=CASE WHEN adults_count=$6 AND kids_6_12_count=$7 AND kids_below_6_count=$8 THEN payment_status
+        WHEN paid_amount>0 AND $14<=paid_amount THEN 'PAID' ELSE 'PENDING' END,registration_status='ACTIVE',cancelled_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=$16 AND registration_status <> 'CANCELLED' RETURNING id`,
       [firstName.trim(),lastName.trim(),email.trim(),normalizedPhone,normalizedWhatsapp,adultsCount,kids6to12Count,kidsBelow6Count,!!volunteerInterest,!!culturalInterest,normalizedCulturalActivity,normalizedComments,!!photoConsent,amount,swish?.id || null,req.params.id]);
     if(!result.rows.length){await client.query('ROLLBACK');return res.status(404).json({error:'Registration not found'});}
     const saved=await registrationWithSwish(client,result.rows[0].id); await client.query('COMMIT'); res.json(saved);
@@ -725,7 +730,7 @@ app.put("/event/registration/:id/pay", express.raw({ type: 'image/*', limit: '5m
     await client.query('BEGIN');
     const result = await client.query(
       `UPDATE event_registrations
-       SET payment_status='PAID', updated_at=CURRENT_TIMESTAMP
+       SET payment_status='PAID', paid_amount=GREATEST(paid_amount, total_amount), updated_at=CURRENT_TIMESTAMP
        WHERE id=$1 AND registration_status <> 'CANCELLED' RETURNING id`,
       [req.params.id]
     );
@@ -784,8 +789,8 @@ app.get("/admin/event-registration-summary", requireAdmin, async (req, res) => {
       COUNT(*) FILTER (WHERE volunteer_interest)::int AS volunteer_families,
       COUNT(*) FILTER (WHERE cultural_interest)::int AS cultural_interest_families,
       COALESCE(SUM(total_amount),0)::int AS total_registration_value,
-      COALESCE(SUM(total_amount) FILTER (WHERE payment_status='PAID'),0)::int AS total_amount_collected,
-      COALESCE(SUM(total_amount) FILTER (WHERE payment_status='PENDING'),0)::int AS total_amount_pending
+      COALESCE(SUM(LEAST(paid_amount, total_amount)),0)::int AS total_amount_collected,
+      COALESCE(SUM(GREATEST(total_amount - paid_amount, 0)),0)::int AS total_amount_pending
       FROM event_registrations
       WHERE registration_status <> 'CANCELLED'`);
     res.json(result.rows[0]);
@@ -796,7 +801,9 @@ app.put("/admin/event-registration/:id/payment", requireAdmin, async (req, res) 
   const { status } = req.body;
   if (!['PENDING','PAID'].includes(status)) return res.status(400).json({ error: "Invalid payment status" });
   try {
-    const result = await pool.query("UPDATE event_registrations SET payment_status=$1,updated_at=CURRENT_TIMESTAMP WHERE id=$2 AND registration_status <> 'CANCELLED' RETURNING *", [status, req.params.id]);
+    const result = await pool.query(`UPDATE event_registrations SET payment_status=$1::text,
+      paid_amount=CASE WHEN $1::text='PAID' THEN total_amount ELSE 0 END,updated_at=CURRENT_TIMESTAMP
+      WHERE id=$2 AND registration_status <> 'CANCELLED' RETURNING *`, [status, req.params.id]);
     if (!result.rows.length) return res.status(404).json({ error: "Registration not found" });
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -806,7 +813,7 @@ app.put("/admin/event-registration/:id/payment", requireAdmin, async (req, res) 
 /* ================= EVENT SWISH ADMIN ================= */
 app.get('/admin/event-swish-accounts', requireAdmin, async (req,res)=>{try{const q=await pool.query(`SELECT a.*,
   COALESCE(SUM(r.total_amount),0)::int allocated_amount,
-  COALESCE(SUM(r.total_amount) FILTER(WHERE r.payment_status='PAID'),0)::int paid_amount
+  COALESCE(SUM(LEAST(r.paid_amount, r.total_amount)),0)::int paid_amount
   FROM event_swish_accounts a LEFT JOIN event_registrations r ON r.swish_account_id=a.id AND r.registration_status <> 'CANCELLED'
   GROUP BY a.id ORDER BY a.priority,a.id`);res.json(q.rows)}catch(e){res.status(500).json({error:e.message})}});
 app.post('/admin/event-swish-accounts', requireAdmin, async (req,res)=>{
