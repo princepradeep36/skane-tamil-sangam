@@ -391,6 +391,13 @@
             return `swish://payment?data=${encodeURIComponent(JSON.stringify(data))}`;
         }
 
+        // The Swish app's scanner only reads its own prefilled-payment format
+        // (C<number>;<amount>;<message>;<lock>, lock 0 = nothing editable), not swish:// links.
+        function swishQrText(registration) {
+            const payee = String(registration.swish_number || '').replace(/\D/g, '');
+            return `C${payee};${amountDue(registration)};Diwali 2026 Reg ${registration.id};0`;
+        }
+
         function showEventSwishQR(registration) {
             document.querySelector('.qr-modal-overlay')?.remove();
             const overlay = document.createElement('div');
@@ -410,7 +417,7 @@
                 qr.textContent = 'QR generator could not be loaded. Please use the Swish number shown above.';
                 return;
             }
-            new QRCode(qr, {text:swishPaymentUrl(registration),width:256,height:256,correctLevel:QRCode.CorrectLevel.L});
+            new QRCode(qr, {text:swishQrText(registration),width:256,height:256,correctLevel:QRCode.CorrectLevel.L});
         }
 
         function renderInlineEventQR(registration) {
@@ -419,7 +426,7 @@
             qr.innerHTML = '';
             amount.textContent = `Amount to pay: ${amountDue(registration)} kr · Swish: ${registration.swish_number}`;
             if (typeof QRCode === 'undefined') { qr.textContent = 'QR generator could not be loaded. Please use the Swish number shown above.'; return; }
-            new QRCode(qr, {text:swishPaymentUrl(registration),width:220,height:220,correctLevel:QRCode.CorrectLevel.L});
+            new QRCode(qr, {text:swishQrText(registration),width:220,height:220,correctLevel:QRCode.CorrectLevel.L});
         }
 
         function showSavedPayment(registration) {
