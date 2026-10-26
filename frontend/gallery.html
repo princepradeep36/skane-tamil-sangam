@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Photo gallery of Skåne Tamil Sangam celebrations — Pongal Vizha 2026 and more.">
+    <title>Gallery | Skåne Tamil Sangam</title>
+    <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@300;400;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="responsive.css?v=20261015">
+    <style>
+        .album-head {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+        }
+
+        .album-head h2 { margin: .3rem 0 0; }
+        .album-count { color: var(--muted); font-weight: 600; }
+
+        /* Photos keep their own shape: a masonry-style column layout. */
+        .photo-grid { columns: 3 280px; column-gap: 1rem; }
+
+        .photo {
+            display: block;
+            width: 100%;
+            margin: 0 0 1rem;
+            padding: 0;
+            border: 0;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            background: var(--primary-light);
+            cursor: zoom-in;
+            break-inside: avoid;
+            box-shadow: var(--shadow-md);
+            transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+        }
+
+        .photo:hover { transform: translateY(-3px); box-shadow: var(--shadow-xl); }
+        .photo img { display: block; width: 100%; height: auto; }
+
+        /* Full-screen viewer */
+        .viewer {
+            position: fixed;
+            inset: 0;
+            z-index: 3000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(10, 12, 20, .92);
+            padding: 3.5rem 1rem;
+        }
+
+        .viewer.open { display: flex; }
+        .viewer img { max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 20px 60px rgba(0, 0, 0, .5); }
+
+        .viewer button {
+            position: absolute;
+            border: 0;
+            background: rgba(255, 255, 255, .14);
+            color: #fff;
+            width: 48px;
+            height: 48px;
+            min-height: 0;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .viewer button:hover { background: rgba(255, 255, 255, .26); }
+        .viewer .v-close { top: 14px; right: 14px; }
+        .viewer .v-prev { left: 14px; top: 50%; transform: translateY(-50%); }
+        .viewer .v-next { right: 14px; top: 50%; transform: translateY(-50%); }
+        .viewer .v-count { position: absolute; bottom: 16px; left: 0; right: 0; text-align: center; color: rgba(255, 255, 255, .8); font-weight: 600; }
+
+        @media (max-width: 600px) {
+            .photo-grid { columns: 2; column-gap: .6rem; }
+            .photo { margin-bottom: .6rem; }
+            .viewer .v-prev, .viewer .v-next { top: auto; bottom: 8px; transform: none; }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container nav-container">
+            <a href="index.html" class="nav-brand">
+                <img src="logo.png" alt="Skåne Tamil Sangam Logo" style="height:100px;">
+                <div class="brand-text">
+                    <span class="brand-en">SKÅNE TAMIL SANGAM</span>
+                    <span class="brand-ta">சுகோனே தமிழ் சங்கம்</span>
+                </div>
+            </a>
+            <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle menu">☰</button>
+            <ul class="nav-links" id="nav-links">
+                <li><a href="index.html" class="nav-link">Home</a></li>
+                <li><a href="about.html" class="nav-link">About Us</a></li>
+                <li><a href="events.html" class="nav-link">Events</a></li>
+                <li><a href="gallery.html" class="nav-link active">Gallery</a></li>
+                <li><a href="contact.html" class="nav-link">Contact</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <header class="page-hero bg-surface animate-fade-in">
+        <div class="container">
+            <span class="section-label">நினைவுகள் · Memories</span>
+            <h1>Gallery</h1>
+            <p>Moments from our celebrations together.</p>
+        </div>
+    </header>
+
+    <section class="section bg-warm" style="padding: 4rem 0 6rem;">
+        <div class="container">
+            <div class="album-head">
+                <div>
+                    <span class="section-label">Album</span>
+                    <h2>Pongal Vizha 2026</h2>
+                </div>
+                <span class="album-count" id="album-count"></span>
+            </div>
+            <div class="photo-grid" id="pongal-2026"></div>
+        </div>
+    </section>
+
+    <div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-label="Photo viewer">
+        <button class="v-close" aria-label="Close">✕</button>
+        <button class="v-prev" aria-label="Previous photo">‹</button>
+        <img alt="">
+        <button class="v-next" aria-label="Next photo">›</button>
+        <div class="v-count"></div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-col">
+                    <h3>Skåne Tamil Sangam</h3>
+                    <p>Non-profit organization dedicated to serving and uniting the Tamil community in Southern Sweden
+                        since 2023.</p>
+                    <div class="footer-social">
+                        <a href="#" aria-label="Facebook">f</a>
+                        <a href="#" aria-label="Instagram">in</a>
+                        <a href="mailto:info@skanetamil.se" aria-label="Email">@</a>
+                    </div>
+                </div>
+                <div class="footer-col">
+                    <h3>Quick Links</h3>
+                    <ul class="footer-links">
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="about.html">About Us</a></li>
+                        <li><a href="events.html">Events</a></li>
+                        <li><a href="gallery.html">Gallery</a></li>
+                        <li><a href="contact.html">Contact</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h3>Contact Us</h3>
+                    <ul class="footer-links">
+                        <li><a href="mailto:info@skanetamil.se">info@skanetamil.se</a></li>
+                        <li><a href="#">Skåne County, Sweden</a></li>
+                        <li><a href="https://facebook.com" target="_blank">Facebook</a></li>
+                        <li><a href="https://instagram.com" target="_blank">Instagram</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="copyright">
+                © 2026 Skåne Tamil Sangam. All rights reserved. Made with ❤️ for the Tamil community.
+            </div>
+        </div>
+    </footer>
+
+    <button class="back-to-top" id="back-to-top" aria-label="Back to top">↑</button>
+
+    <script src="js/main.js"></script>
+    <script>
+        // To add photos: put <name>.webp (1600px) and <name>-thumb.webp (560px) in gallery/pongal-2026/ and list them here.
+        const ALBUM = 'gallery/pongal-2026/';
+        const PHOTOS = [
+            ['pongal-5926', 'Traditional lamp on stage at Pongal Vizha 2026', 374, 560],
+            ['pongal-6032', 'Young dancers on stage at Pongal Vizha 2026', 560, 374],
+            ['pongal-6095', 'Solo dance performance', 373, 560],
+            ['pongal-6158', 'Group dance performance', 373, 560],
+            ['pongal-7113', 'Group dance performance', 560, 373],
+            ['pongal-6026', 'Young dancers greeting the audience', 373, 560],
+            ['pongal-6958', 'Children on stage at Pongal Vizha 2026', 560, 373],
+            ['pongal-6984', 'Group photo at Pongal Vizha 2026', 560, 373],
+            ['pongal-7008', 'Group photo at Pongal Vizha 2026', 560, 373]
+        ];
+
+        const grid = document.getElementById('pongal-2026');
+        grid.innerHTML = PHOTOS.map(([name, alt, w, h], i) =>
+            `<button class="photo" data-i="${i}" aria-label="Open photo: ${alt}"><img src="${ALBUM}${name}-thumb.webp" width="${w}" height="${h}" alt="${alt}" loading="lazy" decoding="async"></button>`).join('');
+        document.getElementById('album-count').textContent = `${PHOTOS.length} photos`;
+
+        const viewer = document.getElementById('viewer');
+        const vImg = viewer.querySelector('img');
+        let current = 0;
+
+        function show(i) {
+            current = (i + PHOTOS.length) % PHOTOS.length;
+            const [name, alt] = PHOTOS[current];
+            vImg.src = `${ALBUM}${name}.webp`;
+            vImg.alt = alt;
+            viewer.querySelector('.v-count').textContent = `${current + 1} / ${PHOTOS.length}`;
+            // Warm the next photo so swiping feels instant.
+            new Image().src = `${ALBUM}${PHOTOS[(current + 1) % PHOTOS.length][0]}.webp`;
+        }
+
+        function open(i) { show(i); viewer.classList.add('open'); document.body.style.overflow = 'hidden'; viewer.querySelector('.v-close').focus(); }
+        function close() { viewer.classList.remove('open'); document.body.style.overflow = ''; grid.querySelector(`[data-i="${current}"]`)?.focus(); }
+
+        grid.addEventListener('click', e => { const b = e.target.closest('.photo'); if (b) open(+b.dataset.i); });
+        viewer.querySelector('.v-close').onclick = close;
+        viewer.querySelector('.v-prev').onclick = () => show(current - 1);
+        viewer.querySelector('.v-next').onclick = () => show(current + 1);
+        viewer.addEventListener('click', e => { if (e.target === viewer) close(); });
+        document.addEventListener('keydown', e => {
+            if (!viewer.classList.contains('open')) return;
+            if (e.key === 'Escape') close();
+            if (e.key === 'ArrowLeft') show(current - 1);
+            if (e.key === 'ArrowRight') show(current + 1);
+        });
+
+        let touchX = null;
+        viewer.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; }, { passive: true });
+        viewer.addEventListener('touchend', e => {
+            if (touchX === null) return;
+            const dx = e.changedTouches[0].clientX - touchX;
+            if (Math.abs(dx) > 40) show(current + (dx < 0 ? 1 : -1));
+            touchX = null;
+        });
+    </script>
+</body>
+
+</html>

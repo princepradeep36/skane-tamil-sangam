@@ -9,293 +9,34 @@
     <title>Skåne Tamil Sangam | Home</title>
     <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@300;400;600;700;800&display=swap"
         rel="stylesheet">
-    <link rel="preload" as="image" href="diwali-2026-banner-1600.webp" imagesrcset="diwali-2026-banner-800.webp 800w, diwali-2026-banner-1600.webp 1600w" imagesizes="(max-width: 900px) 100vw, 1100px">
     <link rel="stylesheet" href="css/styles.css">
-    <link rel="stylesheet" href="responsive.css?v=20261015">
+<link rel="stylesheet" href="responsive.css?v=20261015">
     <style>
-        /* Home page: festival hero, event card, pillars, partners. Shared nav/footer come from styles.css. */
-        [hidden] { display: none !important; }
-
-        :root {
-            --festival: #b45309;
-            --festival-deep: #7c2d12;
-            --gold: #f6c453;
-            --night: #0b1d3a;
-            --night-2: #16305c;
-        }
-
-        .nav-cta {
-            background: linear-gradient(135deg, #f59e0b, #ea580c);
-            color: #fff !important;
-            padding: 0.7rem 1.3rem !important;
-            border-radius: 999px;
-            font-weight: 700;
-            box-shadow: 0 6px 16px rgba(234, 88, 12, .28);
-        }
-
-        .nav-cta:hover { filter: brightness(1.05); }
-
-        /* Hero */
-        .home-hero {
-            position: relative;
-            overflow: hidden;
-            padding: calc(var(--header-height) + 2.5rem) 0 4.5rem;
-            background:
-                radial-gradient(900px 420px at 15% 0%, rgba(246, 196, 83, .28), transparent 65%),
-                radial-gradient(900px 480px at 90% 10%, rgba(234, 88, 12, .22), transparent 60%),
-                linear-gradient(180deg, var(--night) 0%, var(--night-2) 100%);
-            color: #fff;
-            text-align: center;
-        }
-
-        .home-hero::after {
-            content: "";
-            position: absolute;
-            inset: auto 0 0 0;
-            height: 80px;
-            background: linear-gradient(180deg, transparent, rgba(253, 250, 246, 1));
-            pointer-events: none;
-        }
-
-        .hero-kicker {
+        .home-notice {
             display: inline-flex;
             align-items: center;
-            gap: .5rem;
-            padding: .45rem 1rem;
+            gap: .6rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 100%;
+            margin-bottom: 1.5rem;
+            padding: .7rem 1.2rem;
             border-radius: 999px;
-            background: rgba(246, 196, 83, .16);
-            border: 1px solid rgba(246, 196, 83, .45);
-            color: var(--gold);
+            background: rgba(255, 255, 255, .96);
+            color: var(--foreground);
             font-weight: 600;
-            letter-spacing: .02em;
+            text-decoration: none;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+            transition: transform var(--transition-fast);
         }
 
-        .home-hero h1 {
-            color: #fff;
-            font-size: clamp(2.2rem, 5vw, 3.6rem);
-            line-height: 1.08;
-            margin: 1.1rem auto .9rem;
-            max-width: 900px;
-        }
-
-        .home-hero .hero-lead {
-            color: rgba(255, 255, 255, .86);
-            max-width: 760px;
-            margin: 0 auto;
-            font-size: 1.15rem;
-            line-height: 1.6;
-        }
-
-        .hero-lead .ta { display: block; margin-top: .6rem; font-size: 1rem; opacity: .8; }
-
-        .hero-actions {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin: 2rem 0 2.6rem;
-        }
-
-        .btn-festival {
-            background: linear-gradient(135deg, #f59e0b, #ea580c);
-            color: #fff;
-            border: 0;
-            padding: 1rem 2rem;
-            border-radius: 999px;
-            font-weight: 700;
-            font-size: 1.05rem;
-            box-shadow: 0 10px 24px rgba(234, 88, 12, .35);
-        }
-
-        .btn-festival:hover { transform: translateY(-2px); color: #fff; }
-
-        .btn-glass {
-            background: rgba(255, 255, 255, .1);
-            color: #fff;
-            border: 1px solid rgba(255, 255, 255, .45);
-            padding: 1rem 2rem;
-            border-radius: 999px;
-            font-weight: 700;
-            font-size: 1.05rem;
-        }
-
-        .btn-glass:hover { background: rgba(255, 255, 255, .18); color: #fff; }
-
-        .hero-poster {
-            position: relative;
-            z-index: 1;
-            max-width: 1100px;
-            margin: 0 auto;
-            border-radius: 22px;
-            overflow: hidden;
-            border: 1px solid rgba(246, 196, 83, .45);
-            box-shadow: 0 30px 70px rgba(0, 0, 0, .45);
-        }
-
-        .hero-poster img { display: block; width: 100%; height: auto; }
-
-        /* Event card */
-        .event-section { padding: 3.5rem 0 1rem; }
-
-        .event-feature {
-            display: grid;
-            grid-template-columns: auto 1fr auto;
-            gap: 2rem;
-            align-items: center;
-            background: #fff;
-            border-radius: 24px;
-            padding: 2rem 2.2rem;
-            border: 1px solid #f3e3bf;
-            box-shadow: 0 18px 40px rgba(124, 45, 18, .08);
-        }
-
-        .date-badge {
-            width: 104px;
-            border-radius: 18px;
-            overflow: hidden;
-            text-align: center;
-            box-shadow: 0 8px 20px rgba(124, 45, 18, .18);
-        }
-
-        .date-badge .m { display: block; background: linear-gradient(135deg, #f59e0b, #ea580c); color: #fff; font-weight: 800; letter-spacing: .12em; padding: .4rem 0; font-size: .85rem; }
-        .date-badge .d { display: block; background: #fff8eb; color: var(--festival-deep); font-size: 2.6rem; font-weight: 800; line-height: 1; padding: .55rem 0 .2rem; }
-        .date-badge .y { display: block; background: #fff8eb; color: var(--festival); font-weight: 700; padding-bottom: .55rem; font-size: .85rem; }
-
-        .event-feature h2 { margin: .3rem 0 .6rem; font-size: 1.8rem; }
-        .event-tag { display: inline-block; font-size: .78rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--festival); }
-
-        .event-meta { display: flex; flex-wrap: wrap; gap: .5rem 1.4rem; color: var(--muted); font-weight: 600; }
-        .event-meta span { display: inline-flex; align-items: center; gap: .4rem; }
-
-        .event-chips { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
-        .event-chips span { padding: .35rem .8rem; border-radius: 999px; background: #fff4dc; color: var(--festival-deep); font-weight: 600; font-size: .9rem; }
-
-        .event-cta { display: flex; flex-direction: column; gap: .7rem; min-width: 220px; }
-        .event-cta .btn { text-align: center; justify-content: center; }
-
-        .btn-food {
-            background: #fff;
-            color: var(--festival-deep);
-            border: 1.5px solid #f3c27a;
-            padding: .9rem 1.6rem;
-            border-radius: 999px;
-            font-weight: 700;
-        }
-
-        .btn-food:hover { background: #fff8eb; color: var(--festival-deep); }
-
-        .closed-pill { display: block; text-align: center; padding: .8rem 1rem; border-radius: 999px; background: #f1f5f9; color: #64748b; font-weight: 700; }
-
-        /* Stats */
-        .home-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1rem;
-            margin-top: 2rem;
-        }
-
-        .home-stat {
-            background: linear-gradient(160deg, #fff, #fff8eb);
-            border: 1px solid #f3e3bf;
-            border-radius: 18px;
-            padding: 1.4rem 1rem;
-            text-align: center;
-        }
-
-        .home-stat .stat-number { color: var(--festival); font-size: 2.4rem; font-weight: 800; display: block; }
-        .home-stat .stat-label { color: var(--muted); font-weight: 600; }
-
-        /* Pillars */
-        .pillar {
-            position: relative;
-            background: #fff;
-            border-radius: 22px;
-            padding: 2.2rem 1.8rem;
-            text-align: center;
-            border: 1px solid #eef0f4;
-            box-shadow: 0 10px 30px rgba(15, 23, 42, .06);
-            transition: transform .25s, box-shadow .25s;
-        }
-
-        .pillar:hover { transform: translateY(-6px); box-shadow: 0 20px 40px rgba(15, 23, 42, .1); }
-
-        .pillar-icon {
-            width: 76px;
-            height: 76px;
-            margin: 0 auto 1.2rem;
-            border-radius: 22px;
-            display: grid;
-            place-items: center;
-            font-size: 2.2rem;
-            background: linear-gradient(135deg, #fff4dc, #ffe2c2);
-        }
-
-        .pillar h3 { font-size: 1.45rem; margin-bottom: .6rem; }
-
-        /* Partners */
-        .partners {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 1.5rem;
-        }
-
-        .partner-card {
-            display: flex;
-            align-items: center;
-            gap: 1.2rem;
-            padding: 1.4rem 1.8rem;
-            background: #fff;
-            border-radius: 22px;
-            border: 1px solid #f3e3bf;
-            box-shadow: 0 10px 28px rgba(124, 45, 18, .07);
-            max-width: 520px;
-        }
-
-        .partner-card img { width: 92px; height: 92px; border-radius: 50%; flex: 0 0 92px; box-shadow: 0 6px 18px rgba(15, 23, 42, .18); }
-        .partner-card .role { font-size: .75rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--festival); }
-        .partner-card h3 { margin: .25rem 0 .3rem; font-size: 1.3rem; }
-        .partner-card p { margin: 0; color: var(--muted); }
-
-        /* Join banner */
-        .join-banner {
-            margin: 0 auto;
-            border-radius: 28px;
-            padding: 3.2rem 2rem;
-            text-align: center;
-            color: #fff;
-            background:
-                radial-gradient(600px 260px at 10% 0%, rgba(246, 196, 83, .35), transparent 60%),
-                linear-gradient(135deg, var(--night), var(--night-2));
-            box-shadow: 0 24px 50px rgba(11, 29, 58, .3);
-        }
-
-        .join-banner h2 { color: #fff; margin-bottom: .8rem; }
-        .join-banner p { color: rgba(255, 255, 255, .85); max-width: 640px; margin: 0 auto 1.8rem; }
-
-        @media (max-width: 900px) {
-            .event-feature { grid-template-columns: auto 1fr; padding: 1.6rem; gap: 1.2rem 1.4rem; }
-            .event-cta { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; }
-            .event-cta > * { flex: 1 1 200px; }
-        }
+        .home-notice:hover { transform: translateY(-2px); }
+        .home-notice .new { background: var(--secondary); color: var(--foreground); border-radius: 999px; padding: .15rem .6rem; font-size: .8rem; font-weight: 800; }
+        .home-notice .go { color: var(--primary); font-weight: 800; white-space: nowrap; }
+        [hidden] { display: none !important; }
 
         @media (max-width: 600px) {
-            .home-hero { padding: calc(var(--header-height) + 1.2rem) 0 3rem; }
-            .home-hero .hero-lead { font-size: 1.02rem; }
-            .hero-actions { flex-direction: column; align-items: stretch; margin: 1.6rem 0 2rem; }
-            .hero-poster { border-radius: 14px; }
-            .event-feature { grid-template-columns: 1fr; text-align: left; }
-            .date-badge { width: 88px; }
-            .date-badge .d { font-size: 2.1rem; }
-            .event-feature h2 { font-size: 1.45rem; }
-            .event-cta { flex-direction: column; }
-            .event-cta > * { flex: 0 0 auto; }
-            .home-stats { gap: .6rem; }
-            .home-stat { padding: 1rem .4rem; }
-            .home-stat .stat-number { font-size: 1.8rem; }
-            .home-stat .stat-label { font-size: .85rem; }
-            .partner-card { flex-direction: column; text-align: center; padding: 1.4rem; }
-            .join-banner { padding: 2.4rem 1.2rem; border-radius: 20px; }
+            .home-notice { border-radius: 18px; padding: .8rem 1rem; font-size: .92rem; }
         }
     </style>
 </head>
@@ -306,7 +47,7 @@
     <nav class="navbar">
         <div class="container nav-container">
             <a href="index.html" class="nav-brand">
-                <img src="logo-240.webp" alt="Skåne Tamil Sangam Logo" style="height:100px;" width="100" height="100">
+                <img src="logo.png" alt="Skåne Tamil Sangam Logo" style="height:100px;">
                 <div class="brand-text">
                     <span class="brand-en">SKÅNE TAMIL SANGAM</span>
                     <span class="brand-ta">சுகோனே தமிழ் சங்கம்</span>
@@ -317,137 +58,167 @@
                 <li><a href="index.html" class="nav-link active">Home</a></li>
                 <li><a href="about.html" class="nav-link">About Us</a></li>
                 <li><a href="events.html" class="nav-link">Events</a></li>
+                <li><a href="gallery.html" class="nav-link">Gallery</a></li>
                 <li><a href="contact.html" class="nav-link">Contact</a></li>
-                <li class="js-register"><a href="event-registration.html" class="nav-link nav-cta">Register for Diwali</a></li>
             </ul>
         </div>
     </nav>
 
-    <!-- Hero: Diwali 2026 poster -->
-    <header class="home-hero">
-        <div class="container" style="position: relative; z-index: 2;">
-            <span class="hero-kicker">🪔 யாதும் ஊரே யாவரும் கேளிர்</span>
-            <h1 data-cms-key="hero-title">Uniting Tamil Hearts<br>Across Skåne</h1>
-            <p class="hero-lead" data-cms-key="hero-description">
-                The central hub for the Tamil community in Southern Sweden — fostering language, culture, and deep
-                connections that span generations.
-                <span class="ta">தெற்கு ஸ்வீடனில் உள்ள தமிழ் சமூகத்திற்கான மைய மையம் — மொழி, கலாச்சாரம் மற்றும் உறவுகளை வளர்க்கிறது.</span>
-            </p>
-            <div class="hero-actions">
-                <a href="event-registration.html" class="btn btn-festival js-register">Register for Diwali 2026 →</a>
-                <a href="events.html" class="btn btn-glass">Upcoming Events</a>
+    <!-- Hero Section -->
+    <header class="hero">
+        <div class="hero-slider">
+            <div class="hero-slide active"
+                style="background-image: url('https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=1920&q=80');">
             </div>
-            <a href="event-registration.html" class="hero-poster" aria-label="Diwali 2026 – register now">
-                <img src="diwali-2026-banner-1600.webp"
-                    srcset="diwali-2026-banner-800.webp 800w, diwali-2026-banner-1600.webp 1600w"
-                    sizes="(max-width: 900px) 100vw, 1100px" width="1600" height="533"
-                    alt="Skåne Tamil Sangam Diwali 2026 — Sunday 15 November 2026 at Tryckeriet, from 10:00 AM">
-            </a>
+            <div class="hero-slide"
+                style="background-image: url('https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=1920&q=80');">
+            </div>
+            <div class="hero-slide"
+                style="background-image: url('https://images.unsplash.com/photo-1610444558557-45818d6a86e9?auto=format&fit=crop&w=1920&q=80');">
+            </div>
+        </div>
+        <div class="container hero-content animate-fade-in"
+            style="animation-delay: 0.2s; position: relative; z-index: 2;">
+            <a href="events.html" class="home-notice" id="diwali-notice">
+                <span class="new">NEW</span>
+                <span>🪔 Diwali 2026 · Sunday 15 November at Tryckeriet — <span id="notice-status">registration is open</span></span>
+                <span class="go">See invitation →</span>
+            </a><br>
+            <div class="section-label"
+                style="background: rgba(255,193,7,0.2); color: var(--secondary); margin-bottom: 1.5rem;">
+                யாதும் ஊரே யாவரும் கேளிர்
+            </div>
+            <h1 data-cms-key="hero-title">Uniting Tamil Hearts<br>Across Skåne</h1>
+            <p data-cms-key="hero-description"
+                style="margin-top: 1.5rem; max-width: 800px; margin-left: auto; margin-right: auto; line-height: 1.6;">
+                The central hub for the Tamil community in Southern Sweden — fostering language, culture, and deep
+                connections that span generations.<br>
+                <span style="display: block; margin-top: 0.75rem; font-size: 1.1rem; opacity: 0.85;">தெற்கு ஸ்வீடனில்
+                    உள்ள தமிழ் சமூகத்திற்கான மைய மையம் — மொழி, கலாச்சாரம் மற்றும் உறவுகளை வளர்க்கிறது.</span>
+            </p>
+            <div style="display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap; margin-top: 3rem;">
+                
+                <a href="events.html" class="btn btn-outline"
+                    style="border-color: white; color: white; padding: 1.1rem 2.5rem; font-size: 1.05rem;">Explore
+                    Events →</a>
+            </div>
         </div>
     </header>
 
-    <!-- Upcoming event -->
-    <section class="event-section">
-        <div class="container">
-            <div class="section-header" style="margin-bottom: 2rem;">
-                <span class="section-label">Upcoming Event</span>
-                <h2>Join the celebration</h2>
-            </div>
-            <article class="event-feature">
-                <div class="date-badge" aria-label="15 November 2026">
-                    <span class="m">NOV</span><span class="d">15</span><span class="y">2026</span>
-                </div>
-                <div>
-                    <span class="event-tag">Festival of Lights</span>
-                    <h2>Diwali Celebration 2026</h2>
-                    <div class="event-meta">
-                        <span>📅 Sunday 15 November</span>
-                        <span>🕙 From 10:00 AM</span>
-                        <span>📍 Tryckeriet</span>
-                    </div>
-                    <div class="event-chips">
-                        <span>🎭 Culture</span><span>🎲 Games</span><span>🍛 Food stalls</span><span>🎆 Crackers</span>
-                    </div>
-                </div>
-                <div class="event-cta">
-                    <a href="event-registration.html" class="btn btn-festival js-register">Register now →</a>
-                    <span class="closed-pill js-register-closed" hidden>Registration is closed</span>
-                    <a href="food/index.html" class="btn btn-food js-food">🍛 Pre-order food (Click2Eat)</a>
-                    <span class="closed-pill js-food-closed" hidden>Food pre-orders are closed</span>
-                </div>
-            </article>
-
-            <div class="home-stats">
-                <div class="home-stat"><span class="stat-number" data-target="200">0</span><span class="stat-label">Active Members</span></div>
-                <div class="home-stat"><span class="stat-number" data-target="5">0</span><span class="stat-label">Events Per Year</span></div>
-                <div class="home-stat"><span class="stat-number" data-target="5">0</span><span class="stat-label">Years of Community</span></div>
-            </div>
+    <!-- Stats Bar -->
+    <div class="stats-grid">
+        <div class="stat-item">
+            <span class="stat-number" data-target="200">0</span>
+            <span class="stat-label">Active Members</span>
         </div>
-    </section>
+        <div class="stat-item">
+            <span class="stat-number" data-target="5">0</span>
+            <span class="stat-label">Events Per Year</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-number" data-target="5">0</span>
+            <span class="stat-label">Years of Community</span>
+        </div>
+    </div>
 
     <!-- What We Stand For -->
-    <section class="section" style="padding: 4.5rem 0;">
+    <section class="section bg-warm" style="padding: 5rem 0;">
         <div class="container">
             <div class="section-header">
-                <span class="section-label">What we offer</span>
+                <span class="section-label">Our Pillars</span>
                 <h2>What We Stand For</h2>
                 <p>Three simple values that guide everything we do as a community.</p>
             </div>
             <div class="grid grid-3">
-                <div class="pillar">
-                    <div class="pillar-icon">🤝</div>
-                    <h3 data-cms-key="vision-1-title">சமூகம் (Community)</h3>
-                    <p class="text-muted" data-cms-key="vision-1-desc">Connecting Tamil families across Skåne
-                        through regular meetups, shared celebrations, and social gatherings that bring us closer.</p>
+                <div class="card" style="text-align: center;">
+                    <div class="card-content">
+                        <div
+                            style="font-size: 2.5rem; margin-bottom: 1.25rem; padding: 1.25rem; background: var(--primary-light); border-radius: 50%; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; margin-left: auto; margin-right: auto;">
+                            🤝</div>
+                        <h3 class="card-title" style="font-size: 1.5rem;" data-cms-key="vision-1-title">சமூகம்
+                            (Community)</h3>
+                        <p class="text-muted" data-cms-key="vision-1-desc">Connecting Tamil families across Skåne
+                            through regular meetups, shared celebrations, and social gatherings that bring us closer.
+                        </p>
+                    </div>
                 </div>
-                <div class="pillar">
-                    <div class="pillar-icon">🎭</div>
-                    <h3 data-cms-key="vision-2-title">கலாச்சாரம் (Culture)</h3>
-                    <p class="text-muted" data-cms-key="vision-2-desc">Celebrating our rich heritage through grand
-                        festivals like Pongal, Deepavali, and Chithirai Vizha that honour our traditions.</p>
+                <div class="card" style="text-align: center;">
+                    <div class="card-content">
+                        <div
+                            style="font-size: 2.5rem; margin-bottom: 1.25rem; padding: 1.25rem; background: var(--primary-light); border-radius: 50%; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; margin-left: auto; margin-right: auto;">
+                            🎭</div>
+                        <h3 class="card-title" style="font-size: 1.5rem;" data-cms-key="vision-2-title">கலாச்சாரம்
+                            (Culture)</h3>
+                        <p class="text-muted" data-cms-key="vision-2-desc">Celebrating our rich heritage through grand
+                            festivals like Pongal, Deepavali, and Chithirai Vizha that honour our traditions.</p>
+                    </div>
                 </div>
-                <div class="pillar">
-                    <div class="pillar-icon">📚</div>
-                    <h3 data-cms-key="vision-3-title">மொழி (Language)</h3>
-                    <p class="text-muted" data-cms-key="vision-3-desc">Promoting Tamil language learning for the
-                        next generation through workshops and community-led immersion programs.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Partners -->
-    <section class="section bg-warm" style="padding: 4.5rem 0;">
-        <div class="container">
-            <div class="section-header">
-                <span class="section-label">Our Partners</span>
-                <h2>Working with the best partners</h2>
-                <p>Thank you to the partners who help make our celebrations possible.</p>
-            </div>
-            <div class="partners">
-                <div class="partner-card">
-                    <img src="prime-tone-logo.webp" alt="Prime Tone Productions" width="92" height="92" loading="lazy" decoding="async">
-                    <div>
-                        <span class="role">Diwali 2026 collaboration partner</span>
-                        <h3>Prime Tone Productions</h3>
-                        <p>Our collaboration partner for the Skåne Tamil Sangam Diwali 2026 celebration.</p>
+                <div class="card" style="text-align: center;">
+                    <div class="card-content">
+                        <div
+                            style="font-size: 2.5rem; margin-bottom: 1.25rem; padding: 1.25rem; background: var(--primary-light); border-radius: 50%; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; margin-left: auto; margin-right: auto;">
+                            📚</div>
+                        <h3 class="card-title" style="font-size: 1.5rem;" data-cms-key="vision-3-title">மொழி (Language)
+                        </h3>
+                        <p class="text-muted" data-cms-key="vision-3-desc">Promoting Tamil language learning for the
+                            next generation through workshops and community-led immersion programs.</p>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Join -->
-    <section class="section" style="padding: 4.5rem 0 5rem;">
+    <!-- Latest Updates -->
+    <section class="section bg-surface" style="padding: 5rem 0;">
         <div class="container">
-            <div class="join-banner">
-                <span class="section-label" style="background: rgba(255,255,255,0.14); color: var(--gold);">Be Part of Something Special</span>
-                <h2>Ready to Join Our Community?</h2>
-                <p>Become a member and connect with hundreds of Tamil families across Skåne. Events, friendships, and memories await you.</p>
-                <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
-                    <a href="join.html" class="btn btn-festival">Become a member</a>
-                    <a href="about.html" class="btn btn-glass">Learn more about us</a>
-                </div>
+            <div class="section-header">
+                <span class="section-label">Stay Connected</span>
+                <h2>Latest Updates</h2>
+                <p>Stay in the loop with community highlights and upcoming opportunities.</p>
+            </div>
+            <div class="grid grid-3">
+                <article class="card animate-fade-in" style="animation-delay: 0.1s;">
+                    <img src="https://images.unsplash.com/photo-1606216794074-735e91aa2c92?auto=format&fit=crop&w=800&q=80"
+                        alt="Chithirai Festival" class="card-image">
+                    <div class="card-content">
+                        <span class="card-tag">Festival</span>
+                        <h3 class="card-title">Chithirai Vizha 2026</h3>
+                        <p class="text-muted">Join us for the grand celebration of Tamil New Year. Cultural programs, a
+                            traditional feast, and so much more!</p>
+                        <a href="events.html" class="btn btn-ghost" style="padding: 0.5rem 0; margin-top: 0.5rem;">View
+                            Details →</a>
+                    </div>
+                </article>
+                <article class="card animate-fade-in" style="animation-delay: 0.3s;">
+                    <img src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=800&q=80"
+                        alt="Community Gathering" class="card-image">
+                    <div class="card-content">
+                        <span class="card-tag">Community</span>
+                        <h3 class="card-title">New Membership Drive</h3>
+                        <p class="text-muted">We're growing! Invite a friend or family member to join Skåne Tamil Sangam
+                            and become part of our vibrant family.</p>
+                        <a href="join.html" class="btn btn-ghost" style="padding: 0.5rem 0; margin-top: 0.5rem;">Join
+                            Now →</a>
+                    </div>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Banner -->
+    <section class="cta-banner">
+        <div class="container">
+            <span class="section-label"
+                style="background: rgba(255,255,255,0.15); color: white; margin-bottom: 1.5rem;">Be Part of Something
+                Special</span>
+            <h2>Ready to Join Our Community?</h2>
+            <p>Become a member today and connect with hundreds of Tamil families across Skåne. Events, friendships, and
+                memories await you.</p>
+            <div style="display: flex; gap: 1.25rem; justify-content: center; flex-wrap: wrap;">
+                
+                <a href="about.html" class="btn btn-outline"
+                    style="border-color: rgba(255,255,255,0.5); color: white; padding: 1.1rem 2.5rem; font-size: 1.05rem;">Learn
+                    More About Us</a>
             </div>
         </div>
     </section>
@@ -472,9 +243,8 @@
                         <li><a href="index.html">Home</a></li>
                         <li><a href="about.html">About Us</a></li>
                         <li><a href="events.html">Events</a></li>
+                        <li><a href="gallery.html">Gallery</a></li>
                         <li><a href="contact.html">Contact</a></li>
-                        <li class="js-register"><a href="event-registration.html">Diwali 2026 Registration</a></li>
-                        <li class="js-food"><a href="food/index.html">Click2Eat</a></li>
                     </ul>
                 </div>
                 <div class="footer-col">
@@ -495,22 +265,27 @@
 
     <button class="back-to-top" id="back-to-top" aria-label="Back to top">↑</button>
 
+    <script>
+        // The notice always links to the invitation; its wording follows Site Controls.
+        fetch('/food-api/settings', { cache: 'no-store' })
+            .then(r => r.ok ? r.json() : null)
+            .then(st => { if (st && st.event_registration_enabled === false) document.getElementById('notice-status').textContent = 'see you there'; })
+            .catch(() => { });
+    </script>
     <script src="js/cms.js"></script>
     <script src="js/main.js"></script>
     <script>
-        // Hide Register / Click2Eat links when an admin has closed them in Site Controls.
-        fetch('/food-api/settings', { cache: 'no-store' })
-            .then(r => r.ok ? r.json() : null)
-            .then(s => {
-                if (!s) return;
-                const toggle = (open, cls) => {
-                    document.querySelectorAll(`.js-${cls}`).forEach(el => { el.hidden = !open; });
-                    document.querySelectorAll(`.js-${cls}-closed`).forEach(el => { el.hidden = open; });
-                };
-                toggle(s.event_registration_enabled !== false, 'register');
-                toggle(s.food_ordering_enabled !== false, 'food');
-            })
-            .catch(() => { });
+        // Hero Slider Logic
+        const slides = document.querySelectorAll('.hero-slide');
+        let currentSlide = 0;
+
+        if (slides.length > 1) {
+            setInterval(() => {
+                slides[currentSlide].classList.remove('active');
+                currentSlide = (currentSlide + 1) % slides.length;
+                slides[currentSlide].classList.add('active');
+            }, 5000);
+        }
     </script>
 </body>
 
