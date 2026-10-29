@@ -797,7 +797,7 @@
         ${v.menu.map(m => {
           const { max, isSoldOut, available } = itemStock(m);
           const badge = isSoldOut ? '<span class="item-badge out">SOLD OUT</span>'
-            : (max > 0 && available <= 10 ? `<span class="item-badge">ONLY ${available} LEFT</span>` : '');
+            : '';
           return `
           <div class="item-card ${isSoldOut ? 'sold-out' : ''}" onclick="openItem(${v.id}, ${m.id})" role="button" tabindex="0"
                onkeydown="if (event.key === 'Enter') openItem(${v.id}, ${m.id})">
@@ -833,7 +833,7 @@
       document.getElementById('sheet-kicker').textContent = `${v.name} · ${categoryOf(m) === 'SNACKS' ? 'Snacks' : 'Food'}`;
       document.getElementById('sheet-name').textContent = m.item_name;
       document.getElementById('sheet-price').textContent = `${m.price} kr`;
-      document.getElementById('sheet-stock').textContent = isSoldOut ? 'Sold out' : (max > 0 ? `${available} left` : '');
+      document.getElementById('sheet-stock').textContent = isSoldOut ? 'Sold out' : '';
       document.getElementById('sheet-desc').textContent = m.description || '';
       document.getElementById('sheet-desc-wrap').style.display = m.description ? '' : 'none';
       document.getElementById('sheet-ingr').textContent = m.ingredients || '';
@@ -899,7 +899,7 @@
       }
 
       if (currentInCart + qty > maxAvail) {
-        alert(`Sorry, only ${maxAvail} items available (You have ${currentInCart} in cart)`);
+        alert('Sorry, this quantity is not available.');
         return false;
       }
 
