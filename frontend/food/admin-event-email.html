@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Event Emails</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;background:#f4f7f9;margin:0;padding:20px;color:#222}
+.wrap{max-width:1000px;margin:auto}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.top p{color:#667085;margin:4px 0 0}
+.card{background:#fff;border-radius:14px;padding:20px;box-shadow:0 3px 12px #0001;margin-top:18px}
+.card h2{margin:0 0 12px;font-size:1.15rem}
+a.btn,button{border:0;border-radius:8px;padding:10px 14px;text-decoration:none;cursor:pointer;font-weight:bold;font-size:14px}
+.back{background:#476cff;color:#fff}
+.primary{background:#0056b3;color:#fff}
+.send{background:#16a34a;color:#fff}
+.ghost{background:#eef2f7;color:#1f2937}
+button:disabled{opacity:.5;cursor:not-allowed}
+.status{padding:14px 16px;border-radius:12px;font-weight:600;line-height:1.5}
+.status.ok{background:#ecfdf3;color:#067647;border:1px solid #abefc6}
+.status.off{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
+.status code{background:#fff;padding:1px 5px;border-radius:4px;font-size:.85rem}
+.row{display:flex;gap:14px;flex-wrap:wrap}
+.field{flex:1 1 220px;display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.field label{font-weight:bold;font-size:.9rem}
+select,input[type=text],input[type=email],textarea{padding:10px 12px;border:1px solid #d0d5dd;border-radius:8px;font:inherit;font-size:14px;width:100%;box-sizing:border-box}
+textarea{min-height:130px;resize:vertical}
+.check{display:flex;align-items:center;gap:8px;font-size:.9rem;margin:4px 0 12px}
+.check input{width:auto;margin:0}
+.hint{color:#667085;font-size:.82rem}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.summary{margin:14px 0 10px;font-weight:bold}
+.recipients{max-height:180px;overflow:auto;border:1px solid #eee;border-radius:8px;font-size:.85rem}
+.recipients div{padding:6px 10px;border-bottom:1px solid #f2f2f2;display:flex;justify-content:space-between;gap:10px}
+.recipients div:last-child{border-bottom:0}
+iframe{width:100%;height:520px;border:1px solid #eee;border-radius:10px;margin-top:12px;background:#fdfaf6}
+.progress{margin-top:12px;font-weight:bold}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th,td{padding:8px;border-bottom:1px solid #eee;text-align:left;vertical-align:top}
+th{background:#f8fafc}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:bold;font-size:.75rem}
+.SENT{background:#dcfce7;color:#166534}.FAILED{background:#fee2e2;color:#991b1b}.SKIPPED{background:#fef3c7;color:#92400e}
+.table-scroll{overflow:auto;max-height:420px}
+</style>
+<link rel="stylesheet" href="../responsive.css?v=20261015">
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div><h1>Event Emails</h1><p>Email the families registered for Diwali 2026.</p></div>
+    <div><a class="btn back" href="admin.html?admin=true">Admin Home</a></div>
+  </div>
+
+  <div class="card"><div class="status" id="status">Checking email setup…</div></div>
+
+  <div class="card">
+    <h2>Automatic emails</h2>
+    <p class="hint" style="font-size:.9rem;margin:0">These are sent on their own, no action needed:<br>
+      • <b>Registration confirmed</b>: when a family registers, with their details and how to pay.<br>
+      • <b>Payment received</b>: when a family uploads their Swish screenshot and taps Mark as Paid.</p>
+  </div>
+
+  <div class="card">
+    <h2>Send a group email</h2>
+    <div class="row">
+      <div class="field">
+        <label for="kind">Email</label>
+        <select id="kind">
+          <option value="PAYMENT_OPEN">Payment is now open</option>
+          <option value="PAYMENT_REMINDER">Payment reminder</option>
+          <option value="CUSTOM">My own message</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="audience">Send to</label>
+        <select id="audience">
+          <option value="UNPAID">Families who have not paid yet</option>
+          <option value="ALL">All registered families</option>
+          <option value="PAID">Families who have paid</option>
+        </select>
+      </div>
+    </div>
+    <div id="customBox" style="display:none">
+      <div class="field"><label for="subject">Subject</label><input type="text" id="subject" maxlength="150" placeholder="e.g. Diwali 2026 – programme update"></div>
+      <div class="field"><label for="message">Message</label><textarea id="message" maxlength="5000" placeholder="Vanakkam {first_name}, …"></textarea>
+        <span class="hint">You can use {first_name}, {amount_due} and {registration_id}. They are filled in for each family.</span></div>
+      <label class="check"><input type="checkbox" id="includePayment"> Add each family's payment details (amount, Swish number) if they have not paid</label>
+    </div>
+    <label class="check"><input type="checkbox" id="skipRecent" checked> Skip families who already got this email in the last 24 hours</label>
+    <div class="actions">
+      <button class="primary" id="previewBtn">Preview</button>
+      <button class="send" id="sendBtn" disabled>Send email</button>
+    </div>
+    <div id="previewArea" style="display:none">
+      <div class="summary" id="previewCount"></div>
+      <div class="recipients" id="recipientList"></div>
+      <iframe id="previewFrame" sandbox title="Email preview"></iframe>
+    </div>
+    <div class="progress" id="progress"></div>
+  </div>
+
+  <div class="card">
+    <h2>Send a test email</h2>
+    <div class="row" style="align-items:flex-end">
+      <div class="field" style="margin:0"><label for="testTo">Your email address</label><input type="email" id="testTo" placeholder="you@example.com"></div>
+      <div><button class="ghost" id="testBtn">Send test</button></div>
+    </div>
+    <div class="progress" id="testResult"></div>
+  </div>
+
+  <div class="card">
+    <h2>Recent emails</h2>
+    <div class="table-scroll"><table><thead><tr><th>When</th><th>Email</th><th>To</th><th>Status</th></tr></thead><tbody id="log"><tr><td colspan="4">Loading…</td></tr></tbody></table></div>
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script>
+checkAuth('admin');
+const API = '/food-api';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const KIND_NAMES = { REGISTRATION: 'Registration confirmed', PAYMENT_RECEIVED: 'Payment received', PAYMENT_OPEN: 'Payment is open', PAYMENT_REMINDER: 'Payment reminder', CUSTOM: 'Own message' };
+const $ = id => document.getElementById(id);
+let emailReady = false;
+
+async function loadStatus() {
+  try {
+    const r = await authFetch(`${API}/admin/email/status`, { cache: 'no-store' });
+    const s = await r.json();
+    emailReady = !!s.configured;
+    $('status').className = 'status ' + (s.configured ? 'ok' : 'off');
+    $('status').innerHTML = s.configured
+      ? `✓ Email sending is set up. Emails are sent from <b>${esc(s.from)}</b>.`
+      : `Email sending is not set up yet, so nothing is sent. Every email is listed below as SKIPPED.<br>To turn it on, add <code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>SMTP_USER</code>, <code>SMTP_PASS</code> and <code>MAIL_FROM</code> for the food backend on the server.`;
+  } catch (e) { $('status').textContent = 'Could not check the email setup.'; }
+}
+
+function formBody() {
+  return {
+    kind: $('kind').value,
+    audience: $('audience').value,
+    subject: $('subject').value,
+    message: $('message').value,
+    includePayment: $('includePayment').checked,
+    skipHours: $('skipRecent').checked ? 24 : 0
+  };
+}
+
+function resetPreview() { $('sendBtn').disabled = true; $('previewArea').style.display = 'none'; }
+
+$('kind').addEventListener('change', () => {
+  $('customBox').style.display = $('kind').value === 'CUSTOM' ? '' : 'none';
+  if ($('kind').value === 'PAYMENT_OPEN' || $('kind').value === 'PAYMENT_REMINDER') $('audience').value = 'UNPAID';
+  resetPreview();
+});
+['audience', 'subject', 'message', 'includePayment', 'skipRecent'].forEach(id => $(id).addEventListener('input', resetPreview));
+
+$('previewBtn').addEventListener('click', async () => {
+  $('progress').textContent = '';
+  const r = await authFetch(`${API}/admin/email/preview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formBody()) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { alert(d.error || 'Could not make a preview.'); return; }
+  $('previewArea').style.display = '';
+  $('previewCount').textContent = d.count
+    ? `This email will go to ${d.count} famil${d.count === 1 ? 'y' : 'ies'}. Preview of the first one:`
+    : 'Nobody matches this selection.';
+  $('recipientList').innerHTML = d.recipients.map(x => `<div><span>${esc(x.name)} · ${esc(x.email)}</span><span>${x.amount_due ? esc(x.amount_due) + ' kr due' : 'paid'}</span></div>`).join('');
+  $('previewFrame').srcdoc = d.html;
+  $('sendBtn').disabled = !d.count || !emailReady;
+  if (!emailReady && d.count) $('progress').textContent = 'Set up email sending first (see the box at the top) to send this.';
+  $('sendBtn').dataset.count = d.count;
+});
+
+$('sendBtn').addEventListener('click', async () => {
+  const count = $('sendBtn').dataset.count;
+  if (!confirm(`Send this email to ${count} famil${count === '1' ? 'y' : 'ies'} now?`)) return;
+  $('sendBtn').disabled = true;
+  $('previewBtn').disabled = true;
+  const r = await authFetch(`${API}/admin/email/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formBody()) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { alert(d.error || 'Could not send.'); $('previewBtn').disabled = false; return; }
+  const poll = async () => {
+    const b = await (await authFetch(`${API}/admin/email/batch/${d.batchId}`, { cache: 'no-store' })).json();
+    $('progress').textContent = b.done
+      ? `✓ Finished: ${b.sent} sent${b.failed ? `, ${b.failed} failed (see Recent emails)` : ''}.`
+      : `Sending… ${b.sent + b.failed} of ${b.total}`;
+    if (b.done) { $('previewBtn').disabled = false; resetPreview(); loadLog(); } else setTimeout(poll, 1500);
+  };
+  poll();
+});
+
+$('testBtn').addEventListener('click', async () => {
+  $('testResult').textContent = 'Sending…';
+  const r = await authFetch(`${API}/admin/email/test`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: $('testTo').value }) });
+  const d = await r.json().catch(() => ({}));
+  $('testResult').textContent = r.ok ? '✓ Test email sent. Check your inbox (and spam folder).' : (d.error || 'Could not send.');
+});
+
+async function loadLog() {
+  const r = await authFetch(`${API}/admin/email/log`, { cache: 'no-store' });
+  const rows = await r.json().catch(() => []);
+  $('log').innerHTML = rows.map(l => `<tr>
+    <td>${esc(new Date(l.created_at).toLocaleString())}</td>
+    <td>${esc(KIND_NAMES[l.kind] || l.kind)}<br><span class="hint">${esc(l.subject)}</span></td>
+    <td>${esc([l.first_name, l.last_name].filter(Boolean).join(' '))}<br><span class="hint">${esc(l.to_email)}</span></td>
+    <td><span class="pill ${esc(l.status)}">${esc(l.status)}</span>${l.error ? `<br><span class="hint">${esc(l.error)}</span>` : ''}</td></tr>`).join('')
+    || '<tr><td colspan="4">No emails yet.</td></tr>';
+}
+
+loadStatus();
+loadLog();
+</script>
+</body>
+</html>

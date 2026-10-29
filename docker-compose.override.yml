@@ -1,0 +1,12 @@
+# Email settings for event emails (registration/payment confirmations and admin group emails).
+# Docker Compose merges this file into docker-compose.yml automatically.
+# Put the values in the .env file next to docker-compose.yml; leave them empty to keep email turned off.
+services:
+  food-backend:
+    environment:
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      SITE_URL: https://skanetamilsangam.duckdns.org

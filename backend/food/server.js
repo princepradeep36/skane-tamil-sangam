@@ -7,6 +7,7 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const pool = require("./db");
 const initializeDatabase = require("./init-db");
+const mailer = require("./mailer");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error("JWT_SECRET environment variable is required");
@@ -632,7 +633,8 @@ app.post("/event/register", requireEventRegistrationOpen, async (req, res) => {
         [firstName.trim(),lastName.trim(),email.trim(),normalizedPhone,normalizedWhatsapp,adultsCount,kids6to12Count,kidsBelow6Count,!!volunteerInterest,!!culturalInterest,normalizedCulturalActivity,normalizedComments,!!photoConsent,amount,swish?.id || null,existing.rows[0].id]);
       const saved = await registrationWithSwish(client, revived.rows[0].id);
       await client.query('COMMIT');
-      return res.status(201).json(saved);
+      res.status(201).json(saved);
+      return mailer.sendToRegistration(saved, 'REGISTRATION');
     }
     if (existing.rows.length) {
       await client.query('ROLLBACK');
@@ -645,6 +647,7 @@ app.post("/event/register", requireEventRegistrationOpen, async (req, res) => {
     const saved = await registrationWithSwish(client, result.rows[0].id);
     await client.query('COMMIT');
     res.status(201).json(saved);
+    mailer.sendToRegistration(saved, 'REGISTRATION');
   } catch (err) {
     await client.query('ROLLBACK');
     if (err.code === '23505') return res.status(409).json({ code: "BOOKING_EXISTS", error: "You are already booked with this phone number. Please use Find Booking above to view or update your registration." });
@@ -741,6 +744,7 @@ app.put("/event/registration/:id/pay", express.raw({ type: 'image/*', limit: '5m
     const saved = await registrationWithSwish(client, result.rows[0].id);
     await client.query('COMMIT');
     res.json({ success: true, registration: saved });
+    mailer.sendToRegistration(saved, 'PAYMENT_RECEIVED');
   } catch (err) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: err.message });
@@ -809,6 +813,96 @@ app.put("/admin/event-registration/:id/payment", requireAdmin, async (req, res) 
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+
+/* ================= EVENT EMAILS (ADMIN) ================= */
+
+const EMAIL_AUDIENCES = {
+  ALL: "TRUE",
+  UNPAID: "r.payment_status <> 'PAID' AND r.total_amount > r.paid_amount",
+  PAID: "r.payment_status = 'PAID'"
+};
+const GROUP_KINDS = ['PAYMENT_OPEN', 'PAYMENT_REMINDER', 'CUSTOM'];
+const emailBatches = new Map();
+
+// Registrations a group email would go to. skipHours leaves out people who got the same kind of email recently.
+async function emailRecipients(audience, kind, skipHours) {
+  const where = EMAIL_AUDIENCES[audience];
+  if (!where) throw Object.assign(new Error("Unknown audience"), { status: 400 });
+  const hours = Math.max(0, Math.min(Number(skipHours) || 0, 24 * 60));
+  const q = await pool.query(`SELECT r.*, GREATEST(r.total_amount - r.paid_amount, 0) AS amount_due, a.swish_number
+    FROM event_registrations r LEFT JOIN event_swish_accounts a ON a.id = r.swish_account_id
+    WHERE r.registration_status <> 'CANCELLED' AND COALESCE(r.email,'') <> '' AND ${where}
+      AND ($2::int = 0 OR NOT EXISTS (SELECT 1 FROM event_email_log l WHERE l.registration_id = r.id AND l.kind = $1
+        AND l.status = 'SENT' AND l.created_at > CURRENT_TIMESTAMP - make_interval(hours => $2::int)))
+    ORDER BY r.id`, [kind, hours]);
+  return q.rows;
+}
+
+function readGroupEmail(body) {
+  const { audience, kind, subject, message, includePayment, skipHours } = body || {};
+  if (!GROUP_KINDS.includes(kind)) throw Object.assign(new Error("Unknown email type"), { status: 400 });
+  if (kind === 'CUSTOM' && (!String(subject || '').trim() || !String(message || '').trim()))
+    throw Object.assign(new Error("Please write a subject and a message."), { status: 400 });
+  return { audience, kind, skipHours, custom: { subject: String(subject || '').trim(), body: String(message || '').trim(), includePayment: !!includePayment } };
+}
+
+app.get("/admin/email/status", requireAdmin, (req, res) => {
+  res.json({ configured: mailer.configured(), from: mailer.fromAddress() || null });
+});
+
+app.post("/admin/email/preview", requireAdmin, async (req, res) => {
+  try {
+    const g = readGroupEmail(req.body);
+    const recipients = await emailRecipients(g.audience, g.kind, g.skipHours);
+    const sample = recipients[0] || { id: 123, first_name: 'Anu', adults_count: 2, kids_6_12_count: 1, kids_below_6_count: 0, total_amount: 260, paid_amount: 0, amount_due: 260, payment_status: 'PENDING', swish_number: '1234567890' };
+    const { subject, html } = mailer.TEMPLATES[g.kind](sample, g.custom);
+    res.json({ count: recipients.length, recipients: recipients.map(r => ({ id: r.id, name: `${r.first_name} ${r.last_name}`, email: r.email, amount_due: Number(r.amount_due) })), subject, html });
+  } catch (err) { res.status(err.status || 500).json({ error: err.message }); }
+});
+
+app.post("/admin/email/send", requireAdmin, async (req, res) => {
+  try {
+    const g = readGroupEmail(req.body);
+    const recipients = await emailRecipients(g.audience, g.kind, g.skipHours);
+    if (!recipients.length) return res.status(400).json({ error: "Nobody matches this selection." });
+    if (!mailer.configured()) return res.status(400).json({ error: "Email sending is not set up yet. Add the SMTP settings on the server first." });
+    const batchId = crypto.randomUUID();
+    const batch = { total: recipients.length, sent: 0, failed: 0, done: false };
+    emailBatches.set(batchId, batch);
+    res.json({ batchId, total: batch.total });
+    // Send one at a time with a short pause so the mail provider does not throttle us.
+    for (const r of recipients) {
+      (await mailer.sendToRegistration(r, g.kind, g.custom, batchId)) ? batch.sent++ : batch.failed++;
+      await new Promise(resolve => setTimeout(resolve, 1200));
+    }
+    batch.done = true;
+  } catch (err) { if (!res.headersSent) res.status(err.status || 500).json({ error: err.message }); }
+});
+
+app.get("/admin/email/batch/:id", requireAdmin, (req, res) => {
+  const batch = emailBatches.get(req.params.id);
+  if (!batch) return res.status(404).json({ error: "Unknown batch" });
+  res.json(batch);
+});
+
+app.post("/admin/email/test", requireAdmin, async (req, res) => {
+  const to = String(req.body?.to || '').trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return res.status(400).json({ error: "Enter a valid email address." });
+  if (!mailer.configured()) return res.status(400).json({ error: "Email sending is not set up yet. Add the SMTP settings on the server first." });
+  try {
+    await mailer.sendRaw(to, "Test email from Skåne Tamil Sangam", mailer.layout("Test email", "<p>Email sending works. 🎉</p>"));
+    res.json({ success: true });
+  } catch (err) { res.status(502).json({ error: `Could not send: ${err.message}` }); }
+});
+
+app.get("/admin/email/log", requireAdmin, async (req, res) => {
+  try {
+    const q = await pool.query(`SELECT l.id, l.registration_id, l.kind, l.to_email, l.subject, l.status, l.error, l.created_at,
+      r.first_name, r.last_name FROM event_email_log l LEFT JOIN event_registrations r ON r.id = l.registration_id
+      ORDER BY l.id DESC LIMIT 200`);
+    res.json(q.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 /* ================= EVENT SWISH ADMIN ================= */
 app.get('/admin/event-swish-accounts', requireAdmin, async (req,res)=>{try{const q=await pool.query(`SELECT a.*,
@@ -922,6 +1016,7 @@ app.put("/admin/order/:id/payment", requireAdmin, async (req, res) => {
 
 initializeDatabase()
   .then(() => ensureEventRegistrationLifecycle())
+  .then(() => mailer.ensureEmailLog())
   .then(() => ensureSiteSettings())
   .then(() => app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`)))
   .catch(err => { console.error('Failed to initialize event registration lifecycle:', err); process.exit(1); });
