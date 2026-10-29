@@ -182,9 +182,10 @@ $('sendBtn').addEventListener('click', async () => {
   if (!r.ok) { alert(d.error || 'Could not send.'); $('previewBtn').disabled = false; return; }
   const poll = async () => {
     const b = await (await authFetch(`${API}/admin/email/batch/${d.batchId}`, { cache: 'no-store' })).json();
-    $('progress').textContent = b.done
-      ? `✓ Finished: ${b.sent} sent${b.failed ? `, ${b.failed} failed (see Recent emails)` : ''}.`
-      : `Sending… ${b.sent + b.failed} of ${b.total}`;
+    $('progress').textContent = !b.done ? `Sending… ${b.sent + b.failed} of ${b.total}`
+      : b.stoppedForLimit
+        ? `Stopped: the email account reached its daily sending limit. ${b.sent} sent, ${b.notSent + b.failed} not sent. Send the same email again tomorrow with "Skip families who already got this email" ticked, and it will go only to the ones who did not get it.`
+        : `✓ Finished: ${b.sent} sent${b.failed ? `, ${b.failed} failed (see Recent emails)` : ''}.`;
     if (b.done) { $('previewBtn').disabled = false; resetPreview(); loadLog(); } else setTimeout(poll, 1500);
   };
   poll();

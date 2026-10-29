@@ -867,12 +867,14 @@ app.post("/admin/email/send", requireAdmin, async (req, res) => {
     if (!recipients.length) return res.status(400).json({ error: "Nobody matches this selection." });
     if (!mailer.configured()) return res.status(400).json({ error: "Email sending is not set up yet. Add the SMTP settings on the server first." });
     const batchId = crypto.randomUUID();
-    const batch = { total: recipients.length, sent: 0, failed: 0, done: false };
+    const batch = { total: recipients.length, sent: 0, failed: 0, done: false, stoppedForLimit: false, notSent: 0 };
     emailBatches.set(batchId, batch);
     res.json({ batchId, total: batch.total });
     // Send one at a time with a short pause so the mail provider does not throttle us.
-    for (const r of recipients) {
+    for (const [i, r] of recipients.entries()) {
       (await mailer.sendToRegistration(r, g.kind, g.custom, batchId)) ? batch.sent++ : batch.failed++;
+      // Once the provider's daily limit is reached every further email would fail too, so stop here.
+      if (mailer.hitSendingLimit()) { batch.stoppedForLimit = true; batch.notSent = recipients.length - i - 1; break; }
       await new Promise(resolve => setTimeout(resolve, 1200));
     }
     batch.done = true;

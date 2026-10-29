@@ -143,13 +143,21 @@ async function sendToRegistration(r, kind, custom, batchId) {
   if (!r.email) return log({ ...base, status: "FAILED", error: "No email address" }).then(() => false);
   if (!configured()) return log({ ...base, status: "SKIPPED", error: "Email sending is not set up (SMTP settings missing)" }).then(() => false);
   try {
+    lastErrorWasLimit = false;
     await sendRaw(r.email, subject, html);
     await log({ ...base, status: "SENT" });
     return true;
   } catch (err) {
+    lastErrorWasLimit = isSendingLimit(err.message);
     await log({ ...base, status: "FAILED", error: err.message });
     return false;
   }
 }
 
-module.exports = { configured, fromAddress, TEMPLATES, ensureEmailLog, sendToRegistration, sendRaw, layout, amountDue };
+// Gmail and other providers answer 550 5.4.5 / 4.7.x when the daily sending limit is reached.
+let lastErrorWasLimit = false;
+function isSendingLimit(message) {
+  return /5\.4\.5|4\.7\.0|sending limit|limit exceeded|rate limit|too many/i.test(String(message || ""));
+}
+
+module.exports = { hitSendingLimit: () => lastErrorWasLimit, configured, fromAddress, TEMPLATES, ensureEmailLog, sendToRegistration, sendRaw, layout, amountDue };
