@@ -78,13 +78,17 @@
             </div>
 
             <div id="modify-alert" class="alert alert-success hidden"
-                style="margin-bottom: 3rem; display: flex; align-items: center; justify-content: space-between; padding: 1.5rem 2rem;">
+                style="margin-bottom: 3rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; padding: 1.5rem 2rem;">
                 <div>
                     <strong style="display: block; margin-bottom: 4px;">Modifying Existing Registration ✨</strong>
                     <span id="modify-name" style="font-size: 0.95rem;"></span>
                 </div>
-                <button type="button" onclick="resetForm()" class="btn btn-ghost"
-                    style="color: var(--primary-dark); font-weight: 800; padding: 0;">Start New →</button>
+                <div style="display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap;">
+                    <button type="button" id="goPaymentBtn" class="btn hidden" onclick="scrollToPayment()"
+                        style="background:#e61e6d;color:#fff;padding:.7rem 1.2rem;">💳 Go to payment ↓</button>
+                    <button type="button" onclick="resetForm()" class="btn btn-ghost"
+                        style="color: var(--primary-dark); font-weight: 800; padding: 0;">Start New →</button>
+                </div>
             </div>
 
             <form id="reg-form" novalidate style="border-top: 1px solid var(--border); padding-top: 3rem;">
@@ -430,7 +434,19 @@
             new QRCode(qr, {text:swishQrText(registration),width:220,height:220,correctLevel:QRCode.CorrectLevel.L});
         }
 
+        // Payment still to do: a fee, not yet paid, and a Swish number to pay to.
+        function paymentPending(registration) {
+            return Number(registration.total_amount) > 0 && registration.payment_status !== 'PAID' && !!registration.swish_number;
+        }
+
+        function scrollToPayment() {
+            const panel = document.getElementById('payment-panel');
+            const top = panel.getBoundingClientRect().top + window.scrollY - 140; // leave room for the fixed menu
+            window.scrollTo({ top, behavior: 'smooth' });
+        }
+
         function showSavedPayment(registration) {
+            document.getElementById('goPaymentBtn').classList.toggle('hidden', !paymentPending(registration));
             document.getElementById('savedEmail').textContent = registration.email || 'your email address';
             document.getElementById('payment-panel').classList.remove('hidden');
             document.getElementById('savedAmount').textContent = `${registration.total_amount} kr`;
@@ -602,7 +618,9 @@
                     document.getElementById('submit-btn').textContent = 'Update My Registration';
                     document.getElementById('lookup-panel').classList.add('hidden');
                     statusMsg.style.display = 'none';
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    // An unpaid booking goes straight to the payment steps; otherwise show the booking from the top.
+                    if (paymentPending(data)) setTimeout(scrollToPayment, 250);
+                    else window.scrollTo({ top: 0, behavior: 'smooth' });
                 } else {
                     statusMsg.className = 'alert alert-error';
                     statusMsg.textContent = 'No registration found for this number.';
@@ -617,6 +635,7 @@
             currentRegistrationId = null;
             document.getElementById('reg-form').reset();
             document.getElementById('modify-alert').classList.add('hidden');
+            document.getElementById('goPaymentBtn').classList.add('hidden');
             document.getElementById('submit-btn').textContent = 'Confirm My Registration';
             document.getElementById('lookup-panel').classList.remove('hidden');
             document.getElementById('status-msg').style.display = 'none';
