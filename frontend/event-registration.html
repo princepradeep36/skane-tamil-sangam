@@ -204,6 +204,7 @@
                 <div id="status-msg" role="status" aria-live="polite"></div>
                 <div id="payment-panel" class="hidden" style="margin-top:18px;padding:22px;border:1px solid #e9ce72;background:#fff9e8;border-radius:14px;">
                     <strong style="font-size:1.15rem;color:#124c97;">Registration saved successfully!</strong>
+                    <div class="spam-note">📧 We have sent a confirmation email to <b id="savedEmail"></b>. If you don't see it in a few minutes, please check your Spam / Junk folder and mark it as "Not spam" so our future emails (payment and event updates) reach your inbox.</div>
                     <p>Registration amount: <strong id="savedAmount"></strong></p>
                     <p id="savedPaymentStatus">Payment details will appear here after registration.</p>
                     <div id="swishPaymentActions" class="hidden">
@@ -232,10 +233,6 @@
                         <p><span class="pay-step-num">4</span><strong>Mark as Paid.</strong> This button turns on after you choose your screenshot. It sends the screenshot to the organisers with your registration.</p>
                         <button type="button" id="markEventPaidBtn" class="btn" style="background:#16803a;color:white;margin:.4rem .35rem 1rem;" disabled>Mark as Paid</button>
                       </div>
-                    </div>
-                    <div class="spam-note" id="emailSpamNote">
-                        <strong>📧 Check your email, including the Spam folder</strong>
-                        Your registration and payment confirmations are sent by email<span id="emailSpamTo"></span>. They may land in your <b>Spam</b> or <b>Junk</b> folder. If so, open the email and tap <b>"Not spam"</b> (or "Report not spam") so our future emails about payment and the event arrive in your inbox.
                     </div>
                     <p style="font-size:.9rem;">You can reopen your registration using your phone number and update your participant counts.</p>
                 </div>
@@ -434,7 +431,7 @@
         }
 
         function showSavedPayment(registration) {
-            document.getElementById('emailSpamTo').textContent = registration.email ? ` to ${registration.email}` : '';
+            document.getElementById('savedEmail').textContent = registration.email || 'your email address';
             document.getElementById('payment-panel').classList.remove('hidden');
             document.getElementById('savedAmount').textContent = `${registration.total_amount} kr`;
             const actions = document.getElementById('swishPaymentActions');
@@ -530,8 +527,8 @@
                 <div class="thanks-lamps" aria-hidden="true">🪔✨🪔</div>
                 <h2 id="thanksTitle">Thank you${name ? ', ' + name : ''}!</h2>
                 <p>Your registration for <strong>Skåne Tamil Sangam Diwali 2026</strong> is complete and your payment is received.</p>
+                <div class="spam-note">📧 A payment confirmation email is on its way. If it is not in your inbox, check your Spam / Junk folder and mark it as "Not spam".</div>
                 <p class="thanks-when">See you on Sunday 15 November 2026 at Tryckeriet, from 10:00 AM.</p>
-                <div class="spam-note"><strong>📧 A payment confirmation is on its way by email</strong>If you can't find it, check your <b>Spam</b> or <b>Junk</b> folder and tap <b>"Not spam"</b>, so our future emails reach your inbox.</div>
                 <button type="button" class="btn btn-primary" style="width:100%;margin-top:16px">Close</button>
             </div>`;
             overlay.querySelector('button').onclick = () => overlay.remove();

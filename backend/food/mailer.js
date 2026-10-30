@@ -44,7 +44,7 @@ function layout(title, bodyHtml) {
 <div style="font-size:22px;font-weight:bold;margin-top:6px">🪔 ${esc(title)}</div></td></tr>
 <tr><td style="padding:24px 26px;font-size:15px;line-height:1.6">${bodyHtml}</td></tr>
 <tr><td style="padding:16px 26px;background:#fff8e6;color:#6b5b2e;font-size:12px;line-height:1.5">
-Diwali Celebration 2026 · ${esc(EVENT_LINE)}<br>You are receiving this because you registered for this event. Reply to this email if you have questions.</td></tr>
+Diwali Celebration 2026 · ${esc(EVENT_LINE)}<br>You are receiving this because you registered for this event. Reply to this email if you have questions.<br>Found this in Spam or Junk? Please mark it as "Not spam" so our next emails reach your inbox.</td></tr>
 </table></td></tr></table></body></html>`;
 }
 
