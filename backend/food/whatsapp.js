@@ -76,7 +76,7 @@ async function sendTemplate(r, kind, batchId) {
   if (!to) { await logWhatsapp(r, kind, "FAILED", "No valid WhatsApp number", batchId); return false; }
   if (!apiConfigured()) { await logWhatsapp(r, kind, "SKIPPED", "WhatsApp API is not set up", batchId); return false; }
   try {
-    const version = process.env.WHATSAPP_API_VERSION || "v21.0";
+    const version = process.env.WHATSAPP_API_VERSION || "v25.0";
     const res = await fetch(`https://graph.facebook.com/${version}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`, "Content-Type": "application/json" },
