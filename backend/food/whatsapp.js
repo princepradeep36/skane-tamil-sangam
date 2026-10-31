@@ -1,16 +1,16 @@
 // WhatsApp messages the admin sends by hand: the admin page opens WhatsApp with this text
 // already written (https://wa.me/<number>?text=...), and the admin presses Send.
 const { amountDue } = require("./mailer");
+const { bookingUrl } = require("./booking-link");
 
-const SITE_URL = (process.env.SITE_URL || "https://skanetamilsangam.duckdns.org").replace(/\/$/, "");
-const REGISTRATION_URL = `${SITE_URL}/event-registration.html`;
 const EVENT_LINE = "Sunday 15 November 2026 at Tryckeriet, from 10:00 AM";
 
 function paymentLines(r) {
   const due = amountDue(r);
   if (r.payment_status === "PAID" || due <= 0) return "";
   if (!r.swish_number) return `\nAmount to pay: *${due} kr* (payment details will be shared soon)\n`;
-  return `\n*Amount to pay: ${due} kr*\nSwish number: *${r.swish_number}*\nMessage: Diwali 2026 Reg ${r.id}\n\nAfter paying, open ${REGISTRATION_URL}, find your booking with your phone number, upload the Swish screenshot and tap *Mark as Paid*.\n`;
+  return `\n*Amount to pay: ${due} kr*\nSwish number: *${r.swish_number}*\nMessage: Diwali 2026 Reg ${r.id}\n\nPay and confirm here (your booking opens directly): ${bookingUrl(r)}
+After paying, upload the Swish screenshot and tap *Mark as Paid*.\n`;
 }
 
 const MESSAGES = {

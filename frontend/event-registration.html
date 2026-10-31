@@ -49,7 +49,7 @@
             style="max-width: 850px; margin: 0 auto; padding: 4rem; animation-delay: 0.1s;">
 
             <div class="event-banner-wrap">
-                <img src="diwali-2026-banner.png"
+                <img src="diwali-2026-banner-1600.webp" srcset="diwali-2026-banner-800.webp 800w, diwali-2026-banner-1600.webp 1600w" sizes="(max-width: 900px) 100vw, 850px" width="1600" height="533"
                     alt="Skåne Tamil Sangam Diwali 2026 — Sunday 15 November 2026 at Tryckeriet, from 10:00 AM"
                     class="event-banner">
             </div>
@@ -439,10 +439,10 @@
             return Number(registration.total_amount) > 0 && registration.payment_status !== 'PAID' && !!registration.swish_number;
         }
 
-        function scrollToPayment() {
+        function scrollToPayment(instant) {
             const panel = document.getElementById('payment-panel');
             const top = panel.getBoundingClientRect().top + window.scrollY - 140; // leave room for the fixed menu
-            window.scrollTo({ top, behavior: 'smooth' });
+            window.scrollTo({ top, behavior: instant === true ? 'auto' : 'smooth' });
         }
 
         function showSavedPayment(registration) {
@@ -591,6 +591,20 @@
                 const response = await fetch(`${API_BASE_URL}/event/registration/${encodeURIComponent(phone)}`);
                 const data = await response.json();
                 if (response.ok) {
+                    openBooking(data);
+                } else {
+                    statusMsg.className = 'alert alert-error';
+                    statusMsg.textContent = 'No registration found for this number.';
+                }
+            } catch (err) {
+                statusMsg.className = 'alert alert-error';
+                statusMsg.textContent = 'Error connecting to server.';
+            }
+        }
+
+        // Fills the form with a found booking and shows its payment state.
+        function openBooking(data) {
+                    const statusMsg = document.getElementById('status-msg');
                     currentRegistrationId = data.id;
                     document.getElementById('firstName').value = data.first_name;
                     document.getElementById('lastName').value = data.last_name;
@@ -621,15 +635,38 @@
                     // An unpaid booking goes straight to the payment steps; otherwise show the booking from the top.
                     if (paymentPending(data)) setTimeout(scrollToPayment, 250);
                     else window.scrollTo({ top: 0, behavior: 'smooth' });
-                } else {
-                    statusMsg.className = 'alert alert-error';
-                    statusMsg.textContent = 'No registration found for this number.';
+        }
+
+        // Personal link from an email or WhatsApp message (?booking=ID&key=…): open that booking directly.
+        (async function openBookingFromLink() {
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get('booking'), key = params.get('key');
+            if (!id || !key) return;
+            if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; // don't jump back to an old position
+            const statusMsg = document.getElementById('status-msg');
+            statusMsg.className = 'alert alert-info';
+            statusMsg.textContent = 'Opening your registration...';
+            statusMsg.style.display = 'block';
+            try {
+                const response = await fetch(`${API_BASE_URL}/event/booking/${encodeURIComponent(id)}/${encodeURIComponent(key)}`);
+                const data = await response.json().catch(() => ({}));
+                if (response.ok) {
+                    openBooking(data);
+                    // Scrolling while the page is still loading gets undone, so scroll again once it has loaded.
+                    if (paymentPending(data)) {
+                        // Opening from a link lands straight on the payment steps (no smooth scroll to interrupt).
+                        const go = () => setTimeout(() => scrollToPayment(true), 300);
+                        if (document.readyState === 'complete') go(); else window.addEventListener('load', go, { once: true });
+                    }
+                    return;
                 }
+                statusMsg.className = 'alert alert-error';
+                statusMsg.textContent = data.error || 'This link is not valid any more. Please find your booking with your phone number.';
             } catch (err) {
                 statusMsg.className = 'alert alert-error';
                 statusMsg.textContent = 'Error connecting to server.';
             }
-        }
+        })();
 
         function resetForm() {
             currentRegistrationId = null;

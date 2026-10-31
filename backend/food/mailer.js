@@ -3,9 +3,8 @@
 // Without them nothing is sent and every attempt is logged as SKIPPED.
 const nodemailer = require("nodemailer");
 const pool = require("./db");
+const { bookingUrl } = require("./booking-link");
 
-const SITE_URL = (process.env.SITE_URL || "https://skanetamilsangam.duckdns.org").replace(/\/$/, "");
-const REGISTRATION_URL = `${SITE_URL}/event-registration.html`;
 const EVENT_LINE = "Sunday 15 November 2026 at Tryckeriet, from 10:00 AM";
 
 let transporter = null;
@@ -64,7 +63,7 @@ function paymentBlock(r) {
   if (r.payment_status === "PAID" || due <= 0) return "";
   if (!r.swish_number) return `<p><b>Payment:</b> ${due} kr. The payment details will be shared soon.</p>`;
   return `<p style="background:#fff8e6;border:1px solid #f4d48a;border-radius:12px;padding:12px 14px"><b>Amount to pay: ${due} kr</b><br>Swish number: <b>${esc(r.swish_number)}</b><br>Message: Diwali 2026 Reg ${esc(r.id)}</p>
-<p>After paying, open the registration page, find your booking with your phone number, upload the Swish screenshot and tap <b>Mark as Paid</b>.</p>`;
+<p>After paying, open <a href="${esc(bookingUrl(r))}">your booking</a>, upload the Swish screenshot and tap <b>Mark as Paid</b>.</p>`;
 }
 
 const TEMPLATES = {
@@ -74,7 +73,7 @@ const TEMPLATES = {
 <p>Thank you for registering for <b>Skåne Tamil Sangam Diwali 2026</b>. Here are your details:</p>
 <p><b>Registration number:</b> ${esc(r.id)}<br><b>Participants:</b> ${esc(participants(r))}<br><b>Registration fee:</b> ${esc(r.total_amount)} kr</p>
 ${paymentBlock(r)}
-<p>You can view or change your booking at any time using your phone number.</p>${button("Open my registration", REGISTRATION_URL)}
+<p>You can view or change your booking at any time with this button.</p>${button("Open my registration", bookingUrl(r))}
 <p>See you on ${esc(EVENT_LINE)}!</p>`)
   }),
   PAYMENT_RECEIVED: r => ({
@@ -88,13 +87,13 @@ ${paymentBlock(r)}
     subject: "Payment is now open – Diwali 2026",
     html: layout("Payment is now open", `<p>Vanakkam ${esc(r.first_name)},</p>
 <p>Payment for <b>Skåne Tamil Sangam Diwali 2026</b> is now open. Please pay your registration fee by Swish.</p>
-${paymentBlock(r)}${button("Pay for my registration", REGISTRATION_URL)}`)
+${paymentBlock(r)}${button("Pay for my registration", bookingUrl(r))}`)
   }),
   PAYMENT_REMINDER: r => ({
     subject: "Reminder: please complete your Diwali 2026 payment",
     html: layout("Payment reminder", `<p>Vanakkam ${esc(r.first_name)},</p>
 <p>This is a friendly reminder that the payment for your Diwali 2026 registration (number <b>${esc(r.id)}</b>) is still pending.</p>
-${paymentBlock(r)}${button("Pay now", REGISTRATION_URL)}
+${paymentBlock(r)}${button("Pay now", bookingUrl(r))}
 <p>If you have already paid, please upload your Swish screenshot and tap Mark as Paid on the registration page so we can confirm it.</p>`)
   }),
   // Admin-written message. {first_name}, {amount_due} and {registration_id} are filled in per person.
@@ -103,7 +102,7 @@ ${paymentBlock(r)}${button("Pay now", REGISTRATION_URL)}
     const body = esc(fill(custom.body)).replace(/\n/g, "<br>");
     return {
       subject: fill(custom.subject).slice(0, 200),
-      html: layout(fill(custom.subject).slice(0, 120), `<p>${body}</p>${custom.includePayment ? paymentBlock(r) : ""}${button("Open my registration", REGISTRATION_URL)}`)
+      html: layout(fill(custom.subject).slice(0, 120), `<p>${body}</p>${custom.includePayment ? paymentBlock(r) : ""}${button("Open my registration", bookingUrl(r))}`)
     };
   }
 };

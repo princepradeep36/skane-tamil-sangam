@@ -8,7 +8,8 @@ const crypto = require("crypto");
 const pool = require("./db");
 const initializeDatabase = require("./init-db");
 const mailer = require("./mailer");
-const wa = require("./whatsapp"); // not "whatsapp": route bodies use that name for the phone field
+const wa = require("./whatsapp");
+const { validBookingKey } = require("./booking-link"); // not "whatsapp": route bodies use that name for the phone field
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error("JWT_SECRET environment variable is required");
@@ -685,6 +686,31 @@ app.get("/event/registration/:phone", async (req, res) => {
       }
     }
 
+    const saved = await registrationWithSwish(client, registration.id);
+    await client.query('COMMIT');
+    res.json(saved);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally { client.release(); }
+});
+
+// Personal link from an email or WhatsApp message: opens the booking without typing the phone number.
+app.get("/event/booking/:id/:key", async (req, res) => {
+  if (!/^\d+$/.test(req.params.id) || !validBookingKey(req.params.id, req.params.key))
+    return res.status(404).json({ error: "This link is not valid any more. Please find your booking with your phone number." });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const found = await client.query(`SELECT id,total_amount,payment_status,swish_account_id FROM event_registrations
+      WHERE id=$1 AND registration_status <> 'CANCELLED' FOR UPDATE`, [req.params.id]);
+    if (!found.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: "Registration not found" }); }
+    const registration = found.rows[0];
+    // Same as the phone lookup: give an unpaid booking a Swish number if one has been configured since.
+    if (registration.payment_status !== 'PAID' && !registration.swish_account_id) {
+      const swish = await allocateSwishAccount(client, Number(registration.total_amount), Number(registration.id));
+      if (swish) await client.query(`UPDATE event_registrations SET swish_account_id=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$2`, [swish.id, registration.id]);
+    }
     const saved = await registrationWithSwish(client, registration.id);
     await client.query('COMMIT');
     res.json(saved);
