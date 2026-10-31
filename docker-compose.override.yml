@@ -10,3 +10,8 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       MAIL_FROM: ${MAIL_FROM:-}
       SITE_URL: https://skanetamilsangam.duckdns.org
+      # Automatic WhatsApp (Meta WhatsApp Business API). Leave empty to keep it off.
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_LANGUAGE: ${WHATSAPP_LANGUAGE:-en}
+      WHATSAPP_CONFIRMATIONS: ${WHATSAPP_CONFIRMATIONS:-on}

@@ -44,6 +44,7 @@ th{background:#f8fafc}
 .table-scroll{overflow:auto;max-height:420px}
 .wa{background:#25d366;color:#fff;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .wa.done{background:#e7f8ee;color:#166534}
+.auto-box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px}
 .wa-list{margin-top:12px;border:1px solid #eee;border-radius:10px;overflow:hidden}
 .wa-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid #f1f1f1}
 .wa-row:last-child{border-bottom:0}
@@ -76,7 +77,21 @@ th{background:#f8fafc}
 
   <div class="card">
     <h2>💬 Payment reminders on WhatsApp</h2>
-    <p class="hint" style="font-size:.9rem;margin:0 0 12px">Free, with no daily limit. Pick a message, tap <b>Show families</b>, then tap each green button: WhatsApp opens with that family's personal message already written. Press Send in WhatsApp, then come back for the next one.</p>
+    <div class="auto-box">
+      <b>⚡ Send to all unpaid families automatically</b>
+      <div class="hint" id="waApiStatus" style="margin:4px 0 10px">Checking WhatsApp setup…</div>
+      <div class="row" style="align-items:flex-end">
+        <div class="field" style="margin:0">
+          <label for="waAutoKind">Message</label>
+          <select id="waAutoKind"><option value="PAYMENT_REMINDER">Payment reminder</option><option value="PAYMENT_OPEN">Payment is now open</option></select>
+        </div>
+        <div><button class="wa" id="waAutoBtn" disabled>Send to all on WhatsApp</button></div>
+      </div>
+      <label class="check" style="margin-top:8px"><input type="checkbox" id="waAutoSkip" checked> Skip families who already got this WhatsApp message in the last 24 hours</label>
+      <div class="progress" id="waAutoProgress"></div>
+    </div>
+    <h3 style="margin:18px 0 6px;font-size:1rem">Or send one by one from your own WhatsApp (free)</h3>
+    <p class="hint" style="font-size:.9rem;margin:0 0 12px">Pick a message, tap <b>Show families</b>, then tap each green button: WhatsApp opens with that family's personal message already written. Press Send in WhatsApp, then come back for the next one.</p>
     <div class="row">
       <div class="field">
         <label for="waKind">Message</label>
@@ -308,6 +323,43 @@ $('waList').addEventListener('click', async e => {
   if (r.ok) { row.last_sent = (await r.json()).sent_at; loadLog(); }
 });
 
+// ---- WhatsApp: automatic sending through Meta's API ----
+let waApiReady = false;
+async function loadWaAuto() {
+  try {
+    const s = await (await authFetch(`${API}/admin/whatsapp/status`, { cache: 'no-store' })).json();
+    waApiReady = !!s.apiConfigured;
+    const c = await authFetch(`${API}/admin/whatsapp/send-all`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: $('waAutoKind').value, skipHours: $('waAutoSkip').checked ? 24 : 0, dryRun: true }) });
+    const d = await c.json().catch(() => ({ count: 0 }));
+    $('waApiStatus').innerHTML = waApiReady
+      ? `✓ Automatic WhatsApp is set up${s.confirmations ? ', and registration and payment confirmations are also sent on WhatsApp' : ''}. <b>${d.count}</b> unpaid famil${d.count === 1 ? 'y' : 'ies'} will get this message.`
+      : 'Not set up yet: add WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID on the server (see the setup steps). Until then, use the one-by-one buttons below.';
+    $('waAutoBtn').disabled = !waApiReady || !d.count;
+    $('waAutoBtn').dataset.count = d.count;
+  } catch (e) { $('waApiStatus').textContent = 'Could not check the WhatsApp setup.'; }
+}
+['waAutoKind', 'waAutoSkip'].forEach(id => $(id).addEventListener('change', loadWaAuto));
+
+$('waAutoBtn').addEventListener('click', async () => {
+  const count = $('waAutoBtn').dataset.count;
+  if (!confirm(`Send "${$('waAutoKind').selectedOptions[0].text}" on WhatsApp to ${count} unpaid famil${count === '1' ? 'y' : 'ies'} now? Meta charges a small fee per message.`)) return;
+  $('waAutoBtn').disabled = true;
+  const r = await authFetch(`${API}/admin/whatsapp/send-all`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: $('waAutoKind').value, skipHours: $('waAutoSkip').checked ? 24 : 0 }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { alert(d.error || 'Could not send.'); loadWaAuto(); return; }
+  const poll = async () => {
+    const b = await (await authFetch(`${API}/admin/email/batch/${d.batchId}`, { cache: 'no-store' })).json();
+    $('waAutoProgress').textContent = !b.done ? `Sending… ${b.sent + b.failed} of ${b.total}`
+      : b.stoppedForLimit ? `Stopped: WhatsApp's sending limit was reached. ${b.sent} sent, ${b.notSent + b.failed} not sent. Try again later; families who already got it are skipped.`
+      : `✓ Finished: ${b.sent} sent${b.failed ? `, ${b.failed} failed (see Recent messages)` : ''}.`;
+    if (b.done) { loadWaAuto(); loadLog(); } else setTimeout(poll, 1500);
+  };
+  poll();
+});
+
+loadWaAuto();
 loadStatus();
 loadLog();
 </script>

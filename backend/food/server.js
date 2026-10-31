@@ -8,7 +8,7 @@ const crypto = require("crypto");
 const pool = require("./db");
 const initializeDatabase = require("./init-db");
 const mailer = require("./mailer");
-const whatsapp = require("./whatsapp");
+const wa = require("./whatsapp"); // not "whatsapp": route bodies use that name for the phone field
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error("JWT_SECRET environment variable is required");
@@ -635,6 +635,7 @@ app.post("/event/register", requireEventRegistrationOpen, async (req, res) => {
       const saved = await registrationWithSwish(client, revived.rows[0].id);
       await client.query('COMMIT');
       res.status(201).json(saved);
+      if (wa.confirmationsOn()) wa.sendTemplate(saved, 'REGISTRATION');
       return mailer.sendToRegistration(saved, 'REGISTRATION');
     }
     if (existing.rows.length) {
@@ -649,6 +650,7 @@ app.post("/event/register", requireEventRegistrationOpen, async (req, res) => {
     await client.query('COMMIT');
     res.status(201).json(saved);
     mailer.sendToRegistration(saved, 'REGISTRATION');
+    if (wa.confirmationsOn()) wa.sendTemplate(saved, 'REGISTRATION');
   } catch (err) {
     await client.query('ROLLBACK');
     if (err.code === '23505') return res.status(409).json({ code: "BOOKING_EXISTS", error: "You are already booked with this phone number. Please use Find Booking above to view or update your registration." });
@@ -746,6 +748,7 @@ app.put("/event/registration/:id/pay", express.raw({ type: 'image/*', limit: '5m
     await client.query('COMMIT');
     res.json({ success: true, registration: saved });
     mailer.sendToRegistration(saved, 'PAYMENT_RECEIVED');
+    if (wa.confirmationsOn()) wa.sendTemplate(saved, 'PAYMENT_RECEIVED');
   } catch (err) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: err.message });
@@ -928,12 +931,50 @@ app.post("/admin/whatsapp/list", requireAdmin, async (req, res) => {
       id: r.id,
       name: `${r.first_name} ${r.last_name}`,
       whatsapp: r.whatsapp,
-      digits: whatsapp.whatsappDigits(r.whatsapp),
+      digits: wa.whatsappDigits(r.whatsapp),
       amount_due: Number(r.amount_due),
       last_sent: r.last_sent,
-      text: whatsapp.MESSAGES[kind](r, custom)
+      text: wa.MESSAGES[kind](r, custom)
     })));
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get("/admin/whatsapp/status", requireAdmin, (req, res) => {
+  res.json({ apiConfigured: wa.apiConfigured(), confirmations: wa.confirmationsOn(), templates: wa.TEMPLATE_NAMES });
+});
+
+// Families who still owe money and have not had this WhatsApp message in the last skipHours.
+async function whatsappUnpaidRecipients(kind, skipHours) {
+  const hours = Math.max(0, Math.min(Number(skipHours) || 0, 24 * 60));
+  const q = await pool.query(`SELECT r.*, GREATEST(r.total_amount - r.paid_amount, 0) AS amount_due, a.swish_number
+    FROM event_registrations r LEFT JOIN event_swish_accounts a ON a.id = r.swish_account_id
+    WHERE r.registration_status <> 'CANCELLED' AND COALESCE(r.whatsapp,'') <> ''
+      AND r.payment_status <> 'PAID' AND r.total_amount > r.paid_amount
+      AND ($2::int = 0 OR NOT EXISTS (SELECT 1 FROM event_email_log l WHERE l.registration_id = r.id AND l.kind = $1
+        AND l.channel = 'WHATSAPP' AND l.status = 'SENT' AND l.created_at > CURRENT_TIMESTAMP - make_interval(hours => $2::int)))
+    ORDER BY r.id`, [kind, hours]);
+  return q.rows;
+}
+
+app.post("/admin/whatsapp/send-all", requireAdmin, async (req, res) => {
+  const { kind, skipHours, dryRun } = req.body || {};
+  if (!['PAYMENT_REMINDER', 'PAYMENT_OPEN'].includes(kind)) return res.status(400).json({ error: "Only payment reminders and payment-open messages can be sent to everyone." });
+  try {
+    const recipients = await whatsappUnpaidRecipients(kind, skipHours);
+    if (dryRun) return res.json({ count: recipients.length });
+    if (!recipients.length) return res.status(400).json({ error: "Nobody to message: every unpaid family already got it." });
+    if (!wa.apiConfigured()) return res.status(400).json({ error: "Automatic WhatsApp is not set up yet. Add WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID on the server." });
+    const batchId = crypto.randomUUID();
+    const batch = { total: recipients.length, sent: 0, failed: 0, done: false, stoppedForLimit: false, notSent: 0 };
+    emailBatches.set(batchId, batch);
+    res.json({ batchId, total: batch.total });
+    for (const [i, r] of recipients.entries()) {
+      (await wa.sendTemplate(r, kind, batchId)) ? batch.sent++ : batch.failed++;
+      if (wa.hitLimit()) { batch.stoppedForLimit = true; batch.notSent = recipients.length - i - 1; break; }
+      await new Promise(resolve => setTimeout(resolve, 400));
+    }
+    batch.done = true;
+  } catch (err) { if (!res.headersSent) res.status(500).json({ error: err.message }); }
 });
 
 // The admin tapped "Send on WhatsApp" for this family: remember it so the list shows it as done.
