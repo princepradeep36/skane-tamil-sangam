@@ -4,7 +4,9 @@ const { amountDue } = require("./mailer");
 const { bookingUrl } = require("./booking-link");
 
 const HEADER = "🪔 *Skåne Tamil Sangam – Diwali 2026* 🪔";
-const FOOTER = `📅 Sun 15 Nov · 10:00 AM · Tryckeriet
+const FOOTER = `_ℹ️ Please don't reply to this message._
+
+📅 Sun 15 Nov · 10:00 AM · Tryckeriet
 Nandri! 🙏
 – Skåne Tamil Sangam`;
 
