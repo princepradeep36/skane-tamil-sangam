@@ -161,10 +161,8 @@
         }
 
 
+        /* Sits in the header next to Refresh (it used to float over it). */
         .logout-btn {
-            position: absolute;
-            top: 20px;
-            right: 20px;
             background: #dc3545;
             color: white;
             border: none;
@@ -180,7 +178,6 @@
 <body>
 
 
-    <button class="logout-btn" onclick="logout()">Logout</button>
     <div class="container">
         <header>
             <div style="flex:1">
@@ -189,7 +186,10 @@
                     Back to Hub</a>
                 <h1 style="margin-top:5px;">Admin Order Manager</h1>
             </div>
-            <button onclick="loadOrders()" style="padding: 8px 15px; cursor: pointer;">Refresh</button>
+            <div style="display:flex;gap:10px;align-items:center">
+                <button onclick="loadOrders()" style="padding: 8px 15px; cursor: pointer;">Refresh</button>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
         </header>
 
         <script src="auth.js"></script>
