@@ -8,6 +8,7 @@ const crypto = require("crypto");
 const pool = require("./db");
 const initializeDatabase = require("./init-db");
 const mailer = require("./mailer");
+const whatsapp = require("./whatsapp");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error("JWT_SECRET environment variable is required");
@@ -833,7 +834,7 @@ async function emailRecipients(audience, kind, skipHours) {
     FROM event_registrations r LEFT JOIN event_swish_accounts a ON a.id = r.swish_account_id
     WHERE r.registration_status <> 'CANCELLED' AND COALESCE(r.email,'') <> '' AND ${where}
       AND ($2::int = 0 OR NOT EXISTS (SELECT 1 FROM event_email_log l WHERE l.registration_id = r.id AND l.kind = $1
-        AND l.status = 'SENT' AND l.created_at > CURRENT_TIMESTAMP - make_interval(hours => $2::int)))
+        AND l.channel = 'EMAIL' AND l.status = 'SENT' AND l.created_at > CURRENT_TIMESTAMP - make_interval(hours => $2::int)))
     ORDER BY r.id`, [kind, hours]);
   return q.rows;
 }
@@ -899,10 +900,53 @@ app.post("/admin/email/test", requireAdmin, async (req, res) => {
 
 app.get("/admin/email/log", requireAdmin, async (req, res) => {
   try {
-    const q = await pool.query(`SELECT l.id, l.registration_id, l.kind, l.to_email, l.subject, l.status, l.error, l.created_at,
+    const q = await pool.query(`SELECT l.id, l.registration_id, l.kind, l.channel, l.to_email, l.subject, l.status, l.error, l.created_at,
       r.first_name, r.last_name FROM event_email_log l LEFT JOIN event_registrations r ON r.id = l.registration_id
       ORDER BY l.id DESC LIMIT 200`);
     res.json(q.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+/* ================= WHATSAPP MESSAGES (ADMIN, SENT BY HAND) ================= */
+
+const WHATSAPP_KINDS = ['PAYMENT_REMINDER', 'PAYMENT_OPEN', 'CUSTOM'];
+
+// Families to message, each with a ready-written WhatsApp text and when they last got this message.
+app.post("/admin/whatsapp/list", requireAdmin, async (req, res) => {
+  const { audience, kind, message, includePayment } = req.body || {};
+  const where = EMAIL_AUDIENCES[audience];
+  if (!where || !WHATSAPP_KINDS.includes(kind)) return res.status(400).json({ error: "Unknown message or audience." });
+  if (kind === 'CUSTOM' && !String(message || '').trim()) return res.status(400).json({ error: "Please write a message." });
+  try {
+    const q = await pool.query(`SELECT r.*, GREATEST(r.total_amount - r.paid_amount, 0) AS amount_due, a.swish_number,
+        (SELECT MAX(l.created_at) FROM event_email_log l WHERE l.registration_id = r.id AND l.kind = $1 AND l.channel = 'WHATSAPP') AS last_sent
+      FROM event_registrations r LEFT JOIN event_swish_accounts a ON a.id = r.swish_account_id
+      WHERE r.registration_status <> 'CANCELLED' AND ${where}
+      ORDER BY r.id`, [kind]);
+    const custom = { body: String(message || '').trim(), includePayment: !!includePayment };
+    res.json(q.rows.map(r => ({
+      id: r.id,
+      name: `${r.first_name} ${r.last_name}`,
+      whatsapp: r.whatsapp,
+      digits: whatsapp.whatsappDigits(r.whatsapp),
+      amount_due: Number(r.amount_due),
+      last_sent: r.last_sent,
+      text: whatsapp.MESSAGES[kind](r, custom)
+    })));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// The admin tapped "Send on WhatsApp" for this family: remember it so the list shows it as done.
+app.post("/admin/whatsapp/sent", requireAdmin, async (req, res) => {
+  const { registrationId, kind } = req.body || {};
+  if (!WHATSAPP_KINDS.includes(kind)) return res.status(400).json({ error: "Unknown message." });
+  try {
+    const q = await pool.query("SELECT id, whatsapp FROM event_registrations WHERE id=$1", [registrationId]);
+    if (!q.rows.length) return res.status(404).json({ error: "Registration not found" });
+    const names = { PAYMENT_REMINDER: 'Payment reminder', PAYMENT_OPEN: 'Payment is now open', CUSTOM: 'Own message' };
+    await pool.query(`INSERT INTO event_email_log(registration_id,kind,to_email,subject,status,channel) VALUES($1,$2,$3,$4,'SENT','WHATSAPP')`,
+      [q.rows[0].id, kind, String(q.rows[0].whatsapp || '').slice(0, 255), `WhatsApp: ${names[kind]}`]);
+    res.json({ success: true, sent_at: new Date().toISOString() });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

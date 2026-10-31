@@ -125,6 +125,8 @@ async function ensureEmailLog() {
     error VARCHAR(500) NULL,
     batch_id VARCHAR(40) NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)`);
+  // WhatsApp messages sent by hand from the admin page are logged here too.
+  await pool.query(`ALTER TABLE event_email_log ADD COLUMN IF NOT EXISTS channel VARCHAR(10) NOT NULL DEFAULT 'EMAIL'`);
 }
 
 async function log(entry) {

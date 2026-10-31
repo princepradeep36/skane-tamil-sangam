@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Event Emails</title>
+<title>Event Messages</title>
 <style>
 body{font-family:Arial,Helvetica,sans-serif;background:#f4f7f9;margin:0;padding:20px;color:#222}
 .wrap{max-width:1000px;margin:auto}
@@ -42,13 +42,26 @@ th{background:#f8fafc}
 .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:bold;font-size:.75rem}
 .SENT{background:#dcfce7;color:#166534}.FAILED{background:#fee2e2;color:#991b1b}.SKIPPED{background:#fef3c7;color:#92400e}
 .table-scroll{overflow:auto;max-height:420px}
+.wa{background:#25d366;color:#fff;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.wa.done{background:#e7f8ee;color:#166534}
+.wa-list{margin-top:12px;border:1px solid #eee;border-radius:10px;overflow:hidden}
+.wa-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid #f1f1f1}
+.wa-row:last-child{border-bottom:0}
+.wa-row.sent{background:#f6fef9}
+.wa-who{flex:1;min-width:0}
+.wa-who b{display:block}
+.wa-who span{color:#667085;font-size:.82rem}
+.wa-msg{white-space:pre-wrap;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;font-size:.88rem;margin-top:10px;max-height:260px;overflow:auto}
+.CH{display:inline-block;padding:1px 6px;border-radius:6px;font-size:.7rem;font-weight:bold;margin-right:4px}
+.CH.EMAIL{background:#e0e7ff;color:#3730a3}.CH.WHATSAPP{background:#dcfce7;color:#166534}
+@media(max-width:600px){.wa-row{flex-wrap:wrap}.wa-row .wa{width:100%;justify-content:center}}
 </style>
 <link rel="stylesheet" href="../responsive.css?v=20261015">
 </head>
 <body>
 <div class="wrap">
   <div class="top">
-    <div><h1>Event Emails</h1><p>Email the families registered for Diwali 2026.</p></div>
+    <div><h1>Event Messages</h1><p>Email and WhatsApp the families registered for Diwali 2026.</p></div>
     <div><a class="btn back" href="admin.html?admin=true">Admin Home</a></div>
   </div>
 
@@ -59,6 +72,41 @@ th{background:#f8fafc}
     <p class="hint" style="font-size:.9rem;margin:0">These are sent on their own, no action needed:<br>
       • <b>Registration confirmed</b>: when a family registers, with their details and how to pay.<br>
       • <b>Payment received</b>: when a family uploads their Swish screenshot and taps Mark as Paid.</p>
+  </div>
+
+  <div class="card">
+    <h2>💬 Payment reminders on WhatsApp</h2>
+    <p class="hint" style="font-size:.9rem;margin:0 0 12px">Free, with no daily limit. Pick a message, tap <b>Show families</b>, then tap each green button: WhatsApp opens with that family's personal message already written. Press Send in WhatsApp, then come back for the next one.</p>
+    <div class="row">
+      <div class="field">
+        <label for="waKind">Message</label>
+        <select id="waKind">
+          <option value="PAYMENT_REMINDER">Payment reminder</option>
+          <option value="PAYMENT_OPEN">Payment is now open</option>
+          <option value="CUSTOM">My own message</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="waAudience">Send to</label>
+        <select id="waAudience">
+          <option value="UNPAID">Families who have not paid yet</option>
+          <option value="ALL">All registered families</option>
+          <option value="PAID">Families who have paid</option>
+        </select>
+      </div>
+    </div>
+    <div id="waCustomBox" style="display:none">
+      <div class="field"><label for="waMessage">Message</label><textarea id="waMessage" maxlength="2000" placeholder="Vanakkam {first_name}, …"></textarea>
+        <span class="hint">You can use {first_name}, {amount_due} and {registration_id}. Use *stars* for <b>bold</b> in WhatsApp.</span></div>
+      <label class="check"><input type="checkbox" id="waIncludePayment" checked> Add each family's payment details (amount, Swish number) if they have not paid</label>
+    </div>
+    <label class="check"><input type="checkbox" id="waHideRecent" checked> Hide families I already sent this message to in the last 24 hours</label>
+    <div class="actions"><button class="primary" id="waLoadBtn">Show families</button></div>
+    <div id="waArea" style="display:none">
+      <div class="summary" id="waCount"></div>
+      <details><summary class="hint" style="cursor:pointer">See the message for the first family</summary><div class="wa-msg" id="waSample"></div></details>
+      <div class="wa-list" id="waList"></div>
+    </div>
   </div>
 
   <div class="card">
@@ -110,8 +158,8 @@ th{background:#f8fafc}
   </div>
 
   <div class="card">
-    <h2>Recent emails</h2>
-    <div class="table-scroll"><table><thead><tr><th>When</th><th>Email</th><th>To</th><th>Status</th></tr></thead><tbody id="log"><tr><td colspan="4">Loading…</td></tr></tbody></table></div>
+    <h2>Recent messages</h2>
+    <div class="table-scroll"><table><thead><tr><th>When</th><th>Message</th><th>To</th><th>Status</th></tr></thead><tbody id="log"><tr><td colspan="4">Loading…</td></tr></tbody></table></div>
   </div>
 </div>
 
@@ -203,11 +251,62 @@ async function loadLog() {
   const rows = await r.json().catch(() => []);
   $('log').innerHTML = rows.map(l => `<tr>
     <td>${esc(new Date(l.created_at).toLocaleString())}</td>
-    <td>${esc(KIND_NAMES[l.kind] || l.kind)}<br><span class="hint">${esc(l.subject)}</span></td>
+    <td><span class="CH ${esc(l.channel || 'EMAIL')}">${l.channel === 'WHATSAPP' ? 'WhatsApp' : 'Email'}</span>${esc(KIND_NAMES[l.kind] || l.kind)}<br><span class="hint">${esc(l.subject)}</span></td>
     <td>${esc([l.first_name, l.last_name].filter(Boolean).join(' '))}<br><span class="hint">${esc(l.to_email)}</span></td>
     <td><span class="pill ${esc(l.status)}">${esc(l.status)}</span>${l.error ? `<br><span class="hint">${esc(l.error)}</span>` : ''}</td></tr>`).join('')
     || '<tr><td colspan="4">No emails yet.</td></tr>';
 }
+
+// ---- WhatsApp: open a prefilled chat per family and remember who was messaged ----
+let waRows = [];
+$('waKind').addEventListener('change', () => {
+  $('waCustomBox').style.display = $('waKind').value === 'CUSTOM' ? '' : 'none';
+  if ($('waKind').value !== 'CUSTOM') $('waAudience').value = 'UNPAID';
+  $('waArea').style.display = 'none';
+});
+['waAudience', 'waMessage', 'waIncludePayment', 'waHideRecent'].forEach(id => $(id).addEventListener('input', () => { $('waArea').style.display = 'none'; }));
+
+function recentlySent(row) {
+  return row.last_sent && (Date.now() - new Date(row.last_sent).getTime()) < 24 * 3600 * 1000;
+}
+
+function renderWa() {
+  const hide = $('waHideRecent').checked;
+  const shown = waRows.filter(r => !(hide && recentlySent(r) && !r.justSent));
+  const remaining = shown.filter(r => !r.justSent).length;
+  $('waCount').textContent = shown.length
+    ? `${shown.length} famil${shown.length === 1 ? 'y' : 'ies'} · ${remaining} still to message`
+    : 'Nobody to message for this selection.';
+  $('waSample').textContent = shown[0] ? shown[0].text : '';
+  $('waList').innerHTML = shown.map(r => `<div class="wa-row ${r.justSent ? 'sent' : ''}">
+      <div class="wa-who"><b>${esc(r.name)}</b><span>${esc(r.whatsapp || 'No WhatsApp number')}${r.amount_due ? ` · ${esc(r.amount_due)} kr due` : ''}${r.last_sent ? ` · last sent ${esc(new Date(r.last_sent).toLocaleString())}` : ''}</span></div>
+      ${r.digits
+        ? `<a class="btn wa ${r.justSent ? 'done' : ''}" href="https://wa.me/${r.digits}?text=${encodeURIComponent(r.text)}" target="_blank" rel="noopener" data-id="${r.id}">${r.justSent ? '✓ Opened – tap to open again' : '💬 Send on WhatsApp'}</a>`
+        : '<span class="hint">Cannot message</span>'}
+    </div>`).join('');
+}
+
+$('waLoadBtn').addEventListener('click', async () => {
+  const r = await authFetch(`${API}/admin/whatsapp/list`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: $('waKind').value, audience: $('waAudience').value, message: $('waMessage').value, includePayment: $('waIncludePayment').checked }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { alert(d.error || 'Could not load the families.'); return; }
+  waRows = d;
+  $('waArea').style.display = '';
+  renderWa();
+});
+
+// Record the tap; WhatsApp itself opens through the link.
+$('waList').addEventListener('click', async e => {
+  const link = e.target.closest('a.wa');
+  if (!link) return;
+  const row = waRows.find(x => String(x.id) === link.dataset.id);
+  if (!row || row.justSent) return;
+  row.justSent = true;
+  setTimeout(renderWa, 300); // let the browser follow the link before the list is redrawn
+  const r = await authFetch(`${API}/admin/whatsapp/sent`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ registrationId: row.id, kind: $('waKind').value }) });
+  if (r.ok) { row.last_sent = (await r.json()).sent_at; loadLog(); }
+});
 
 loadStatus();
 loadLog();
