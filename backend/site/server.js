@@ -83,6 +83,9 @@ app.get('/health', (req, res) => res.json({ status: 'ok', service: 'site-backend
 // 1. Register Member (With Encryption & Hashing)
 app.post('/api/register', async (req, res) => {
     const { firstName, lastName, email, phone, password, category, dob } = req.body;
+    if (!firstName || !lastName || !email || !password || !category) {
+        return res.status(400).json({ error: "Please fill in your first name, last name, email, password and membership type." });
+    }
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
         const encryptedLastName = encryptData(lastName);
@@ -90,11 +93,13 @@ app.post('/api/register', async (req, res) => {
 
         const query = `INSERT INTO members (first_name, last_name, email, phone, password, category, dob) 
                        VALUES ($1, $2, $3, $4, $5, $6, $7)`;
-        await pool.query(query, [firstName, encryptedLastName, email, encryptedPhone, hashedPassword, category, dob]);
+        await pool.query(query, [firstName, encryptedLastName, email, encryptedPhone, hashedPassword, category, dob || null]);
 
         res.status(201).json({ message: "Registration successful and data encrypted!" });
     } catch (err) {
-        res.status(400).json({ error: "Email already exists or DB error" });
+        if (err.code === '23505') return res.status(409).json({ error: "An account with this email already exists. Please log in, or use Forgot password." });
+        console.error('Registration failed:', err.message);
+        res.status(500).json({ error: "Could not create your account right now. Please try again later." });
     }
 });
 
@@ -471,6 +476,12 @@ app.delete('/api/admin/tasks/:id', requireAdmin, async (req, res) => {
 
 
 const PORT = process.env.PORT || 3001;
+// Columns added after the first release, so older databases are brought up to date on every start.
+async function ensureMemberColumns() {
+  await pool.query(`ALTER TABLE members ADD COLUMN IF NOT EXISTS phone TEXT`);
+}
+
 initializeDatabase()
+  .then(() => ensureMemberColumns())
   .then(() => app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`)))
   .catch(err => { console.error('Failed to initialize database:', err); process.exit(1); });
