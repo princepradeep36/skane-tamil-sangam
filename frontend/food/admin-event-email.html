@@ -282,6 +282,10 @@ async function loadLog() {
 
 // ---- WhatsApp: open a prefilled chat per family and remember who was messaged ----
 let waRows = [];
+// api.whatsapp.com/send keeps emojis intact; wa.me links turned them into '?' symbols in WhatsApp on a computer.
+function waLink(digits, text) {
+  return `https://api.whatsapp.com/send?${digits ? `phone=${digits}&` : ''}text=${encodeURIComponent(text)}`;
+}
 $('waKind').addEventListener('change', () => {
   $('waCustomBox').style.display = $('waKind').value === 'CUSTOM' ? '' : 'none';
   if ($('waKind').value !== 'CUSTOM') $('waAudience').value = 'UNPAID';
@@ -307,7 +311,7 @@ function renderWa() {
   $('waList').innerHTML = shown.map(r => `<div class="wa-row ${r.justSent ? 'sent' : ''}">
       <div class="wa-who"><b>${esc(r.name)}</b><span>${esc(r.whatsapp || 'No WhatsApp number')}${r.amount_due ? ` · ${esc(r.amount_due)} kr due` : ''}${r.last_sent ? ` · last sent ${esc(new Date(r.last_sent).toLocaleString())}` : ''}</span></div>
       ${r.digits
-        ? `<a class="btn wa ${r.justSent ? 'done' : ''}" href="https://wa.me/${r.digits}?text=${encodeURIComponent(r.text)}" target="_blank" rel="noopener" data-id="${r.id}">${r.justSent ? '✓ Opened – tap to open again' : '💬 Send on WhatsApp'}</a>`
+        ? `<a class="btn wa ${r.justSent ? 'done' : ''}" href="${waLink(r.digits, r.text)}" target="_blank" rel="noopener" data-id="${r.id}">${r.justSent ? '✓ Opened – tap to open again' : '💬 Send on WhatsApp'}</a>`
         : '<span class="hint">Cannot message</span>'}
     </div>`).join('');
 }
@@ -342,7 +346,7 @@ $('waNextBtn').addEventListener('click', () => {
   const hide = $('waHideRecent').checked;
   const row = waRows.find(r => r.digits && !r.justSent && !(hide && recentlySent(r)));
   if (!row) return;
-  window.open(`https://wa.me/${row.digits}?text=${encodeURIComponent(row.text)}`, '_blank', 'noopener');
+  window.open(waLink(row.digits, row.text), '_blank', 'noopener');
   markWaSent(row);
 });
 
@@ -366,7 +370,7 @@ _Already paid? Thank you! Nothing more to do._
 
 With warm wishes,
 *Skåne Tamil Sangam* 🙏`;
-function updateGroupLink() { $('groupOpen').href = `https://wa.me/?text=${encodeURIComponent($('groupMsg').value)}`; }
+function updateGroupLink() { $('groupOpen').href = waLink('', $('groupMsg').value); }
 $('groupMsg').value = GROUP_MESSAGE;
 updateGroupLink();
 $('groupMsg').addEventListener('input', updateGroupLink);
