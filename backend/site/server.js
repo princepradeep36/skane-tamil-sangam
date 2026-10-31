@@ -123,6 +123,44 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+// 1.1b Sign in with Google: the page sends Google's ID token; we check it with Google, then log the
+// member in, creating the account on first use. Needs GOOGLE_CLIENT_ID (the web client ID from Google Cloud).
+app.get('/api/auth/google/config', (req, res) => {
+    res.json({ clientId: process.env.GOOGLE_CLIENT_ID || null });
+});
+
+app.post('/api/auth/google', async (req, res) => {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) return res.status(503).json({ error: "Google sign-in is not set up yet." });
+    const credential = String(req.body?.credential || '');
+    if (!credential) return res.status(400).json({ error: "Missing Google credential" });
+    try {
+        const check = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+        const info = await check.json().catch(() => ({}));
+        const validIssuer = info.iss === 'accounts.google.com' || info.iss === 'https://accounts.google.com';
+        if (!check.ok || info.aud !== clientId || !validIssuer || String(info.email_verified) !== 'true' || !info.email || Number(info.exp) * 1000 < Date.now()) {
+            return res.status(401).json({ error: "Google sign-in could not be verified. Please try again." });
+        }
+        const email = String(info.email).toLowerCase();
+        let result = await pool.query('SELECT * FROM members WHERE lower(email) = $1', [email]);
+        if (!result.rows.length) {
+            // First Google sign-in: create the member. The random password is never used; they can set one with "Forgot password".
+            const randomPassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+            result = await pool.query(`INSERT INTO members (first_name, last_name, email, password, category)
+                VALUES ($1, $2, $3, $4, 'Primary') RETURNING *`,
+                [info.given_name || email.split('@')[0], encryptData(info.family_name || ''), email, randomPassword]);
+        }
+        const user = result.rows[0];
+        const token = jwt.sign({ userId: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '8h' });
+        res.json({
+            message: "Login successful", role: user.role, token,
+            user: { firstName: user.first_name, lastName: user.last_name, email: user.email }
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // 1.2 Change Password (Secure)
 app.post('/api/user/change-password', authenticateToken, async (req, res) => {
     const { oldPassword, newPassword } = req.body;

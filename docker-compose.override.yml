@@ -2,6 +2,10 @@
 # Docker Compose merges this file into docker-compose.yml automatically.
 # Put the values in the .env file next to docker-compose.yml; leave them empty to keep email turned off.
 services:
+  site-backend:
+    environment:
+      # "Sign in with Google" on Login and Create Account: the OAuth web client ID from Google Cloud Console.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
   food-backend:
     environment:
       SMTP_HOST: ${SMTP_HOST:-}
