@@ -720,14 +720,26 @@ app.get("/event/booking/:id/:key", async (req, res) => {
   } finally { client.release(); }
 });
 
-app.put("/event/registration/:id", requireEventRegistrationOpen, async (req, res) => {
-  const { firstName, lastName, email, phone, whatsapp, adultsCount, kids6to12Count, kidsBelow6Count, volunteerInterest, culturalInterest, culturalActivityType, comments, photoConsent } = req.body;
+app.put("/event/registration/:id", requireEventRegistrationOpen, (req, res) => saveRegistrationEdit(req, res, false));
+
+// Admins can correct any registration (names, contact details, counts), even when registration is closed.
+// The photo consent is the family's own choice, so an admin edit keeps whatever they chose.
+app.put("/admin/event-registration/:id", requireAdmin, (req, res) => saveRegistrationEdit(req, res, true));
+
+async function saveRegistrationEdit(req, res, byAdmin) {
+  const { firstName, lastName, email, phone, whatsapp, adultsCount, kids6to12Count, kidsBelow6Count, volunteerInterest, culturalInterest, culturalActivityType, comments } = req.body;
+  let { photoConsent } = req.body;
+  if (byAdmin) {
+    const current = await pool.query("SELECT photo_consent FROM event_registrations WHERE id=$1", [req.params.id]).catch(() => ({ rows: [] }));
+    if (!current.rows.length) return res.status(404).json({ error: 'Registration not found' });
+    photoConsent = current.rows[0].photo_consent;
+  }
   const normalizedPhone = normalizeInternationalPhone(phone);
   const normalizedWhatsapp = normalizeInternationalPhone(whatsapp);
   const normalizedCulturalActivity = normalizeCulturalActivity(!!culturalInterest, culturalActivityType);
   const normalizedComments = normalizeRegistrationComments(comments);
   if (!!culturalInterest && !normalizedCulturalActivity) return res.status(400).json({ error: "Please select Group Dance or Group Singing for cultural activities." });
-  if (!firstName || !lastName || !email || !normalizedPhone || !normalizedWhatsapp || !photoConsent || !validCount(adultsCount) || !validCount(kids6to12Count) || !validCount(kidsBelow6Count) || adultsCount + kids6to12Count + kidsBelow6Count < 1)
+  if (!firstName || !lastName || !email || !normalizedPhone || !normalizedWhatsapp || (!byAdmin && !photoConsent) || !validCount(adultsCount) || !validCount(kids6to12Count) || !validCount(kidsBelow6Count) || adultsCount + kids6to12Count + kidsBelow6Count < 1)
     return res.status(400).json({ error: "Please complete all mandatory fields, enter phone and WhatsApp numbers with country code (for example +46701234567 or +919876543210), accept the consent, and register at least one participant." });
   const client=await pool.connect();
   try {
@@ -742,7 +754,7 @@ app.put("/event/registration/:id", requireEventRegistrationOpen, async (req, res
     const saved=await registrationWithSwish(client,result.rows[0].id); await client.query('COMMIT'); res.json(saved);
   } catch(err){await client.query('ROLLBACK'); if(err.code==='23505') return res.status(409).json({error:'That phone number is already used by another registration.'}); res.status(500).json({error:err.message});}
   finally{client.release();}
-});
+}
 
 // Customer payment confirmation, matching the existing Click2Eat food-payment flow.
 // This records the customer's confirmation; it is not a bank-side Swish verification.
