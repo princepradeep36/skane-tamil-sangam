@@ -3,55 +3,40 @@
 const { amountDue } = require("./mailer");
 const { bookingUrl } = require("./booking-link");
 
-const HEADER = "🪔 *Skåne Tamil Sangam · Diwali 2026* 🪔";
-const LINE = "━━━━━━━━━━━━━━━━";
-const FOOTER = `📅 Sunday 15 November 2026 · from 10:00 AM
-📍 Tryckeriet
+const HEADER = "🪔 *Skåne Tamil Sangam – Diwali 2026* 🪔";
+const FOOTER = `📅 Sun 15 Nov · 10:00 AM · Tryckeriet
+Nandri! 🙏
+– Skåne Tamil Sangam`;
 
-With warm wishes,
-*Skåne Tamil Sangam* 🙏`;
-
-// The payment details as a tidy block, plus the personal link that opens the family's booking.
+// Amount, Swish details and the personal link that opens the family's booking.
 function paymentBlock(r) {
   const due = amountDue(r);
   if (r.payment_status === "PAID" || due <= 0) return "";
-  const swish = r.swish_number
-    ? `📱 Swish number: *${r.swish_number}*
-✍️ Swish message: *Diwali 2026 Reg ${r.id}*`
-    : "📱 Swish number: _will be shared soon_";
-  return `${LINE}
-🧾 Registration no: *${r.id}*
-💰 Amount to pay: *${due} kr*
-${swish}
-${LINE}
+  return `💰 *Amount:* ${due} kr
+📱 *Swish:* ${r.swish_number || "will be shared soon"}
+📝 *Message:* Diwali 2026 Reg ${r.id}
 
-👉 *Pay & confirm here* (your booking opens directly):
+👉 *Pay & confirm here:*
 ${bookingUrl(r)}
 
-After paying, upload your Swish screenshot and tap *Mark as Paid* ✅`;
+After paying, upload your Swish screenshot and tap *Mark as Paid*. ✅`;
+}
+
+function message(r, sentence) {
+  const payment = paymentBlock(r);
+  return `${HEADER}
+
+Vanakkam ${r.first_name} 🙏
+${sentence}${payment ? `
+
+${payment}` : ""}
+
+${FOOTER}`;
 }
 
 const MESSAGES = {
-  PAYMENT_OPEN: r => `${HEADER}
-
-Vanakkam *${r.first_name}* 🙏
-
-Good news: payment for the Diwali celebration is now *open* 🎉 Please pay your registration fee by Swish.
-
-${paymentBlock(r)}
-
-${FOOTER}`,
-  PAYMENT_REMINDER: r => `${HEADER}
-
-Vanakkam *${r.first_name}* 🙏
-
-A gentle reminder: the payment for your registration is still *pending*.
-
-${paymentBlock(r)}
-
-_Already paid? Just upload your Swish screenshot on the same page so we can confirm it._
-
-${FOOTER}`,
+  PAYMENT_OPEN: r => message(r, "Payment for Diwali 2026 is now open."),
+  PAYMENT_REMINDER: r => message(r, "Just a gentle reminder that your registration payment is still pending."),
   // Admin-written text. {first_name}, {amount_due} and {registration_id} are filled in per family.
   CUSTOM: (r, custom) => {
     const fill = s => String(s || "").replace(/\{first_name\}/g, r.first_name).replace(/\{amount_due\}/g, String(amountDue(r))).replace(/\{registration_id\}/g, String(r.id));
