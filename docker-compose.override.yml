@@ -4,8 +4,9 @@
 services:
   site-backend:
     environment:
-      # "Sign in with Google" on Login and Create Account: the OAuth web client ID from Google Cloud Console.
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      # "Sign in with Google" on Login and Create Account: the Sangam's OAuth web client ID from Google Cloud Console
+      # (public, not a secret). Set GOOGLE_CLIENT_ID in .env to use a different one.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-766549084894-uf92j72j1kcu6adjk5vestkuv2t47mfp.apps.googleusercontent.com}
   food-backend:
     environment:
       SMTP_HOST: ${SMTP_HOST:-}
