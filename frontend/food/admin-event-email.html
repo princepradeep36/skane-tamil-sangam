@@ -44,7 +44,7 @@ th{background:#f8fafc}
 .table-scroll{overflow:auto;max-height:420px}
 .wa{background:#25d366;color:#fff;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .wa.done{background:#e7f8ee;color:#166534}
-.auto-box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px}
+.group-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin-bottom:16px}.group-box textarea{min-height:250px;font-size:.88rem;margin-top:8px}.wa.big{font-size:1.05rem;padding:14px 22px;margin:12px 0}.wa.big:disabled{background:#cbd5e1;color:#475569}.auto-box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px}
 .wa-list{margin-top:12px;border:1px solid #eee;border-radius:10px;overflow:hidden}
 .wa-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid #f1f1f1}
 .wa-row:last-child{border-bottom:0}
@@ -90,8 +90,15 @@ th{background:#f8fafc}
       <label class="check" style="margin-top:8px"><input type="checkbox" id="waAutoSkip" checked> Skip families who already got this WhatsApp message in the last 24 hours</label>
       <div class="progress" id="waAutoProgress"></div>
     </div>
-    <h3 id="waManualTitle" style="margin:18px 0 6px;font-size:1rem;display:none">Or send one by one from your own WhatsApp (free)</h3>
-    <p class="hint" style="font-size:.9rem;margin:0 0 12px">Pick a message, tap <b>Show families</b>, then tap each green button: WhatsApp opens with that family's personal message already written. Press Send in WhatsApp, then come back for the next one.</p>
+    <div class="group-box">
+      <b>📢 One message for your WhatsApp group</b>
+      <p class="hint" style="margin:4px 0 0">Post one general reminder in the Sangam's WhatsApp group or Community: everyone sees it at once, and the registration page shows each family their own amount. You can edit the text before sending.</p>
+      <textarea id="groupMsg"></textarea>
+      <div class="actions"><button type="button" class="wa" id="groupCopy">📋 Copy message</button><a class="btn wa" id="groupOpen" target="_blank" rel="noopener">💬 Open in WhatsApp</a></div>
+      <div class="hint" id="groupResult"></div>
+    </div>
+    <h3 id="waManualTitle" style="margin:18px 0 6px;font-size:1rem">💬 Personal reminders, family by family (free)</h3>
+    <p class="hint" style="font-size:.9rem;margin:0 0 12px">Pick a message and tap <b>Show families</b>. Then just keep tapping <b>Next family →</b>: WhatsApp opens with that family's personal message already written, you press Send, come back and tap again.</p>
     <div class="row">
       <div class="field">
         <label for="waKind">Message</label>
@@ -119,6 +126,7 @@ th{background:#f8fafc}
     <div class="actions"><button class="primary" id="waLoadBtn">Show families</button></div>
     <div id="waArea" style="display:none">
       <div class="summary" id="waCount"></div>
+      <button type="button" class="wa big" id="waNextBtn">💬 Next family →</button>
       <details><summary class="hint" style="cursor:pointer">See the message for the first family</summary><div class="wa-msg" id="waSample"></div></details>
       <div class="wa-list" id="waList"></div>
     </div>
@@ -293,6 +301,9 @@ function renderWa() {
     ? `${shown.length} famil${shown.length === 1 ? 'y' : 'ies'} · ${remaining} still to message`
     : 'Nobody to message for this selection.';
   $('waSample').textContent = shown[0] ? shown[0].text : '';
+  const next = shown.find(r => r.digits && !r.justSent);
+  $('waNextBtn').disabled = !next;
+  $('waNextBtn').textContent = next ? `💬 Next family: ${next.name} →` : (shown.length ? '✓ All families done' : 'Nobody to message');
   $('waList').innerHTML = shown.map(r => `<div class="wa-row ${r.justSent ? 'sent' : ''}">
       <div class="wa-who"><b>${esc(r.name)}</b><span>${esc(r.whatsapp || 'No WhatsApp number')}${r.amount_due ? ` · ${esc(r.amount_due)} kr due` : ''}${r.last_sent ? ` · last sent ${esc(new Date(r.last_sent).toLocaleString())}` : ''}</span></div>
       ${r.digits
@@ -311,16 +322,57 @@ $('waLoadBtn').addEventListener('click', async () => {
   renderWa();
 });
 
-// Record the tap; WhatsApp itself opens through the link.
-$('waList').addEventListener('click', async e => {
-  const link = e.target.closest('a.wa');
-  if (!link) return;
-  const row = waRows.find(x => String(x.id) === link.dataset.id);
-  if (!row || row.justSent) return;
+async function markWaSent(row) {
   row.justSent = true;
   setTimeout(renderWa, 300); // let the browser follow the link before the list is redrawn
   const r = await authFetch(`${API}/admin/whatsapp/sent`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ registrationId: row.id, kind: $('waKind').value }) });
   if (r.ok) { row.last_sent = (await r.json()).sent_at; loadLog(); }
+}
+
+// Record the tap; WhatsApp itself opens through the link.
+$('waList').addEventListener('click', e => {
+  const link = e.target.closest('a.wa');
+  if (!link) return;
+  const row = waRows.find(x => String(x.id) === link.dataset.id);
+  if (row && !row.justSent) markWaSent(row);
+});
+
+// One button for the whole list: opens the next family who has not been messaged yet.
+$('waNextBtn').addEventListener('click', () => {
+  const hide = $('waHideRecent').checked;
+  const row = waRows.find(r => r.digits && !r.justSent && !(hide && recentlySent(r)));
+  if (!row) return;
+  window.open(`https://wa.me/${row.digits}?text=${encodeURIComponent(row.text)}`, '_blank', 'noopener');
+  markWaSent(row);
+});
+
+// ---- WhatsApp: one general message for the group ----
+const GROUP_MESSAGE = `🪔 *Skåne Tamil Sangam · Diwali 2026* 🪔
+
+Vanakkam everyone 🙏
+
+A gentle reminder to complete your *registration payment* if you haven't already.
+
+1️⃣ Open the registration page:
+https://skanetamilsangam.duckdns.org/event-registration.html
+2️⃣ Enter your phone number under *Find Booking*
+3️⃣ Pay by Swish: your amount and Swish number are shown there
+4️⃣ Upload your Swish screenshot and tap *Mark as Paid* ✅
+
+_Already paid? Thank you! Nothing more to do._
+
+📅 Sunday 15 November 2026 · from 10:00 AM
+📍 Tryckeriet
+
+With warm wishes,
+*Skåne Tamil Sangam* 🙏`;
+function updateGroupLink() { $('groupOpen').href = `https://wa.me/?text=${encodeURIComponent($('groupMsg').value)}`; }
+$('groupMsg').value = GROUP_MESSAGE;
+updateGroupLink();
+$('groupMsg').addEventListener('input', updateGroupLink);
+$('groupCopy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText($('groupMsg').value); $('groupResult').textContent = '✓ Copied. Open your WhatsApp group, paste it and press Send.'; }
+  catch (e) { $('groupMsg').select(); $('groupResult').textContent = 'Select the text above and copy it (Ctrl+C, or long-press on a phone).'; }
 });
 
 // ---- WhatsApp: automatic sending through Meta's API ----
@@ -331,7 +383,6 @@ async function loadWaAuto() {
     waApiReady = !!s.apiConfigured;
     // The automatic box only matters once Meta's WhatsApp API is set up on the server.
     $('waAutoBox').style.display = waApiReady ? '' : 'none';
-    $('waManualTitle').style.display = waApiReady ? '' : 'none';
     if (!waApiReady) return;
     const c = await authFetch(`${API}/admin/whatsapp/send-all`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ kind: $('waAutoKind').value, skipHours: $('waAutoSkip').checked ? 24 : 0, dryRun: true }) });
