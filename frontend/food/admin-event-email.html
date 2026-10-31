@@ -77,7 +77,7 @@ th{background:#f8fafc}
 
   <div class="card">
     <h2>💬 Payment reminders on WhatsApp</h2>
-    <div class="auto-box">
+    <div class="auto-box" id="waAutoBox" style="display:none">
       <b>⚡ Send to all unpaid families automatically</b>
       <div class="hint" id="waApiStatus" style="margin:4px 0 10px">Checking WhatsApp setup…</div>
       <div class="row" style="align-items:flex-end">
@@ -90,7 +90,7 @@ th{background:#f8fafc}
       <label class="check" style="margin-top:8px"><input type="checkbox" id="waAutoSkip" checked> Skip families who already got this WhatsApp message in the last 24 hours</label>
       <div class="progress" id="waAutoProgress"></div>
     </div>
-    <h3 style="margin:18px 0 6px;font-size:1rem">Or send one by one from your own WhatsApp (free)</h3>
+    <h3 id="waManualTitle" style="margin:18px 0 6px;font-size:1rem;display:none">Or send one by one from your own WhatsApp (free)</h3>
     <p class="hint" style="font-size:.9rem;margin:0 0 12px">Pick a message, tap <b>Show families</b>, then tap each green button: WhatsApp opens with that family's personal message already written. Press Send in WhatsApp, then come back for the next one.</p>
     <div class="row">
       <div class="field">
@@ -329,6 +329,10 @@ async function loadWaAuto() {
   try {
     const s = await (await authFetch(`${API}/admin/whatsapp/status`, { cache: 'no-store' })).json();
     waApiReady = !!s.apiConfigured;
+    // The automatic box only matters once Meta's WhatsApp API is set up on the server.
+    $('waAutoBox').style.display = waApiReady ? '' : 'none';
+    $('waManualTitle').style.display = waApiReady ? '' : 'none';
+    if (!waApiReady) return;
     const c = await authFetch(`${API}/admin/whatsapp/send-all`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ kind: $('waAutoKind').value, skipHours: $('waAutoSkip').checked ? 24 : 0, dryRun: true }) });
     const d = await c.json().catch(() => ({ count: 0 }));
