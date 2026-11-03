@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Connection Game | Skåne Tamil Sangam</title>
+<style>
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:linear-gradient(170deg,#003d80,#0056b3 60%,#0b75d1);color:#fff;display:flex;flex-direction:column;min-height:100dvh;-webkit-tap-highlight-color:transparent}
+header{padding:16px 18px 6px;text-align:center}
+header b{display:block;font-size:1.2rem;letter-spacing:.02em}
+header span{color:#ffd76a;font-weight:600;font-size:.9rem}
+main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:18px;text-align:center}
+.join{width:min(360px,100%);background:#fff;color:#1c1c1e;border-radius:20px;padding:24px;box-shadow:0 18px 40px rgba(0,0,0,.25)}
+.join h1{margin:0 0 6px;font-size:1.5rem;color:#003d80}
+.join p{margin:0 0 16px;color:#57534e}
+.join input{width:100%;font-size:1.1rem;padding:14px;border:1.5px solid #d0d5dd;border-radius:12px}
+.join button{width:100%;margin-top:12px;font-size:1.15rem;font-weight:800;padding:14px;border:0;border-radius:12px;background:#ffc107;color:#1c1c1e;cursor:pointer}
+.err{color:#b42318;font-weight:600;margin-top:10px;min-height:1.2em}
+.buzz{width:min(78vw,340px);aspect-ratio:1;border-radius:50%;border:0;font-size:clamp(1.6rem,8vw,2.3rem);font-weight:900;line-height:1.15;color:#3d2c06;background:radial-gradient(circle at 35% 30%,#ffe08a,#ffc107 60%,#e0a100);box-shadow:0 14px 0 #b98500,0 26px 40px rgba(0,0,0,.35);cursor:pointer;touch-action:manipulation;user-select:none}
+.buzz:active{transform:translateY(10px);box-shadow:0 4px 0 #b98500,0 10px 20px rgba(0,0,0,.35)}
+.big{font-size:clamp(1.7rem,8vw,2.4rem);font-weight:900;line-height:1.2;margin:0}
+.sub{font-size:1.1rem;margin:0;opacity:.92;line-height:1.45;max-width:340px}
+.emoji{font-size:4.5rem;line-height:1}
+.panel{width:min(360px,100%);padding:26px 20px;border-radius:22px;background:rgba(255,255,255,.12)}
+.panel.go{background:#16a34a;animation:pulse 1s infinite}
+.panel.wait{background:rgba(255,193,7,.22)}
+.panel.bad{background:rgba(220,38,38,.35)}
+.panel.win{background:#16a34a}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,.6)}50%{box-shadow:0 0 0 18px rgba(255,255,255,0)}}
+footer{padding:10px 16px 16px;text-align:center;font-size:.9rem;opacity:.85}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header><b>🪔 Connection Game</b><span id="progress">Skåne Tamil Sangam</span></header>
+<main id="app"></main>
+<footer id="who"></footer>
+<script>
+const API = '/food-api';
+const app = document.getElementById('app');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const store = {
+  get() { try { return localStorage.getItem('connectionToken'); } catch (e) { return memoryToken; } },
+  set(v) { memoryToken = v; try { v ? localStorage.setItem('connectionToken', v) : localStorage.removeItem('connectionToken'); } catch (e) {} }
+};
+let memoryToken = null;
+let lastView = '';
+let lastTurn = '';
+
+function render(key, html) {
+  // Only touch the page when something changed, so typing and tapping are never interrupted.
+  if (key === lastView) return;
+  lastView = key;
+  app.innerHTML = html;
+}
+
+function showJoin(status) {
+  const open = status === 'LOBBY' || status === 'PLAYING';
+  document.getElementById('progress').textContent = 'Skåne Tamil Sangam';
+  document.getElementById('who').textContent = '';
+  if (!open) {
+    render('closed' + status, status === 'ENDED'
+      ? `<div class="emoji">🎉</div><p class="big">The game has finished</p><p class="sub">Thank you for playing!</p>`
+      : `<div class="emoji">⏳</div><p class="big">The game hasn't opened yet</p><p class="sub">This page will open by itself when it starts. Please keep it open.</p>`);
+    return;
+  }
+  if (lastView === 'join') return;
+  render('join', `<form class="join" id="joinForm">
+      <h1>Join the game</h1><p>Type the name to show on stage.</p>
+      <input id="name" maxlength="30" autocomplete="name" placeholder="Your name" required>
+      <button type="submit">Join</button><div class="err" id="err"></div></form>`);
+  document.getElementById('joinForm').onsubmit = async e => {
+    e.preventDefault();
+    const r = await fetch(`${API}/connection/join`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: document.getElementById('name').value }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { document.getElementById('err').textContent = d.error || 'Could not join. Please try again.'; return; }
+    store.set(d.token);
+    lastView = '';
+    tick();
+  };
+}
+
+function showPlayer(me) {
+  document.getElementById('who').textContent = `Playing as ${me.name} · Score: ${me.score}`;
+  document.getElementById('progress').textContent = me.status === 'PLAYING' ? `Question ${me.questionNumber} of ${me.questionTotal}` : 'Skåne Tamil Sangam';
+  if (me.turn === 'ANSWERING' && lastTurn !== 'ANSWERING' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  lastTurn = me.turn;
+  if (me.status === 'LOBBY') {
+    return render('lobby', `<div class="emoji">✅</div><p class="big">You're in!</p><p class="sub">Look at the stage screen. The game starts soon.</p>`);
+  }
+  if (me.status === 'ENDED') {
+    return render('ended' + me.score, `<div class="emoji">🎉</div><p class="big">Thanks for playing!</p><p class="sub">Your score: <b>${me.score}</b></p>`);
+  }
+  if (me.turn === 'ANSWERING') {
+    return render('answering' + me.questionNumber, `<div class="panel go"><div class="emoji">🎤</div><p class="big">It's your turn!</p><p class="sub">Say your answer on stage now.</p></div>`);
+  }
+  if (me.turn === 'CORRECT') {
+    return render('correct' + me.questionNumber, `<div class="panel win"><div class="emoji">🏆</div><p class="big">Correct!</p><p class="sub">Well done. Next question coming up.</p></div>`);
+  }
+  if (me.revealed) {
+    return render('revealed' + me.questionNumber, `<div class="emoji">👀</div><p class="big">Answer revealed</p><p class="sub">See the stage screen. Next question coming up.</p>`);
+  }
+  if (me.turn === 'WAITING') {
+    return render(`waiting${me.questionNumber}-${me.ahead}`, `<div class="panel wait"><div class="emoji">✋</div><p class="big">You're in line</p><p class="sub">${me.ahead === 1 ? '1 person is' : me.ahead + ' people are'} ahead of you. Be ready to answer on stage!</p></div>`);
+  }
+  if (me.turn === 'WRONG') {
+    return render('wrong' + me.questionNumber, `<div class="panel bad"><div class="emoji">🙈</div><p class="big">Not this time</p><p class="sub">You can try again on the next question.</p></div>`);
+  }
+  if (me.canBuzz) {
+    if (lastView !== 'buzz' + me.questionNumber) {
+      render('buzz' + me.questionNumber, `<button class="buzz" id="buzz">I want<br>to answer</button><p class="sub">Tap if you know the connection. You get one try per question.</p>`);
+      document.getElementById('buzz').onclick = buzz;
+    }
+  }
+}
+
+async function buzz() {
+  const btn = document.getElementById('buzz');
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch(`${API}/connection/buzz`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: store.get() }) });
+    const me = await r.json();
+    if (r.ok) showPlayer(me); else lastView = '';
+  } catch (e) { lastView = ''; }
+}
+
+async function tick() {
+  try {
+    const token = store.get();
+    const r = await fetch(`${API}/connection/me?token=${encodeURIComponent(token || '')}`, { cache: 'no-store' });
+    const me = await r.json();
+    if (me.needJoin) { store.set(null); showJoin(me.status); } else showPlayer(me);
+  } catch (e) { /* network blip: keep what's on screen and retry */ }
+}
+
+tick();
+setInterval(tick, 1200);
+</script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connection Game · Stage Screen</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:radial-gradient(1200px 600px at 50% -10%,#0b75d1,#003d80 55%,#001f45);color:#fff;overflow:hidden}
+.view{height:100vh;display:flex;flex-direction:column;padding:2.5vh 3vw}
+[hidden]{display:none!important}
+.title{text-align:center;font-weight:900;font-size:5vh;margin:0}
+.title small{display:block;color:#ffd76a;font-size:2.6vh;font-weight:700;letter-spacing:.04em}
+/* Lobby */
+.lobby-body{flex:1;display:flex;gap:4vw;align-items:center;justify-content:center;min-height:0}
+.qr-card{background:#fff;color:#003d80;border-radius:24px;padding:3vh;text-align:center}
+#qr{display:flex;justify-content:center}
+#qr img,#qr canvas{width:46vh!important;height:46vh!important}
+.join-url{margin-top:2vh;font-weight:800;font-size:2.4vh;word-break:break-all;max-width:46vh}
+.players{flex:1;max-width:48vw;align-self:stretch;display:flex;flex-direction:column;justify-content:center;min-height:0}
+.players h2{margin:0 0 2vh;font-size:4.5vh}
+.names{display:flex;flex-wrap:wrap;gap:1vh;overflow:hidden;align-content:flex-start;max-height:62vh}
+.names span{background:rgba(255,255,255,.16);padding:.8vh 1.6vh;border-radius:999px;font-size:2.6vh;font-weight:700}
+/* Game */
+.bar{display:flex;justify-content:space-between;align-items:center;font-size:3vh;font-weight:800;margin-bottom:1.5vh}
+.bar .q{color:#ffd76a}
+.stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.25);border-radius:20px;overflow:hidden}
+.stage img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.status{margin-top:1.5vh;min-height:13vh;display:flex;align-items:center;justify-content:center;gap:2vw;text-align:center;border-radius:18px;padding:1vh 2vw;font-weight:900}
+.status.answering{background:#16a34a;font-size:6vh}
+.status.answer{background:#ffc107;color:#3d2c06;font-size:7vh}
+.status.idle{background:rgba(255,255,255,.1);font-size:3.4vh;font-weight:700}
+.status small{display:block;font-size:2.6vh;font-weight:700;opacity:.9}
+/* End */
+.end{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh}
+.end h1{font-size:8vh;margin:0}
+.lb{width:min(70vw,900px);display:flex;flex-direction:column;gap:1.2vh}
+.lb div{display:flex;justify-content:space-between;background:rgba(255,255,255,.14);border-radius:14px;padding:1.4vh 2.4vh;font-size:3.6vh;font-weight:800}
+.lb div:first-child{background:#ffc107;color:#3d2c06}
+.wait{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;font-size:4vh;font-weight:700}
+</style>
+</head>
+<body>
+<div class="view" id="idle"><p class="title">🪔 Connection Game<small>Skåne Tamil Sangam</small></p><div class="wait">The game will start soon</div></div>
+
+<div class="view" id="lobby" hidden>
+  <p class="title">🪔 Connection Game<small>Scan to join!</small></p>
+  <div class="lobby-body">
+    <div class="qr-card"><div id="qr"></div><div class="join-url" id="joinUrl"></div></div>
+    <div class="players"><h2><span id="count">0</span> players joined</h2><div class="names" id="names"></div></div>
+  </div>
+</div>
+
+<div class="view" id="playing" hidden>
+  <div class="bar"><span class="q" id="qNum"></span><span id="imgNum"></span></div>
+  <div class="stage"><img id="img" alt="Question image"></div>
+  <div class="status idle" id="status"></div>
+</div>
+
+<div class="view" id="ended" hidden>
+  <div class="end"><h1>🎉 Thank you!</h1><div class="lb" id="lb"></div></div>
+</div>
+
+<script>
+const API = '/food-api';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const $ = id => document.getElementById(id);
+const joinUrl = `${location.origin}/connection.html`;
+$('joinUrl').textContent = joinUrl.replace(/^https?:\/\//, '');
+if (typeof QRCode !== 'undefined') new QRCode($('qr'), { text: joinUrl, width: 512, height: 512, correctLevel: QRCode.CorrectLevel.M });
+else $('qr').textContent = 'Open the address below to join';
+
+let shownImage = null;
+function setHtml(el, html) { if (el.dataset.html !== html) { el.dataset.html = html; el.innerHTML = html; } }
+
+function render(s) {
+  ['idle', 'lobby', 'playing', 'ended'].forEach(v => { $(v).hidden = v !== s.status.toLowerCase(); });
+  if (s.status === 'LOBBY') {
+    $('count').textContent = s.playerCount;
+    setHtml($('names'), s.playerNames.map(n => `<span>${esc(n)}</span>`).join(''));
+  }
+  if (s.status === 'PLAYING') {
+    $('qNum').textContent = `Question ${s.questionNumber} of ${s.questionTotal}`;
+    $('imgNum').textContent = `Image ${s.imageNumber} of ${s.imageCount}`;
+    if (shownImage !== s.imageId) {
+      shownImage = s.imageId;
+      $('img').src = `${API}/connection/image/${s.imageId}`;
+    }
+    const st = $('status');
+    if (s.revealed) {
+      st.className = 'status answer';
+      setHtml(st, `<div>${esc(s.answer)}${s.winner ? `<small>🏆 ${esc(s.winner)} got it right!</small>` : ''}</div>`);
+    } else if (s.answering) {
+      st.className = 'status answering';
+      setHtml(st, `<div>🎤 ${esc(s.answering)}${s.waiting.length ? `<small>Next: ${s.waiting.slice(0, 3).map(esc).join(', ')}${s.waiting.length > 3 ? ` +${s.waiting.length - 3}` : ''}</small>` : ''}</div>`);
+    } else {
+      st.className = 'status idle';
+      setHtml(st, `<div>Know the connection? Tap <b>I want to answer</b> on your phone!${s.wrong.length ? `<small>Not this time: ${s.wrong.map(esc).join(', ')}</small>` : ''}</div>`);
+    }
+  }
+  if (s.status === 'ENDED') {
+    setHtml($('lb'), s.leaderboard.map((p, i) => `<div><span>${i + 1}. ${esc(p.name)}</span><span>${p.score}</span></div>`).join('') || '<div><span>Thanks for playing!</span></div>');
+  }
+}
+
+async function tick() {
+  try {
+    const r = await fetch(`${API}/connection/screen`, { cache: 'no-store' });
+    if (r.ok) render(await r.json());
+  } catch (e) { /* keep showing the last state and retry */ }
+}
+tick();
+setInterval(tick, 800);
+</script>
+</body>
+</html>

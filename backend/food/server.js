@@ -9,7 +9,8 @@ const pool = require("./db");
 const initializeDatabase = require("./init-db");
 const mailer = require("./mailer");
 const wa = require("./whatsapp");
-const { validBookingKey } = require("./booking-link"); // not "whatsapp": route bodies use that name for the phone field
+const { validBookingKey } = require("./booking-link");
+const registerConnectionGame = require("./connection-game"); // not "whatsapp": route bodies use that name for the phone field
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error("JWT_SECRET environment variable is required");
@@ -1139,9 +1140,12 @@ app.put("/admin/order/:id/payment", requireAdmin, async (req, res) => {
 // Reuse existing details endpoint for fetching items of an order
 // app.get("/order/:id/details") is already available and public
 
+const ensureConnectionTables = registerConnectionGame(app, { pool, requireAdmin, imageContentType });
+
 initializeDatabase()
   .then(() => ensureEventRegistrationLifecycle())
   .then(() => mailer.ensureEmailLog())
+  .then(() => ensureConnectionTables())
   .then(() => ensureSiteSettings())
   .then(() => app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`)))
   .catch(err => { console.error('Failed to initialize event registration lifecycle:', err); process.exit(1); });

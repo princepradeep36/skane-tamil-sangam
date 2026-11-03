@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connection Game</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;background:#f4f7f9;margin:0;padding:20px;color:#222}
+.wrap{max-width:1100px;margin:auto}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.top h1{margin:0}.top p{margin:4px 0 0;color:#667085}
+.card{background:#fff;border-radius:14px;padding:20px;box-shadow:0 3px 12px #0001;margin-top:18px}
+.card h2{margin:0 0 12px;font-size:1.15rem}
+a.btn,button{border:0;border-radius:10px;padding:11px 16px;text-decoration:none;cursor:pointer;font-weight:bold;font-size:15px;display:inline-block}
+.back{background:#476cff;color:#fff}.ghost{background:#eef2f7;color:#1f2937}.primary{background:#0056b3;color:#fff}.go{background:#16a34a;color:#fff}.bad{background:#dc2626;color:#fff}.warn{background:#ffc107;color:#3d2c06}
+button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.hint{color:#667085;font-size:.9rem}
+.big{font-size:1.2rem;padding:15px 24px}
+.status{display:inline-block;padding:4px 12px;border-radius:999px;font-weight:bold;font-size:.85rem;background:#eef2f7;margin-left:8px}
+.game{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;align-items:start}
+.preview{background:#0f172a;border-radius:12px;aspect-ratio:16/10;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.preview img{max-width:100%;max-height:100%;object-fit:contain}
+.secret{background:#fff7ed;border:1px dashed #f59e0b;border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.secret small{display:block;color:#9a3412;font-weight:bold}.secret b{font-size:1.4rem}
+.turn{border-radius:12px;padding:14px;background:#f1f5f9;margin-bottom:12px}
+.turn.on{background:#dcfce7}
+.turn .name{font-size:1.6rem;font-weight:bold;margin:2px 0 10px}
+.line{margin:8px 0 0;font-size:.95rem}
+.pill{display:inline-block;background:#eef2f7;border-radius:999px;padding:3px 10px;margin:2px;font-size:.88rem}
+.pill.x{background:#fee2e2;color:#991b1b}
+.names{max-height:170px;overflow:auto}
+.q{border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-top:12px}
+.q-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.q-num{font-weight:bold;color:#0056b3}
+.q input[type=text]{flex:1;min-width:200px;padding:10px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:15px}
+.small{padding:7px 10px;font-size:13px}
+.thumbs{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.thumb{position:relative;width:110px;height:82px;border-radius:8px;overflow:hidden;background:#e5e7eb}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb span{position:absolute;left:4px;top:4px;background:#000a;color:#fff;font-size:12px;padding:0 6px;border-radius:6px}
+.thumb button{position:absolute;right:3px;top:3px;padding:1px 7px;font-size:13px;background:#dc2626;color:#fff;border-radius:6px;min-height:0}
+.add{width:110px;height:82px;border:2px dashed #cbd5e1;border-radius:8px;display:flex;align-items:center;justify-content:center;text-align:center;color:#475569;font-size:13px;font-weight:bold;cursor:pointer}
+.add input{display:none}
+.newq{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.newq input{flex:1;min-width:220px;padding:11px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:15px}
+[hidden]{display:none!important}
+@media(max-width:800px){.game{grid-template-columns:minmax(0,1fr)}}
+</style>
+<link rel="stylesheet" href="../responsive.css?v=20261015">
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div><h1>🎯 Connection Game</h1><p>Players join by QR code and tap "I want to answer". Answers are given on stage.</p></div>
+    <div class="row"><a class="btn go" href="../connection-screen.html" target="_blank" rel="noopener">🖥️ Open stage screen</a><a class="btn back" href="admin.html?admin=true">Admin Home</a></div>
+  </div>
+
+  <div class="card" id="control">Loading…</div>
+
+  <div class="card">
+    <h2>Questions</h2>
+    <p class="hint" style="margin:0">Each question has several images, shown one at a time, and one answer. Add the answer, then its images in the order to show them.</p>
+    <div class="newq"><input id="newAnswer" maxlength="300" placeholder="Answer for a new question, e.g. Pongal"><button class="primary" id="addQ">+ Add question</button></div>
+    <div id="questions"></div>
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script>
+checkAuth('admin');
+const API = '/food-api';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const json = { 'Content-Type': 'application/json' };
+
+/* ---------- Game control ---------- */
+let lastState = '';
+
+async function act(action, confirmText) {
+  if (confirmText && !confirm(confirmText)) return;
+  const r = await authFetch(`${API}/admin/connection/action`, { method: 'POST', headers: json, body: JSON.stringify({ action }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) return alert(d.error || 'That did not work.');
+  renderControl(d);
+}
+
+function renderControl(s) {
+  const key = JSON.stringify(s);
+  if (key === lastState) return;
+  lastState = key;
+  const el = $('control');
+  if (s.status === 'IDLE' || s.status === 'ENDED') {
+    el.innerHTML = `<h2>Run the game <span class="status">${s.status === 'ENDED' ? 'Finished' : 'Not started'}</span></h2>
+      ${s.status === 'ENDED' ? `<p><b>Final scores:</b> ${s.leaderboard.map(p => `<span class="pill">${esc(p.name)}: ${p.score}</span>`).join('') || 'No points scored.'}</p>` : ''}
+      <p class="hint">1. Open the stage screen on the projector. 2. Open the game for joining: the QR code appears on the stage screen.</p>
+      <button class="primary big" onclick="act('open-lobby')">Open game for joining</button>`;
+  } else if (s.status === 'LOBBY') {
+    el.innerHTML = `<h2>Players are joining <span class="status">${s.playerCount} joined</span></h2>
+      <p class="hint">The QR code is on the stage screen. Players can also still join after the game has started.</p>
+      <div class="names">${s.playerNames.map(n => `<span class="pill">${esc(n)}</span>`).join('') || '<span class="hint">Nobody yet…</span>'}</div>
+      <div class="row" style="margin-top:14px"><button class="go big" onclick="act('start')">▶ Start game</button><button class="ghost" onclick="act('reset','Cancel this game?')">Cancel</button></div>`;
+  } else {
+    const first = s.imageNumber <= 1, last = s.imageNumber >= s.imageCount;
+    el.innerHTML = `<h2>Question ${s.questionNumber} of ${s.questionTotal} <span class="status">${s.playerCount} players</span></h2>
+      <div class="game">
+        <div>
+          <div class="preview"><img src="${API}/connection/image/${s.imageId}" alt="Current image"></div>
+          <div class="row" style="margin-top:10px;justify-content:space-between">
+            <button class="ghost" onclick="act('prev-image')" ${first ? 'disabled' : ''}>← Previous</button>
+            <b>Image ${s.imageNumber} of ${s.imageCount}</b>
+            <button class="primary" onclick="act('next-image')" ${last ? 'disabled' : ''}>Next image →</button>
+          </div>
+        </div>
+        <div>
+          <div class="secret"><small>🔒 Answer (only on this screen${s.revealed ? ', now shown on stage too' : ''})</small><b>${esc(s.secretAnswer)}</b></div>
+          ${s.revealed
+            ? `<div class="turn on"><b>${s.winner ? `🏆 ${esc(s.winner)} answered correctly` : 'Answer shown on stage'}</b></div>`
+            : s.answering
+              ? `<div class="turn on"><small>🎤 Now answering (first in line)</small><div class="name">${esc(s.answering)}</div>
+                  <div class="row"><button class="go" onclick="act('correct')">✓ Correct</button><button class="bad" onclick="act('wrong')">✗ Wrong, next person</button></div>
+                  ${s.waiting.length ? `<p class="line"><b>Next in line:</b> ${s.waiting.map(n => `<span class="pill">${esc(n)}</span>`).join('')}</p>` : ''}</div>`
+              : `<div class="turn"><b>Waiting for someone to tap "I want to answer"…</b></div>`}
+          ${s.wrong.length ? `<p class="line"><b>Wrong:</b> ${s.wrong.map(n => `<span class="pill x">${esc(n)}</span>`).join('')}</p>` : ''}
+          <div class="row" style="margin-top:12px">
+            ${s.revealed ? '' : `<button class="warn" onclick="act('reveal')">Show answer</button>`}
+            ${s.revealed
+              ? `<button class="primary big" onclick="act('next-question')">${s.hasMoreQuestions ? 'Next question →' : 'Finish game 🎉'}</button>`
+              : `<button class="ghost" onclick="act('next-question','Skip to the next question without showing the answer?')">Skip question</button>`}
+            <button class="ghost" onclick="act('end','End the game now?')">End game</button>
+          </div>
+        </div>
+      </div>
+      <p class="line" style="margin-top:14px"><b>Scores:</b> ${s.players.filter(p => p.score).map(p => `<span class="pill">${esc(p.name)}: ${p.score}</span>`).join('') || '<span class="hint">None yet</span>'}</p>`;
+  }
+}
+
+async function poll() {
+  try {
+    const r = await authFetch(`${API}/admin/connection/state`, { cache: 'no-store' });
+    if (r.ok) renderControl(await r.json());
+  } catch (e) { /* retry on the next tick */ }
+}
+
+/* ---------- Questions ---------- */
+const thumbUrls = new Map();
+
+async function thumb(id) {
+  if (!thumbUrls.has(id)) {
+    const r = await authFetch(`${API}/admin/connection/images/${id}`);
+    thumbUrls.set(id, URL.createObjectURL(await r.blob()));
+  }
+  return thumbUrls.get(id);
+}
+
+async function loadQuestions() {
+  const r = await authFetch(`${API}/admin/connection/questions`, { cache: 'no-store' });
+  const list = await r.json();
+  $('questions').innerHTML = list.map((q, i) => `
+    <div class="q" data-id="${q.id}">
+      <div class="q-head">
+        <span class="q-num">Q${i + 1}</span>
+        <input type="text" maxlength="300" value="${esc(q.answer)}" aria-label="Answer" onchange="saveAnswer(${q.id}, this.value)">
+        <button class="ghost small" onclick="moveQ(${q.id},-1)" ${i === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
+        <button class="ghost small" onclick="moveQ(${q.id},1)" ${i === list.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>
+        <button class="bad small" onclick="deleteQ(${q.id})">Delete</button>
+      </div>
+      <div class="thumbs">
+        ${q.image_ids.map((id, n) => `<div class="thumb"><img data-img="${id}" alt="Image ${n + 1}"><span>${n + 1}</span><button onclick="deleteImage(${id})" aria-label="Remove image">✕</button></div>`).join('')}
+        <label class="add">+ Add images<input type="file" accept="image/*" multiple onchange="addImages(${q.id}, this)"></label>
+      </div>
+      ${q.image_ids.length ? '' : '<p class="hint" style="margin:8px 0 0">No images yet: this question is skipped until it has at least one.</p>'}
+    </div>`).join('') || '<p class="hint">No questions yet. Add the first one above.</p>';
+  document.querySelectorAll('img[data-img]').forEach(async img => { img.src = await thumb(Number(img.dataset.img)); });
+}
+
+$('addQ').onclick = async () => {
+  const answer = $('newAnswer').value.trim();
+  if (!answer) return alert('Please type the answer first.');
+  const r = await authFetch(`${API}/admin/connection/questions`, { method: 'POST', headers: json, body: JSON.stringify({ answer }) });
+  if (!r.ok) return alert((await r.json().catch(() => ({}))).error || 'Could not add the question.');
+  $('newAnswer').value = '';
+  loadQuestions();
+};
+
+async function saveAnswer(id, answer) {
+  const r = await authFetch(`${API}/admin/connection/questions/${id}`, { method: 'PUT', headers: json, body: JSON.stringify({ answer }) });
+  if (!r.ok) { alert((await r.json().catch(() => ({}))).error || 'Could not save the answer.'); loadQuestions(); }
+}
+async function moveQ(id, direction) {
+  await authFetch(`${API}/admin/connection/questions/${id}/move`, { method: 'POST', headers: json, body: JSON.stringify({ direction }) });
+  loadQuestions();
+}
+async function deleteQ(id) {
+  if (!confirm('Delete this question and its images?')) return;
+  await authFetch(`${API}/admin/connection/questions/${id}`, { method: 'DELETE' });
+  loadQuestions();
+}
+async function deleteImage(id) {
+  if (!confirm('Remove this image?')) return;
+  await authFetch(`${API}/admin/connection/images/${id}`, { method: 'DELETE' });
+  loadQuestions();
+}
+
+// Big phone photos are shrunk to a 1600px JPEG, plenty for the projector.
+function shrink(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const src = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(src);
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error('Could not read the image.')), 'image/jpeg', 0.85);
+    };
+    img.onerror = () => { URL.revokeObjectURL(src); reject(new Error(`${file.name} could not be opened as an image.`)); };
+    img.src = src;
+  });
+}
+
+async function addImages(id, input) {
+  // In file-name order, so naming them 1.jpg, 2.jpg, … sets the order they are shown in.
+  const files = [...input.files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const label = input.closest('.add');
+  for (const [i, file] of files.entries()) {
+    label.firstChild.textContent = `Uploading ${i + 1}/${files.length}…`;
+    try {
+      const r = await authFetch(`${API}/admin/connection/questions/${id}/images`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: await shrink(file) });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Could not upload ${file.name}.`);
+    } catch (e) { alert(e.message); }
+  }
+  loadQuestions();
+}
+
+poll();
+setInterval(poll, 1000);
+loadQuestions();
+</script>
+</body>
+</html>
