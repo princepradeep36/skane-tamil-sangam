@@ -89,6 +89,67 @@
             font-size: 0.95rem;
         }
 
+        .item-name {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .qty {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 0 8px;
+        }
+
+        .qty button,
+        .remove-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 1.5px solid #ddd;
+            background: #fff;
+            color: var(--text);
+            font-size: 1rem;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0;
+            flex-shrink: 0;
+        }
+
+        .qty span {
+            min-width: 18px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .item-price {
+            width: 58px;
+            text-align: right;
+        }
+
+        .remove-btn {
+            margin-left: 8px;
+            color: #c62828;
+            border-color: #f3c4c4;
+        }
+
+        .qty button:disabled,
+        .remove-btn:disabled {
+            opacity: 0.4;
+        }
+
+        .edit-hint {
+            font-size: 0.8rem;
+            color: #888;
+            margin: 4px 0 0;
+        }
+
+        .phone-locked {
+            font-size: 1rem;
+            text-align: center;
+            margin: 0;
+        }
+
         .total-section {
             margin-top: 12px;
             padding-top: 12px;
@@ -185,9 +246,12 @@
             <h4 style="color: var(--accent); margin: 5px 0;">Pending Payments</h4>
         </div>
 
-        <div class="search-section">
+        <div class="search-section" id="search-section">
             <input type="tel" id="phone" placeholder="Enter 10-digit Phone Number">
             <button class="primary-btn" onclick="loadPendingOrders()">Find Pending Payments</button>
+        </div>
+        <div class="search-section" id="phone-section" hidden>
+            <p class="phone-locked">📱 Orders for <b id="phone-shown"></b></p>
         </div>
 
         <div id="orders"></div>
@@ -209,6 +273,17 @@
 
         const ordersDiv = document.getElementById("orders");
         let vendorsCache = {};
+        const itemsCache = {};
+        const totals = {};
+        const esc = s => Validation.escapeHtml(String(s ?? ''));
+
+        // The phone number can't be changed once orders are shown for it.
+        function lockPhone(phone) {
+            document.getElementById("phone").readOnly = true;
+            document.getElementById("phone-shown").textContent = phone;
+            document.getElementById("search-section").hidden = true;
+            document.getElementById("phone-section").hidden = false;
+        }
 
         // Auto-load if phone is in URL
         window.onload = () => {
@@ -216,6 +291,7 @@
             const phone = params.get("phone");
             if (phone) {
                 document.getElementById("phone").value = phone;
+                lockPhone(phone);
                 loadVendors().then(loadPendingOrders);
             } else {
                 loadVendors();
@@ -237,6 +313,7 @@
             try {
                 const res = await fetch(`${API}/orders/${phone}`);
                 const allOrders = await res.json();
+                lockPhone(phone);
 
                 // Filter for UNPAID orders
                 const pendingOrders = allOrders.filter(o => o.payment_status !== 'PAID');
@@ -264,16 +341,19 @@
             <p style="color: #999; font-size: 0.8rem;">Loading items...</p>
           </div>
           
+          <p class="edit-hint">Need a change? Use − and + or ✕ to remove an item before you pay.</p>
+
           <div class="total-section">
             <span>Amount Due</span>
-            <span>${order.total}kr</span>
+            <span id="total_${order.id}">${Number(order.total)}kr</span>
           </div>
 
           <div class="payment-actions">
-            <button class="btn-swish" onclick="payWithSwish(${order.id}, '${swishNum}', ${order.total})">Pay with Swish</button>
+            <button class="btn-swish" onclick="payWithSwish(${order.id}, '${swishNum}')">Pay with Swish</button>
             <button class="btn-mark-paid" id="btn-paid-${order.id}" onclick="markAsPaid(${order.id})">Mark as Paid</button>
           </div>
         `;
+                    totals[order.id] = Number(order.total);
                     ordersDiv.appendChild(card);
                     fetchItems(order.id);
                 }
@@ -286,27 +366,80 @@
         async function fetchItems(orderId) {
             try {
                 const res = await fetch(`${API}/order/${orderId}/details`);
-                const items = await res.json();
-                const container = document.getElementById(`items_${orderId}`);
-
-                container.innerHTML = items.map(i => `
-        <div class="item-row">
-          <div style="flex: 2;">${i.item_name}</div>
-          <div style="flex: 1; text-align: center; color: #666;">x${i.quantity}</div>
-          <div style="flex: 1; text-align: right;">${i.price * i.quantity}kr</div>
-        </div>
-      `).join('');
+                itemsCache[orderId] = await res.json();
+                renderItems(orderId);
             } catch (err) {
                 console.error(err);
             }
+        }
+
+        function renderItems(orderId) {
+            document.getElementById(`items_${orderId}`).innerHTML = itemsCache[orderId].map(i => `
+        <div class="item-row">
+          <div class="item-name">${esc(i.item_name)}</div>
+          <div class="qty">
+            <button type="button" aria-label="One less" onclick="changeQty(${orderId}, ${i.id}, -1)">−</button>
+            <span>${i.quantity}</span>
+            <button type="button" aria-label="One more" onclick="changeQty(${orderId}, ${i.id}, 1)">+</button>
+          </div>
+          <div class="item-price">${i.price * i.quantity}kr</div>
+          <button type="button" class="remove-btn" aria-label="Remove ${esc(i.item_name)}" onclick="changeQty(${orderId}, ${i.id}, 'remove')">✕</button>
+        </div>
+      `).join('');
+        }
+
+        async function changeQty(orderId, itemId, change) {
+            const items = itemsCache[orderId];
+            const item = items.find(i => i.id === itemId);
+            if (!item) return;
+            const quantity = change === 'remove' ? 0 : item.quantity + change;
+            if (quantity === 0) {
+                const question = items.length === 1
+                    ? `Remove ${item.item_name}? It's the only item, so this order will be cancelled.`
+                    : `Remove ${item.item_name} from this order?`;
+                if (!confirm(question)) return;
+            }
+
+            const card = document.getElementById(`order-card-${orderId}`);
+            card.querySelectorAll('.qty button, .remove-btn').forEach(b => b.disabled = true);
+            try {
+                const res = await fetch(`${API}/order/${orderId}/items`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: document.getElementById("phone").value.trim(), items: [{ id: itemId, quantity }] })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || "Couldn't change the order. Please try again.");
+
+                if (data.removed) {
+                    card.remove();
+                    showIfEmpty("No pending payments left.");
+                    return;
+                }
+                totals[orderId] = data.total;
+                document.getElementById(`total_${orderId}`).textContent = `${data.total}kr`;
+                // The amount changed, so they pay again with the new amount before marking it paid.
+                document.getElementById(`btn-paid-${orderId}`).style.display = "none";
+                await fetchItems(orderId);
+            } catch (err) {
+                alert(err.message);
+                renderItems(orderId);
+            }
+        }
+
+        function showIfEmpty(message) {
+            if (ordersDiv.children.length) return;
+            const phone = encodeURIComponent(document.getElementById("phone").value);
+            ordersDiv.innerHTML = `<div style="text-align:center; padding:20px;">${message} <br><a href="receipts.html?phone=${phone}">View Receipts</a></div>`;
         }
 
         function isMobile() {
             return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         }
 
-        function payWithSwish(orderId, swishNum, amount) {
+        function payWithSwish(orderId, swishNum) {
             if (!swishNum) return alert("Vendor Swish number not found");
+            const amount = totals[orderId];
 
             const swishData = {
                 version: 1,
@@ -387,11 +520,7 @@
                 card.style.opacity = '0.5';
                 setTimeout(() => {
                     card.remove();
-                    // check if empty
-                    if (document.getElementById("orders").children.length === 0) {
-                        const phone = document.getElementById("phone").value;
-                        document.getElementById("orders").innerHTML = `<div style="text-align:center; padding:20px;">All paid! <br><a href="receipts.html?phone=${phone}">View Receipts</a></div>`;
-                    }
+                    showIfEmpty("All paid!");
                 }, 500);
 
             } catch (err) {

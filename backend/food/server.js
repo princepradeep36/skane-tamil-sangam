@@ -412,15 +412,52 @@ app.get("/orders/:phone", async (req, res) => {
   const data = await pool.query(`
     SELECT o.id, o.total, o.payment_status, o.delivery_status, v.name AS vendor 
     FROM orders o JOIN vendors v ON o.vendor_id = v.id
-    JOIN customers c ON o.customer_id = c.id WHERE c.phone=$1`, [req.params.phone]);
+    JOIN customers c ON o.customer_id = c.id WHERE c.phone=$1 ORDER BY o.id`, [req.params.phone]);
   res.json(data.rows);
 });
 
 app.get("/order/:id/details", async (req, res) => {
   const data = await pool.query(`
     SELECT oi.id, m.item_name, oi.quantity, m.price FROM order_items oi 
-    JOIN menu_items m ON oi.menu_item_id = m.id WHERE oi.order_id=$1`, [req.params.id]);
+    JOIN menu_items m ON oi.menu_item_id = m.id WHERE oi.order_id=$1 ORDER BY oi.id`, [req.params.id]);
   res.json(data.rows);
+});
+
+// Before paying, a customer can change quantities or remove items. Lowering or removing
+// is always allowed; adding more needs food ordering to be open. No items left = no order.
+app.put("/order/:id/items", async (req, res) => {
+  try {
+    const order = await pool.query(`SELECT o.id, o.payment_status FROM orders o JOIN customers c ON o.customer_id = c.id
+      WHERE o.id = $1 AND c.phone = $2`, [req.params.id, String(req.body.phone || "")]);
+    if (!order.rows.length) return res.status(404).json({ error: "Order not found" });
+    if (order.rows[0].payment_status === "PAID") return res.status(409).json({ error: "This order is already paid, so it can't be changed." });
+    const wanted = new Map((Array.isArray(req.body.items) ? req.body.items : []).map(i => [Number(i.id), Number(i.quantity)]));
+    const current = await pool.query("SELECT id, quantity FROM order_items WHERE order_id = $1", [req.params.id]);
+    let adding = false;
+    for (const row of current.rows) {
+      if (!wanted.has(row.id)) continue;
+      const quantity = wanted.get(row.id);
+      if (!Number.isInteger(quantity) || quantity < 0 || quantity > 99) return res.status(400).json({ error: "Please choose a quantity between 0 and 99." });
+      if (quantity > row.quantity) adding = true;
+    }
+    if (adding && !(await getSettings()).food_ordering_enabled) {
+      return res.status(423).json({ error: "Food ordering is closed now, so you can only lower quantities or remove items." });
+    }
+    for (const row of current.rows) {
+      const quantity = wanted.get(row.id);
+      if (quantity === undefined || quantity === row.quantity) continue;
+      if (quantity === 0) await pool.query("DELETE FROM order_items WHERE id = $1", [row.id]);
+      else await pool.query("UPDATE order_items SET quantity = $1 WHERE id = $2", [quantity, row.id]);
+    }
+    const sum = await pool.query(`SELECT COALESCE(SUM(oi.quantity * m.price), 0) AS total, COUNT(*)::int AS items
+      FROM order_items oi JOIN menu_items m ON oi.menu_item_id = m.id WHERE oi.order_id = $1`, [req.params.id]);
+    if (!sum.rows[0].items) {
+      await pool.query("DELETE FROM orders WHERE id = $1 AND payment_status <> 'PAID'", [req.params.id]);
+      return res.json({ success: true, removed: true });
+    }
+    await pool.query("UPDATE orders SET total = $1 WHERE id = $2", [sum.rows[0].total, req.params.id]);
+    res.json({ success: true, total: Number(sum.rows[0].total) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put("/order/:id/pay", async (req, res) => {
