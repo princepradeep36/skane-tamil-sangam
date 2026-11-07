@@ -590,6 +590,18 @@ app.get("/vendor-summary", requireVendor, async (req, res) => {
   res.json(data.rows);
 });
 
+// A stall that received the money some other way (cash, Swish to the stall) marks the order paid.
+app.put("/vendor/order/:id/mark-paid", requireVendor, async (req, res) => {
+  try {
+    const params = [req.params.id];
+    let query = "UPDATE orders SET payment_status = 'PAID' WHERE id = $1 AND payment_status <> 'PAID'";
+    if (req.user.role !== "admin") { query += " AND vendor_id = $2"; params.push(req.user.vendorId); }
+    const result = await pool.query(query + " RETURNING id", params);
+    if (!result.rows.length) return res.status(404).json({ error: "Order not found, or it's already paid." });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.put("/order/:id/delivery", requireVendor, async (req, res) => {
   const { status } = req.body;
   // If status is provided, use it. Otherwise toggle for backward compatibility if needed (though we will use explicit status now)

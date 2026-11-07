@@ -357,6 +357,19 @@
       });
     }
 
+    async function markPaid(orderId) {
+      const order = allOrders.find(o => o.id === orderId);
+      if (!order || !confirm(`Have you received ${money(order.total)} from ${order.name} for order #${orderId}?
+
+The order moves to Paid and can't be changed by the customer any more.`)) return;
+      try {
+        const res = await authFetch(`${API}/vendor/order/${orderId}/mark-paid`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: "{}" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Couldn't mark the order as paid. Please try again.");
+      } catch (err) { alert(err.message); }
+      loadVendorOrders(role === 'vendor' ? myId : vendorSelect.value);
+    }
+
     function updateStatus(orderId, newStatus) {
       authFetch(`${API}/order/${orderId}/delivery`, {
         method: "PUT",
@@ -436,7 +449,7 @@
 
       const list = (currentTab === 'paid' ? paid : unpaid).filter(o => matches(o, query));
       ordersDiv.innerHTML = currentTab === 'unpaid'
-        ? `<p class="tab-note">Not paid yet, so don't prepare these. The customer can still change or cancel them.</p>`
+        ? `<p class="tab-note">Not paid yet, so don't prepare these. The customer can still change or cancel them. If you received the payment yourself, tap "Mark as paid".</p>`
         : '';
 
       if (!list.length) {
@@ -477,7 +490,8 @@
             <span class="customer-phone">${esc(order.phone)}</span>
           </div>
           ${itemsHtml(order)}
-          <div class="amount-due"><span>Amount due · #${order.id}</span><span>${money(order.total)}</span></div>`;
+          <div class="amount-due"><span>Amount due · #${order.id}</span><span>${money(order.total)}</span></div>
+          <button onclick="markPaid(${order.id})" class="status-btn" style="background:var(--success); color:white;">💰 Payment received · Mark as paid</button>`;
         }
         ordersDiv.appendChild(card);
       });
