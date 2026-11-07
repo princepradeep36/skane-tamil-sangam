@@ -278,9 +278,12 @@
 
       ordersDiv.innerHTML = '<div class="empty-state">Loading orders...</div>';
 
-      authFetch(`${API}/vendor-orders/${vendorId}`)
-        .then(res => res.json())
-        .then(data => {
+      Promise.all([
+        authFetch(`${API}/vendor-orders/${vendorId}`).then(res => res.json()),
+        authFetch(`${API}/vendor-unpaid-orders/${vendorId}`).then(res => res.ok ? res.json() : [])
+      ])
+        .then(([paidRows, unpaidRows]) => {
+          const data = [...paidRows.map(r => ({ ...r, paid: true })), ...unpaidRows.map(r => ({ ...r, paid: false }))];
           if (data.length === 0) {
             ordersDiv.innerHTML = '<div class="empty-state">No orders found for this stall.</div>';
             return;
@@ -294,7 +297,7 @@
                 name: row.customer_name,
                 phone: row.customer_phone,
                 status: row.delivery_status || 'Pending',
-                paid: !row.payment_status || row.payment_status === 'PAID',
+                paid: row.paid,
                 total: Number(row.total),
                 items: []
               };

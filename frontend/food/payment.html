@@ -129,6 +129,11 @@
 
         .remove-btn {
             margin-left: 8px;
+            width: auto;
+            border-radius: 15px;
+            padding: 0 9px;
+            font-size: 0.8rem;
+            font-weight: bold;
             color: #c62828;
             border-color: #f3c4c4;
         }
@@ -153,6 +158,29 @@
 
         .add-item:disabled {
             opacity: 0.5;
+        }
+
+        .btn-cancel-order {
+            background: #fff;
+            color: #c62828;
+            border: 1.5px solid #f3c4c4;
+            padding: 9px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .add-more {
+            display: block;
+            text-align: center;
+            margin: 0 0 20px;
+            padding: 12px;
+            border-radius: 10px;
+            background: #fff;
+            border: 1.5px dashed var(--accent);
+            color: #b26a00;
+            font-weight: bold;
+            text-decoration: none;
         }
 
         .edit-hint {
@@ -272,6 +300,7 @@
         </div>
 
         <div id="orders"></div>
+        <a href="menu.html" class="add-more" id="add-more" hidden>➕ Add other food items</a>
 
         <div style="text-align: center; margin-top: 30px;">
             <a href="receipts.html" style="color: #927272; text-decoration: none; margin-right: 20px;">
@@ -335,6 +364,7 @@
                 const res = await fetch(`${API}/orders/${encodeURIComponent(phone)}`);
                 const allOrders = await res.json();
                 lockPhone(phone);
+                document.getElementById("add-more").hidden = !orderingOpen;
 
                 // Filter for UNPAID orders
                 const pendingOrders = allOrders.filter(o => o.payment_status !== 'PAID');
@@ -363,7 +393,7 @@
           </div>
           
           ${addItemPicker(order)}
-          <p class="edit-hint">Need a change? Add an item, use − and +, or ✕ to remove an item before you pay.</p>
+          <p class="edit-hint">Need a change? Add an item, use − and +, or Remove before you pay.</p>
 
           <div class="total-section">
             <span>Amount Due</span>
@@ -373,6 +403,7 @@
           <div class="payment-actions">
             <button class="btn-swish" onclick="payWithSwish(${order.id}, '${swishNum}')">Pay with Swish</button>
             <button class="btn-mark-paid" id="btn-paid-${order.id}" onclick="markAsPaid(${order.id})">Mark as Paid</button>
+            <button class="btn-cancel-order" type="button" onclick="cancelOrder(${order.id})">Cancel this order</button>
           </div>
         `;
                     totals[order.id] = Number(order.total);
@@ -406,7 +437,7 @@
             <button type="button" aria-label="One more" onclick="changeQty(${orderId}, ${i.id}, 1)">+</button>
           </div>
           <div class="item-price">${i.price * i.quantity}kr</div>
-          <button type="button" class="remove-btn" aria-label="Remove ${esc(i.item_name)}" onclick="changeQty(${orderId}, ${i.id}, 'remove')">✕</button>
+          <button type="button" class="remove-btn" aria-label="Remove ${esc(i.item_name)}" onclick="changeQty(${orderId}, ${i.id}, 'remove')">Remove</button>
         </div>
       `).join('');
         }
@@ -428,17 +459,17 @@
             const menuItemId = Number(select.value);
             if (!menuItemId) return;
             select.disabled = true;
-            await saveChange(orderId, 'POST', { menuItemId });
+            await saveChange(orderId, 'POST', '/items', { menuItemId });
             select.value = '';
             select.disabled = false;
         }
 
         // Sends a change to the server and shows the new items and total.
-        async function saveChange(orderId, method, change) {
+        async function saveChange(orderId, method, path, change) {
             const card = document.getElementById(`order-card-${orderId}`);
-            card.querySelectorAll('.qty button, .remove-btn').forEach(b => b.disabled = true);
+            card.querySelectorAll('.qty button, .remove-btn, .btn-cancel-order').forEach(b => b.disabled = true);
             try {
-                const res = await fetch(`${API}/order/${orderId}/items`, {
+                const res = await fetch(`${API}/order/${orderId}${path}`, {
                     method,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ phone: document.getElementById("phone").value.trim(), ...change })
@@ -473,7 +504,12 @@
                     : `Remove ${item.item_name} from this order?`;
                 if (!confirm(question)) return;
             }
-            await saveChange(orderId, 'PUT', { items: [{ id: itemId, quantity }] });
+            await saveChange(orderId, 'PUT', `/item/${itemId}`, { quantity });
+        }
+
+        async function cancelOrder(orderId) {
+            if (!confirm(`Cancel this order from ${orderVendor[orderId]}? This can't be undone.`)) return;
+            await saveChange(orderId, 'DELETE', '', {});
         }
 
         function showIfEmpty(message) {

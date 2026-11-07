@@ -380,16 +380,24 @@ app.get("/food-eligibility/:phone", async (req, res) => {
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Food orders now store phones like registrations (+46...). Older orders were saved as
-// 07..., so lookups match both forms of the same number.
+// Click2Eat phones are read like the registration form, then stored the way food orders
+// always were: Swedish numbers as 07..., other countries as +<code>... Lookups also match
+// the +46 form of the same number.
+function normalizeFoodPhone(value) {
+  let phone = String(value || "").trim().replace(/[\s().-]/g, "");
+  if (/^7\d{8}$/.test(phone)) phone = "0" + phone;
+  else if (/^[6-9]\d{9}$/.test(phone)) phone = "+91" + phone;
+  const international = normalizeInternationalPhone(phone);
+  return international && (legacySwedishPhone(international) || international);
+}
 function customerPhones(value) {
-  const normalized = normalizeInternationalPhone(String(value || ""));
-  return [...new Set([normalized, legacySwedishPhone(normalized), String(value || "").trim()].filter(Boolean))];
+  const phone = normalizeFoodPhone(value);
+  return phone ? [...new Set([phone, normalizeInternationalPhone(phone)])] : [];
 }
 
 app.post("/order", requireFoodOrderingOpen, async (req, res) => {
   const { name, cart } = req.body;
-  const phone = normalizeInternationalPhone(String(req.body.phone || ""));
+  const phone = normalizeFoodPhone(req.body.phone);
   if (!phone) return res.status(400).json({ error: "Please enter your phone number with country code, e.g. +46 70 123 45 67." });
   const eligibility = await foodOrderEligibility(phone).catch(err => ({ eligible: false, error: err.message }));
   if (!eligibility.eligible) return res.status(403).json(eligibility);
@@ -470,28 +478,32 @@ async function refreshOrderTotal(orderId, res) {
   res.json({ success: true, total: Number(sum.rows[0].total) });
 }
 
-app.put("/order/:id/items", async (req, res) => {
+// Sets one item's quantity; 0 removes it.
+app.put("/order/:id/item/:itemId", async (req, res) => {
   try {
     const order = await findUnpaidOrder(req, res);
     if (!order) return;
-    const wanted = new Map((Array.isArray(req.body.items) ? req.body.items : []).map(i => [Number(i.id), Number(i.quantity)]));
-    const current = await pool.query("SELECT id, menu_item_id, quantity FROM order_items WHERE order_id = $1", [order.id]);
-    for (const row of current.rows) {
-      if (!wanted.has(row.id)) continue;
-      const quantity = wanted.get(row.id);
-      if (!Number.isInteger(quantity) || quantity < 0 || quantity > 99) return res.status(400).json({ error: "Please choose a quantity between 0 and 99." });
-      if (quantity > row.quantity) {
-        const problem = await cannotAdd(row.menu_item_id, quantity - row.quantity);
-        if (problem) return res.status(409).json({ error: problem });
-      }
+    const quantity = Number(req.body.quantity);
+    if (!Number.isInteger(quantity) || quantity < 0 || quantity > 99) return res.status(400).json({ error: "Please choose a quantity between 0 and 99." });
+    const row = (await pool.query("SELECT id, menu_item_id, quantity FROM order_items WHERE id = $1 AND order_id = $2", [req.params.itemId, order.id])).rows[0];
+    if (!row) return res.status(404).json({ error: "This item isn't in the order any more." });
+    if (quantity > row.quantity) {
+      const problem = await cannotAdd(row.menu_item_id, quantity - row.quantity);
+      if (problem) return res.status(409).json({ error: problem });
     }
-    for (const row of current.rows) {
-      const quantity = wanted.get(row.id);
-      if (quantity === undefined || quantity === row.quantity) continue;
-      if (quantity === 0) await pool.query("DELETE FROM order_items WHERE id = $1", [row.id]);
-      else await pool.query("UPDATE order_items SET quantity = $1 WHERE id = $2", [quantity, row.id]);
-    }
+    if (quantity === 0) await pool.query("DELETE FROM order_items WHERE id = $1", [row.id]);
+    else await pool.query("UPDATE order_items SET quantity = $1 WHERE id = $2", [quantity, row.id]);
     await refreshOrderTotal(order.id, res);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Cancels a whole unpaid order (its items go with it: ON DELETE CASCADE).
+app.delete("/order/:id", async (req, res) => {
+  try {
+    const order = await findUnpaidOrder(req, res);
+    if (!order) return;
+    await pool.query("DELETE FROM orders WHERE id = $1 AND payment_status <> 'PAID'", [order.id]);
+    res.json({ success: true, removed: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -539,12 +551,27 @@ app.get("/vendor-orders/:vendorId", requireVendor, async (req, res) => {
   const vendorId = vendorScope(req, req.params.vendorId);
   if (req.user.role !== "admin" && Number(req.params.vendorId) !== vendorId) return res.status(403).json({ error: "Cannot access another vendor" });
   const data = await pool.query(`
-    SELECT o.id AS order_id, o.delivery_status, o.payment_status, o.total, c.name AS customer_name, c.phone AS customer_phone, m.item_name, oi.quantity
+    SELECT o.id AS order_id, o.delivery_status, c.name AS customer_name, c.phone AS customer_phone, m.item_name, oi.quantity
     FROM orders o JOIN customers c ON o.customer_id = c.id
     JOIN order_items oi ON o.id = oi.order_id
     JOIN menu_items m ON oi.menu_item_id = m.id
-    WHERE o.vendor_id = $1 ORDER BY o.id DESC, oi.id`, [vendorId]);
+    WHERE o.vendor_id = $1 AND o.payment_status = 'PAID' ORDER BY o.id DESC`, [vendorId]);
   res.json(data.rows);
+});
+
+// Orders placed but not paid yet, so a stall can see what may still come.
+app.get("/vendor-unpaid-orders/:vendorId", requireVendor, async (req, res) => {
+  const vendorId = vendorScope(req, req.params.vendorId);
+  if (req.user.role !== "admin" && Number(req.params.vendorId) !== vendorId) return res.status(403).json({ error: "Cannot access another vendor" });
+  try {
+    const data = await pool.query(`
+      SELECT o.id AS order_id, o.total, c.name AS customer_name, c.phone AS customer_phone, m.item_name, oi.quantity
+      FROM orders o JOIN customers c ON o.customer_id = c.id
+      JOIN order_items oi ON o.id = oi.order_id
+      JOIN menu_items m ON oi.menu_item_id = m.id
+      WHERE o.vendor_id = $1 AND o.payment_status <> 'PAID' ORDER BY o.id DESC, oi.id`, [vendorId]);
+    res.json(data.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get("/vendor-summary", requireVendor, async (req, res) => {
