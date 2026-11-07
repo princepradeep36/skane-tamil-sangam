@@ -138,6 +138,23 @@
             opacity: 0.4;
         }
 
+        .add-item {
+            width: 100%;
+            margin: 8px 0 0;
+            padding: 10px;
+            border: 1.5px dashed var(--primary);
+            border-radius: 8px;
+            background: #f5f9ff;
+            color: var(--primary);
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .add-item:disabled {
+            opacity: 0.5;
+        }
+
         .edit-hint {
             font-size: 0.8rem;
             color: #888;
@@ -273,7 +290,9 @@
 
         const ordersDiv = document.getElementById("orders");
         let vendorsCache = {};
+        let orderingOpen = true;
         const itemsCache = {};
+        const orderVendor = {};
         const totals = {};
         const esc = s => Validation.escapeHtml(String(s ?? ''));
 
@@ -300,9 +319,10 @@
 
         async function loadVendors() {
             try {
-                const res = await fetch(`${API}/vendors`);
+                const [res, settings] = await Promise.all([fetch(`${API}/vendors`), fetch(`${API}/settings`)]);
                 const vendors = await res.json();
                 vendors.forEach(v => vendorsCache[v.name] = v); // Map by name for easy lookup
+                orderingOpen = settings.ok ? (await settings.json()).food_ordering_enabled !== false : true;
             } catch (e) { console.error("Error loading vendors", e); }
         }
 
@@ -341,7 +361,8 @@
             <p style="color: #999; font-size: 0.8rem;">Loading items...</p>
           </div>
           
-          <p class="edit-hint">Need a change? Use − and + or ✕ to remove an item before you pay.</p>
+          ${addItemPicker(order)}
+          <p class="edit-hint">Need a change? Add an item, use − and +, or ✕ to remove an item before you pay.</p>
 
           <div class="total-section">
             <span>Amount Due</span>
@@ -354,6 +375,7 @@
           </div>
         `;
                     totals[order.id] = Number(order.total);
+                    orderVendor[order.id] = order.vendor;
                     ordersDiv.appendChild(card);
                     fetchItems(order.id);
                 }
@@ -388,25 +410,37 @@
       `).join('');
         }
 
-        async function changeQty(orderId, itemId, change) {
-            const items = itemsCache[orderId];
-            const item = items.find(i => i.id === itemId);
-            if (!item) return;
-            const quantity = change === 'remove' ? 0 : item.quantity + change;
-            if (quantity === 0) {
-                const question = items.length === 1
-                    ? `Remove ${item.item_name}? It's the only item, so this order will be cancelled.`
-                    : `Remove ${item.item_name} from this order?`;
-                if (!confirm(question)) return;
-            }
+        // A dropdown of the vendor's other dishes; picking one adds it to this order.
+        function addItemPicker(order) {
+            const menu = (vendorsCache[order.vendor] || {}).menu || [];
+            if (!orderingOpen || !menu.length) return '';
+            const options = menu.map(m => {
+                const max = Number(m.max_quantity) || 0;
+                const soldOut = max > 0 && Number(m.sold_quantity) >= max;
+                return `<option value="${m.id}"${soldOut ? ' disabled' : ''}>${esc(m.item_name)} · ${Number(m.price)}kr${soldOut ? ' (sold out)' : ''}</option>`;
+            }).join('');
+            return `<select class="add-item" aria-label="Add an item" onchange="addItem(${order.id}, this)">
+              <option value="">＋ Add an item</option>${options}</select>`;
+        }
 
+        async function addItem(orderId, select) {
+            const menuItemId = Number(select.value);
+            if (!menuItemId) return;
+            select.disabled = true;
+            await saveChange(orderId, 'POST', { menuItemId });
+            select.value = '';
+            select.disabled = false;
+        }
+
+        // Sends a change to the server and shows the new items and total.
+        async function saveChange(orderId, method, change) {
             const card = document.getElementById(`order-card-${orderId}`);
             card.querySelectorAll('.qty button, .remove-btn').forEach(b => b.disabled = true);
             try {
                 const res = await fetch(`${API}/order/${orderId}/items`, {
-                    method: 'PUT',
+                    method,
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone: document.getElementById("phone").value.trim(), items: [{ id: itemId, quantity }] })
+                    body: JSON.stringify({ phone: document.getElementById("phone").value.trim(), ...change })
                 });
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) throw new Error(data.error || "Couldn't change the order. Please try again.");
@@ -425,6 +459,20 @@
                 alert(err.message);
                 renderItems(orderId);
             }
+        }
+
+        async function changeQty(orderId, itemId, change) {
+            const items = itemsCache[orderId];
+            const item = items.find(i => i.id === itemId);
+            if (!item) return;
+            const quantity = change === 'remove' ? 0 : item.quantity + change;
+            if (quantity === 0) {
+                const question = items.length === 1
+                    ? `Remove ${item.item_name}? It's the only item, so this order will be cancelled.`
+                    : `Remove ${item.item_name} from this order?`;
+                if (!confirm(question)) return;
+            }
+            await saveChange(orderId, 'PUT', { items: [{ id: itemId, quantity }] });
         }
 
         function showIfEmpty(message) {

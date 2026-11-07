@@ -423,25 +423,58 @@ app.get("/order/:id/details", async (req, res) => {
   res.json(data.rows);
 });
 
-// Before paying, a customer can change quantities or remove items. Lowering or removing
-// is always allowed; adding more needs food ordering to be open. No items left = no order.
+// Before paying, a customer can add items, change quantities or remove items. Lowering or
+// removing is always allowed; adding needs food ordering to be open and the item in stock.
+async function findUnpaidOrder(req, res) {
+  const order = await pool.query(`SELECT o.id, o.vendor_id, o.payment_status FROM orders o JOIN customers c ON o.customer_id = c.id
+    WHERE o.id = $1 AND c.phone = $2`, [req.params.id, String(req.body.phone || "")]);
+  if (!order.rows.length) { res.status(404).json({ error: "Order not found" }); return null; }
+  if (order.rows[0].payment_status === "PAID") { res.status(409).json({ error: "This order is already paid, so it can't be changed." }); return null; }
+  return order.rows[0];
+}
+
+// Returns an error message when adding `extra` more of a menu item isn't possible, otherwise null.
+async function cannotAdd(menuItemId, extra) {
+  if (!(await getSettings()).food_ordering_enabled) return "Food ordering is closed now, so you can only lower quantities or remove items.";
+  const q = await pool.query(`SELECT m.item_name, m.max_quantity, m.is_active,
+    (SELECT COALESCE(SUM(quantity), 0) FROM order_items WHERE menu_item_id = m.id)::int AS sold
+    FROM menu_items m WHERE m.id = $1`, [menuItemId]);
+  const item = q.rows[0];
+  if (!item || !item.is_active) return "This item isn't available any more.";
+  const max = Number(item.max_quantity) || 0;
+  if (max > 0 && item.sold + extra > max) {
+    const left = Math.max(0, max - item.sold);
+    return left ? `Only ${left} more ${item.item_name} left.` : `${item.item_name} is sold out.`;
+  }
+  return null;
+}
+
+// Recalculates the total from menu prices; an order with no items left is cancelled.
+async function refreshOrderTotal(orderId, res) {
+  const sum = await pool.query(`SELECT COALESCE(SUM(oi.quantity * m.price), 0) AS total, COUNT(*)::int AS items
+    FROM order_items oi JOIN menu_items m ON oi.menu_item_id = m.id WHERE oi.order_id = $1`, [orderId]);
+  if (!sum.rows[0].items) {
+    await pool.query("DELETE FROM orders WHERE id = $1 AND payment_status <> 'PAID'", [orderId]);
+    return res.json({ success: true, removed: true });
+  }
+  await pool.query("UPDATE orders SET total = $1 WHERE id = $2", [sum.rows[0].total, orderId]);
+  res.json({ success: true, total: Number(sum.rows[0].total) });
+}
+
 app.put("/order/:id/items", async (req, res) => {
   try {
-    const order = await pool.query(`SELECT o.id, o.payment_status FROM orders o JOIN customers c ON o.customer_id = c.id
-      WHERE o.id = $1 AND c.phone = $2`, [req.params.id, String(req.body.phone || "")]);
-    if (!order.rows.length) return res.status(404).json({ error: "Order not found" });
-    if (order.rows[0].payment_status === "PAID") return res.status(409).json({ error: "This order is already paid, so it can't be changed." });
+    const order = await findUnpaidOrder(req, res);
+    if (!order) return;
     const wanted = new Map((Array.isArray(req.body.items) ? req.body.items : []).map(i => [Number(i.id), Number(i.quantity)]));
-    const current = await pool.query("SELECT id, quantity FROM order_items WHERE order_id = $1", [req.params.id]);
-    let adding = false;
+    const current = await pool.query("SELECT id, menu_item_id, quantity FROM order_items WHERE order_id = $1", [order.id]);
     for (const row of current.rows) {
       if (!wanted.has(row.id)) continue;
       const quantity = wanted.get(row.id);
       if (!Number.isInteger(quantity) || quantity < 0 || quantity > 99) return res.status(400).json({ error: "Please choose a quantity between 0 and 99." });
-      if (quantity > row.quantity) adding = true;
-    }
-    if (adding && !(await getSettings()).food_ordering_enabled) {
-      return res.status(423).json({ error: "Food ordering is closed now, so you can only lower quantities or remove items." });
+      if (quantity > row.quantity) {
+        const problem = await cannotAdd(row.menu_item_id, quantity - row.quantity);
+        if (problem) return res.status(409).json({ error: problem });
+      }
     }
     for (const row of current.rows) {
       const quantity = wanted.get(row.id);
@@ -449,14 +482,27 @@ app.put("/order/:id/items", async (req, res) => {
       if (quantity === 0) await pool.query("DELETE FROM order_items WHERE id = $1", [row.id]);
       else await pool.query("UPDATE order_items SET quantity = $1 WHERE id = $2", [quantity, row.id]);
     }
-    const sum = await pool.query(`SELECT COALESCE(SUM(oi.quantity * m.price), 0) AS total, COUNT(*)::int AS items
-      FROM order_items oi JOIN menu_items m ON oi.menu_item_id = m.id WHERE oi.order_id = $1`, [req.params.id]);
-    if (!sum.rows[0].items) {
-      await pool.query("DELETE FROM orders WHERE id = $1 AND payment_status <> 'PAID'", [req.params.id]);
-      return res.json({ success: true, removed: true });
+    await refreshOrderTotal(order.id, res);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Adds one of another item from the same vendor (or one more, if it's already in the order).
+app.post("/order/:id/items", async (req, res) => {
+  try {
+    const order = await findUnpaidOrder(req, res);
+    if (!order) return;
+    const menuItem = await pool.query("SELECT id FROM menu_items WHERE id = $1 AND vendor_id = $2", [Number(req.body.menuItemId) || 0, order.vendor_id]);
+    if (!menuItem.rows.length) return res.status(404).json({ error: "This item isn't on this vendor's menu." });
+    const problem = await cannotAdd(menuItem.rows[0].id, 1);
+    if (problem) return res.status(409).json({ error: problem });
+    const existing = await pool.query("SELECT id, quantity FROM order_items WHERE order_id = $1 AND menu_item_id = $2", [order.id, menuItem.rows[0].id]);
+    if (existing.rows.length) {
+      if (existing.rows[0].quantity >= 99) return res.status(400).json({ error: "Please choose a quantity between 0 and 99." });
+      await pool.query("UPDATE order_items SET quantity = quantity + 1 WHERE id = $1", [existing.rows[0].id]);
+    } else {
+      await pool.query("INSERT INTO order_items(order_id, menu_item_id, quantity) VALUES($1,$2,1)", [order.id, menuItem.rows[0].id]);
     }
-    await pool.query("UPDATE orders SET total = $1 WHERE id = $2", [sum.rows[0].total, req.params.id]);
-    res.json({ success: true, total: Number(sum.rows[0].total) });
+    await refreshOrderTotal(order.id, res);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
