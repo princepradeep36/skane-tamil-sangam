@@ -202,6 +202,15 @@
       margin: 0 4px 12px;
     }
 
+    .tab-note.warn {
+      background: #fff4e5;
+      border: 1px solid #ffd59e;
+      color: #8a4b00;
+      font-weight: bold;
+      padding: 10px 12px;
+      border-radius: 10px;
+    }
+
     .item-row .item-name {
       flex: 1;
       min-width: 0;
@@ -359,9 +368,11 @@
 
     async function markPaid(orderId) {
       const order = allOrders.find(o => o.id === orderId);
-      if (!order || !confirm(`Have you received ${money(order.total)} from ${order.name} for order #${orderId}?
+      if (!order || !confirm(`⚠️ Make sure you have received the payment!
 
-The order moves to Paid and can't be changed by the customer any more.`)) return;
+Check your Swish app (or cash) that ${money(order.total)} from ${order.name} for order #${orderId} has really arrived. A screenshot from the customer is not enough.
+
+Only press OK if the money is in. The order then moves to Paid and the customer can't change it any more.`)) return;
       try {
         const res = await authFetch(`${API}/vendor/order/${orderId}/mark-paid`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: "{}" });
         const data = await res.json().catch(() => ({}));
@@ -449,7 +460,8 @@ The order moves to Paid and can't be changed by the customer any more.`)) return
 
       const list = (currentTab === 'paid' ? paid : unpaid).filter(o => matches(o, query));
       ordersDiv.innerHTML = currentTab === 'unpaid'
-        ? `<p class="tab-note">Not paid yet, so don't prepare these. The customer can still change or cancel them. If you received the payment yourself, tap "Mark as paid".</p>`
+        ? `<p class="tab-note">Not paid yet, so don't prepare these. The customer can still change or cancel them. If you received the payment yourself, tap "Mark as paid".</p>
+           <p class="tab-note warn">⚠️ Make sure you have received the payment in your Swish app (or as cash) before you mark an order as paid.</p>`
         : '';
 
       if (!list.length) {
