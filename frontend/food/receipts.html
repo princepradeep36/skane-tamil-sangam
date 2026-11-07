@@ -139,7 +139,7 @@
     </div>
 
     <div class="search-section">
-      <input type="tel" id="phone" placeholder="Enter 10-digit Phone Number">
+      <input type="tel" id="phone" placeholder="Phone, e.g. +46 70 123 45 67" inputmode="tel" autocomplete="tel">
       <button class="primary-btn" onclick="loadOrders()">View My Receipts</button>
     </div>
 
@@ -166,11 +166,12 @@
     };
 
     async function loadOrders() {
-      const phone = document.getElementById("phone").value.trim();
-      if (!Validation.isValidPhone(phone)) return alert("Please enter a valid 10-digit phone number.");
+      const phone = Validation.normalizePhone(document.getElementById("phone").value);
+      if (!phone) return alert("Please enter your phone number with country code, e.g. +46 70 123 45 67 (the number you registered with).");
+      document.getElementById("phone").value = phone;
 
       try {
-        const res = await fetch(`${API}/orders/${phone}`);
+        const res = await fetch(`${API}/orders/${encodeURIComponent(phone)}`);
         const data = await res.json();
 
         ordersDiv.innerHTML = "";
@@ -182,7 +183,7 @@
         const paidOrders = data.filter(o => o.payment_status === 'PAID');
 
         if (paidOrders.length === 0) {
-          ordersDiv.innerHTML = `<div style="text-align:center; padding:20px;">No paid receipts found.<br><br><a href="payment.html?phone=${phone}" style="color:var(--primary)">Check Pending Payments</a></div>`;
+          ordersDiv.innerHTML = `<div style="text-align:center; padding:20px;">No paid receipts found.<br><br><a href="payment.html?phone=${encodeURIComponent(phone)}" style="color:var(--primary)">Check Pending Payments</a></div>`;
           return;
         }
 

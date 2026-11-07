@@ -264,7 +264,7 @@
         </div>
 
         <div class="search-section" id="search-section">
-            <input type="tel" id="phone" placeholder="Enter 10-digit Phone Number">
+            <input type="tel" id="phone" placeholder="Phone, e.g. +46 70 123 45 67" inputmode="tel" autocomplete="tel">
             <button class="primary-btn" onclick="loadPendingOrders()">Find Pending Payments</button>
         </div>
         <div class="search-section" id="phone-section" hidden>
@@ -327,11 +327,12 @@
         }
 
         async function loadPendingOrders() {
-            const phone = document.getElementById("phone").value.trim();
-            if (!Validation.isValidPhone(phone)) return alert("Please enter a valid 10-digit phone number.");
+            const phone = Validation.normalizePhone(document.getElementById("phone").value);
+            if (!phone) return alert("Please enter your phone number with country code, e.g. +46 70 123 45 67 (the number you registered with).");
+            document.getElementById("phone").value = phone;
 
             try {
-                const res = await fetch(`${API}/orders/${phone}`);
+                const res = await fetch(`${API}/orders/${encodeURIComponent(phone)}`);
                 const allOrders = await res.json();
                 lockPhone(phone);
 
@@ -340,7 +341,7 @@
 
                 ordersDiv.innerHTML = "";
                 if (pendingOrders.length === 0) {
-                    ordersDiv.innerHTML = `<div style="text-align:center; padding:20px;">No pending payments found! <br><a href="receipts.html?phone=${phone}">View Receipts</a></div>`;
+                    ordersDiv.innerHTML = `<div style="text-align:center; padding:20px;">No pending payments found! <br><a href="receipts.html?phone=${encodeURIComponent(phone)}">View Receipts</a></div>`;
                     return;
                 }
 

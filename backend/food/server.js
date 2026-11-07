@@ -380,11 +380,20 @@ app.get("/food-eligibility/:phone", async (req, res) => {
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Food orders now store phones like registrations (+46...). Older orders were saved as
+// 07..., so lookups match both forms of the same number.
+function customerPhones(value) {
+  const normalized = normalizeInternationalPhone(String(value || ""));
+  return [...new Set([normalized, legacySwedishPhone(normalized), String(value || "").trim()].filter(Boolean))];
+}
+
 app.post("/order", requireFoodOrderingOpen, async (req, res) => {
-  const { name, phone, cart } = req.body;
+  const { name, cart } = req.body;
+  const phone = normalizeInternationalPhone(String(req.body.phone || ""));
+  if (!phone) return res.status(400).json({ error: "Please enter your phone number with country code, e.g. +46 70 123 45 67." });
   const eligibility = await foodOrderEligibility(phone).catch(err => ({ eligible: false, error: err.message }));
   if (!eligibility.eligible) return res.status(403).json(eligibility);
-  let customer = await pool.query("SELECT id FROM customers WHERE phone=$1", [phone]);
+  let customer = await pool.query("SELECT id FROM customers WHERE phone = ANY($1) ORDER BY id LIMIT 1", [customerPhones(phone)]);
   if (customer.rows.length === 0) {
     customer = await pool.query("INSERT INTO customers(name,phone) VALUES($1,$2) RETURNING id", [name, phone]);
   }
@@ -412,7 +421,7 @@ app.get("/orders/:phone", async (req, res) => {
   const data = await pool.query(`
     SELECT o.id, o.total, o.payment_status, o.delivery_status, v.name AS vendor 
     FROM orders o JOIN vendors v ON o.vendor_id = v.id
-    JOIN customers c ON o.customer_id = c.id WHERE c.phone=$1 ORDER BY o.id`, [req.params.phone]);
+    JOIN customers c ON o.customer_id = c.id WHERE c.phone = ANY($1) ORDER BY o.id`, [customerPhones(req.params.phone)]);
   res.json(data.rows);
 });
 
@@ -427,7 +436,7 @@ app.get("/order/:id/details", async (req, res) => {
 // removing is always allowed; adding needs food ordering to be open and the item in stock.
 async function findUnpaidOrder(req, res) {
   const order = await pool.query(`SELECT o.id, o.vendor_id, o.payment_status FROM orders o JOIN customers c ON o.customer_id = c.id
-    WHERE o.id = $1 AND c.phone = $2`, [req.params.id, String(req.body.phone || "")]);
+    WHERE o.id = $1 AND c.phone = ANY($2)`, [req.params.id, customerPhones(req.body.phone)]);
   if (!order.rows.length) { res.status(404).json({ error: "Order not found" }); return null; }
   if (order.rows[0].payment_status === "PAID") { res.status(409).json({ error: "This order is already paid, so it can't be changed." }); return null; }
   return order.rows[0];
@@ -530,11 +539,11 @@ app.get("/vendor-orders/:vendorId", requireVendor, async (req, res) => {
   const vendorId = vendorScope(req, req.params.vendorId);
   if (req.user.role !== "admin" && Number(req.params.vendorId) !== vendorId) return res.status(403).json({ error: "Cannot access another vendor" });
   const data = await pool.query(`
-    SELECT o.id AS order_id, o.delivery_status, c.name AS customer_name, c.phone AS customer_phone, m.item_name, oi.quantity
+    SELECT o.id AS order_id, o.delivery_status, o.payment_status, o.total, c.name AS customer_name, c.phone AS customer_phone, m.item_name, oi.quantity
     FROM orders o JOIN customers c ON o.customer_id = c.id
     JOIN order_items oi ON o.id = oi.order_id
     JOIN menu_items m ON oi.menu_item_id = m.id
-    WHERE o.vendor_id = $1 AND o.payment_status = 'PAID' ORDER BY o.id DESC`, [vendorId]);
+    WHERE o.vendor_id = $1 ORDER BY o.id DESC, oi.id`, [vendorId]);
   res.json(data.rows);
 });
 

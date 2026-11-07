@@ -20,6 +20,18 @@ const Validation = {
         return true;
     },
 
+    // Customer phone, read the same way as the event registration form: returns
+    // +<country code><number>, or null. 07... is taken as Swedish, a bare 10-digit
+    // number starting 6-9 as Indian.
+    normalizePhone: function (value) {
+        let phone = String(value || '').trim().replace(/[\s().-]/g, '');
+        if (phone.startsWith('00')) phone = '+' + phone.slice(2);
+        if (/^0\d{9}$/.test(phone)) phone = '+46' + phone.slice(1);
+        else if (/^7\d{8}$/.test(phone)) phone = '+46' + phone;
+        else if (/^[6-9]\d{9}$/.test(phone)) phone = '+91' + phone;
+        return /^\+[1-9]\d{7,14}$/.test(phone) ? phone : null;
+    },
+
     // Escape for HTML Attributes (e.g., value="...")
     escapeHtml: function (str) {
         if (!str) return "";

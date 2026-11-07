@@ -132,6 +132,46 @@
       color: #999;
     }
 
+    .section-title {
+      margin: 22px 4px 10px;
+      font-size: 1.05rem;
+      color: #333;
+    }
+
+    .section-title small {
+      display: block;
+      font-weight: normal;
+      color: #777;
+      font-size: 0.85rem;
+      margin-top: 3px;
+    }
+
+    .customer-card.unpaid {
+      border-left-color: #ff9800;
+      background: #fffaf2;
+    }
+
+    .unpaid-tag {
+      font-weight: bold;
+      font-size: 0.75em;
+      margin-left: 8px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #ffe0b2;
+      color: #8a4b00;
+      white-space: nowrap;
+    }
+
+    .amount-due {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed #f0d9b5;
+      display: flex;
+      justify-content: space-between;
+      font-weight: bold;
+      color: #8a4b00;
+    }
+
     .logout-btn {
       position: absolute;
       top: 20px;
@@ -174,7 +214,7 @@
       backLink.href = "admin.html";
       backLink.style.display = "inline-block";
     } else if (vendorIdParam || params.get("hub") === "vendor") {
-      backLink.href = `vendor.html?vendor_id=${vendorIdParam || myId}`;
+      backLink.href = `vendor.html?vendor_id=${vendorIdParam || sessionStorage.getItem("vendor_id")}`;
       backLink.style.display = "inline-block";
     }
   </script>
@@ -195,6 +235,7 @@
     const API = '/food-api';
 
     const vendorSelect = document.getElementById("vendorSelect");
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const ordersDiv = document.getElementById("orders");
 
     // Load Vendors for dropdown
@@ -253,6 +294,8 @@
                 name: row.customer_name,
                 phone: row.customer_phone,
                 status: row.delivery_status || 'Pending',
+                paid: !row.payment_status || row.payment_status === 'PAID',
+                total: Number(row.total),
                 items: []
               };
             }
@@ -260,7 +303,17 @@
           });
 
           ordersDiv.innerHTML = "";
-          Object.values(orders).forEach(order => {
+          const all = Object.values(orders).sort((a, b) => b.id - a.id);
+          const unpaid = all.filter(o => !o.paid);
+          const paid = all.filter(o => o.paid);
+
+          if (paid.length) {
+            const h = document.createElement("h2");
+            h.className = "section-title";
+            h.innerHTML = `✅ Paid orders (${paid.length})`;
+            ordersDiv.appendChild(h);
+          }
+          paid.forEach(order => {
             const status = order.status;
             let btnHtml = '';
 
@@ -289,6 +342,33 @@
             `).join('')}
           </div>
           ${btnHtml}`;
+            ordersDiv.appendChild(card);
+          });
+
+          // Orders placed but not paid yet: shown so the stall can plan, but not to be prepared.
+          if (unpaid.length) {
+            const h = document.createElement("h2");
+            h.className = "section-title";
+            h.innerHTML = `⏳ Waiting for payment (${unpaid.length})<small>Not paid yet, so don't prepare these. The customer can still change or cancel them.</small>`;
+            ordersDiv.appendChild(h);
+          }
+          unpaid.forEach(order => {
+            const card = document.createElement("div");
+            card.className = "customer-card unpaid";
+            card.innerHTML = `
+          <div class="customer-header">
+            <span class="customer-name">${esc(order.name)}<span class="unpaid-tag">Not paid</span></span>
+            <span class="customer-phone">${esc(order.phone)}</span>
+          </div>
+          <div class="item-list">
+            ${order.items.map(i => `
+              <div class="item-row">
+                <span>${esc(i.item_name)}</span>
+                <span class="item-qty">x${i.quantity}</span>
+              </div>
+            `).join('')}
+          </div>
+          <div class="amount-due"><span>Amount due</span><span>${order.total}kr</span></div>`;
             ordersDiv.appendChild(card);
           });
         })

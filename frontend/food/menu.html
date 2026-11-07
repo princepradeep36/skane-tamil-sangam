@@ -655,7 +655,7 @@
   <div class="container">
     <div class="user-box">
       <input type="text" id="name" placeholder="Full Name">
-      <input type="tel" id="phone" placeholder="10-digit Phone Number" onblur="checkEligibility()" oninput="eligibility = null; showEligibility(null)">
+      <input type="tel" id="phone" placeholder="Phone, e.g. +46 70 123 45 67" inputmode="tel" autocomplete="tel" onblur="checkEligibility()" oninput="eligibility = null; showEligibility(null)">
     </div>
 
     <div class="notice notice-info">
@@ -944,10 +944,10 @@
 
       // Validation: Name and Phone required
       const name = document.getElementById("name").value.trim();
-      const phone = document.getElementById("phone").value.trim();
+      const phone = Validation.normalizePhone(document.getElementById("phone").value);
 
-      if (!name || !Validation.isValidPhone(phone)) {
-        alert("Please enter a valid Name and 10-digit Phone NUMBER.\n\nNote: Repeated or sequential digits (e.g. 0000000000, 1234567890) are not allowed.");
+      if (!name || !phone) {
+        alert("Please enter your name and phone number.\n\nPlease enter your phone number with country code, e.g. +46 70 123 45 67 (the number you registered with).");
         if (!name) document.getElementById("name").focus();
         else {
           const p = document.getElementById("phone");
@@ -1108,8 +1108,9 @@
     }
 
     async function checkEligibility() {
-      const phone = document.getElementById("phone").value.trim();
-      if (!Validation.isValidPhone(phone)) { eligibility = null; showEligibility(null); return null; }
+      const phone = Validation.normalizePhone(document.getElementById("phone").value);
+      if (!phone) { eligibility = null; showEligibility(null); return null; }
+      document.getElementById("phone").value = phone;
       try {
         const res = await fetch(`${API}/food-eligibility/${encodeURIComponent(phone)}`, { cache: 'no-store' });
         if (!res.ok) return null;
@@ -1121,10 +1122,10 @@
 
     async function checkout() {
       const name = document.getElementById("name").value.trim();
-      const phone = document.getElementById("phone").value.trim();
+      const phone = Validation.normalizePhone(document.getElementById("phone").value);
       const btn = document.getElementById("checkoutBtn");
 
-      if (!name || !Validation.isValidPhone(phone)) return alert("Please enter valid Name and Phone Number");
+      if (!name || !phone) return alert("Please enter your name and phone number.\n\nPlease enter your phone number with country code, e.g. +46 70 123 45 67 (the number you registered with).");
 
       const allowed = await checkEligibility();
       if (allowed && !allowed.eligible) {
@@ -1174,7 +1175,7 @@
           btn.disabled = false;
           btn.innerText = "Confirm Order";
 
-          window.location.href = `payment.html?phone=${phone}`;
+          window.location.href = `payment.html?phone=${encodeURIComponent(phone)}`;
         })
         .catch(err => {
           alert(err.shown ? err.message : "Error placing order. Please try again.");
@@ -1186,9 +1187,9 @@
     }
 
     function openOrders() {
-      const phone = document.getElementById("phone").value.trim();
-      if (!phone) return alert("Enter your phone number first");
-      window.location.href = `receipts.html?phone=${phone}`;
+      const phone = Validation.normalizePhone(document.getElementById("phone").value);
+      if (!phone) return alert("Please enter your phone number with country code, e.g. +46 70 123 45 67 (the number you registered with).");
+      window.location.href = `receipts.html?phone=${encodeURIComponent(phone)}`;
     }
 
     // Removed payWithSwish and confirmPaid functions as they are moved to payment.html
