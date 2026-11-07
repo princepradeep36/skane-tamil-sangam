@@ -551,7 +551,7 @@ app.get("/vendor-orders/:vendorId", requireVendor, async (req, res) => {
   const vendorId = vendorScope(req, req.params.vendorId);
   if (req.user.role !== "admin" && Number(req.params.vendorId) !== vendorId) return res.status(403).json({ error: "Cannot access another vendor" });
   const data = await pool.query(`
-    SELECT o.id AS order_id, o.delivery_status, c.name AS customer_name, c.phone AS customer_phone, m.item_name, oi.quantity
+    SELECT o.id AS order_id, o.delivery_status, o.total, c.name AS customer_name, c.phone AS customer_phone, m.item_name, m.price, oi.quantity
     FROM orders o JOIN customers c ON o.customer_id = c.id
     JOIN order_items oi ON o.id = oi.order_id
     JOIN menu_items m ON oi.menu_item_id = m.id
@@ -565,7 +565,7 @@ app.get("/vendor-unpaid-orders/:vendorId", requireVendor, async (req, res) => {
   if (req.user.role !== "admin" && Number(req.params.vendorId) !== vendorId) return res.status(403).json({ error: "Cannot access another vendor" });
   try {
     const data = await pool.query(`
-      SELECT o.id AS order_id, o.total, c.name AS customer_name, c.phone AS customer_phone, m.item_name, oi.quantity
+      SELECT o.id AS order_id, o.total, c.name AS customer_name, c.phone AS customer_phone, m.item_name, m.price, oi.quantity
       FROM orders o JOIN customers c ON o.customer_id = c.id
       JOIN order_items oi ON o.id = oi.order_id
       JOIN menu_items m ON oi.menu_item_id = m.id

@@ -132,18 +132,99 @@
       color: #999;
     }
 
-    .section-title {
-      margin: 22px 4px 10px;
-      font-size: 1.05rem;
-      color: #333;
+    /* Paid / Waiting tabs, styled like the Food / Snacks tabs on the menu */
+    .toolbar {
+      margin-bottom: 15px;
     }
 
-    .section-title small {
-      display: block;
-      font-weight: normal;
+    .order-tabs {
+      display: flex;
+      gap: 8px;
+      background: #e9eef5;
+      padding: 5px;
+      border-radius: 14px;
+    }
+
+    .order-tab {
+      flex: 1;
+      border: none;
+      background: transparent;
+      padding: 12px 8px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: bold;
+      color: #555;
+      cursor: pointer;
+    }
+
+    .order-tab.active {
+      background: var(--card);
+      color: var(--primary);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .order-tab[data-tab="unpaid"].active {
+      color: #b26a00;
+    }
+
+    .tab-count {
+      font-size: 0.75rem;
+      background: #dfe6f0;
+      color: #555;
+      padding: 1px 7px;
+      border-radius: 10px;
+      margin-left: 4px;
+    }
+
+    .order-tab.active .tab-count {
+      background: var(--primary);
+      color: white;
+    }
+
+    .order-tab[data-tab="unpaid"].active .tab-count {
+      background: #ff9800;
+    }
+
+    .search {
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 10px;
+      padding: 12px 14px;
+      border: 1px solid #e3e7ee;
+      border-radius: 12px;
+      font-size: 16px;
+      background: #fff;
+    }
+
+    .tab-note {
       color: #777;
       font-size: 0.85rem;
-      margin-top: 3px;
+      margin: 0 4px 12px;
+    }
+
+    .item-row .item-name {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .item-row .item-qty {
+      width: 40px;
+      text-align: center;
+    }
+
+    .item-row .item-price {
+      width: 70px;
+      text-align: right;
+      color: #444;
+    }
+
+    .order-total {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed #e5e5e5;
+      display: flex;
+      justify-content: space-between;
+      font-weight: bold;
     }
 
     .customer-card.unpaid {
@@ -226,6 +307,14 @@
       </select>
     </div>
 
+    <div class="toolbar" id="toolbar" hidden>
+      <div class="order-tabs" role="tablist">
+        <button class="order-tab active" data-tab="paid" role="tab" onclick="selectTab('paid')">✅ Paid <span class="tab-count" id="count-paid">0</span></button>
+        <button class="order-tab" data-tab="unpaid" role="tab" onclick="selectTab('unpaid')">⏳ Unpaid <span class="tab-count" id="count-unpaid">0</span></button>
+      </div>
+      <input type="search" class="search" id="search" placeholder="🔍 Search name, phone or item" oninput="renderOrders()" autocomplete="off">
+    </div>
+
     <div id="orders">
       <div class="empty-state">Select a vendor to see incoming orders</div>
     </div>
@@ -237,6 +326,8 @@
     const vendorSelect = document.getElementById("vendorSelect");
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const ordersDiv = document.getElementById("orders");
+    let allOrders = [];
+    let currentTab = 'paid';
 
     // Load Vendors for dropdown
     const role = sessionStorage.getItem("user_role");
@@ -259,7 +350,11 @@
           });
         });
 
-      vendorSelect.addEventListener("change", () => loadVendorOrders(vendorSelect.value));
+      vendorSelect.addEventListener("change", () => {
+        allOrders = [];
+        document.getElementById("search").value = '';
+        loadVendorOrders(vendorSelect.value);
+      });
     }
 
     function updateStatus(orderId, newStatus) {
@@ -270,27 +365,30 @@
       }).then(() => loadVendorOrders(role === 'vendor' ? myId : vendorSelect.value));
     }
 
+    const money = n => `${Number(n) % 1 ? Number(n).toFixed(2) : Number(n)}kr`;
+
+    function selectTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.order-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+      renderOrders();
+    }
+
     function loadVendorOrders(vendorId) {
       if (!vendorId) {
+        document.getElementById("toolbar").hidden = true;
         ordersDiv.innerHTML = '<div class="empty-state">Select a vendor to see incoming orders</div>';
         return;
       }
 
-      ordersDiv.innerHTML = '<div class="empty-state">Loading orders...</div>';
+      if (!allOrders.length) ordersDiv.innerHTML = '<div class="empty-state">Loading orders...</div>';
 
       Promise.all([
         authFetch(`${API}/vendor-orders/${vendorId}`).then(res => res.json()),
         authFetch(`${API}/vendor-unpaid-orders/${vendorId}`).then(res => res.ok ? res.json() : [])
       ])
         .then(([paidRows, unpaidRows]) => {
-          const data = [...paidRows.map(r => ({ ...r, paid: true })), ...unpaidRows.map(r => ({ ...r, paid: false }))];
-          if (data.length === 0) {
-            ordersDiv.innerHTML = '<div class="empty-state">No orders found for this stall.</div>';
-            return;
-          }
-
           const orders = {};
-          data.forEach(row => {
+          [...paidRows.map(r => ({ ...r, paid: true })), ...unpaidRows.map(r => ({ ...r, paid: false }))].forEach(row => {
             if (!orders[row.order_id]) {
               orders[row.order_id] = {
                 id: row.order_id,
@@ -304,78 +402,85 @@
             }
             orders[row.order_id].items.push(row);
           });
+          allOrders = Object.values(orders).sort((a, b) => b.id - a.id);
+          document.getElementById("toolbar").hidden = false;
+          renderOrders();
+        })
+        .catch(() => { ordersDiv.innerHTML = '<div class="empty-state">Error loading orders.</div>'; });
+    }
 
-          ordersDiv.innerHTML = "";
-          const all = Object.values(orders).sort((a, b) => b.id - a.id);
-          const unpaid = all.filter(o => !o.paid);
-          const paid = all.filter(o => o.paid);
+    function matches(order, query) {
+      if (!query) return true;
+      const text = [order.name, order.phone, `#${order.id}`, String(order.id), ...order.items.map(i => i.item_name)].join(' ').toLowerCase();
+      return query.split(/\s+/).every(word => text.includes(word));
+    }
 
-          if (paid.length) {
-            const h = document.createElement("h2");
-            h.className = "section-title";
-            h.innerHTML = `✅ Paid orders (${paid.length})`;
-            ordersDiv.appendChild(h);
-          }
-          paid.forEach(order => {
-            const status = order.status;
-            let btnHtml = '';
-
-            // Status Flow: Pending -> Accepted -> Delivered
-            if (status === 'Pending') {
-              btnHtml = `<button onclick="updateStatus('${order.id}', 'Accepted')" class="status-btn" style="background:var(--warning); color:black;">Accept Order</button>`;
-            } else if (status === 'Accepted') {
-              btnHtml = `<button onclick="updateStatus('${order.id}', 'Delivered')" class="status-btn" style="background:var(--primary); color:white;">Mark as Delivered</button>`;
-            } else if (status === 'Delivered') {
-              btnHtml = `<button onclick="updateStatus('${order.id}', 'Accepted')" class="status-btn" style="background:var(--success); color:white;">✓ Delivered (Undo)</button>`;
-            }
-
-            const card = document.createElement("div");
-            card.className = "customer-card";
-            card.innerHTML = `
-          <div class="customer-header">
-            <span class="customer-name">${order.name} <span style="font-weight:normal; font-size:0.8em; margin-left:10px; padding:2px 6px; border-radius:4px; background:#eee;">${status}</span></span>
-            <span class="customer-phone">${order.phone}</span>
-          </div>
-          <div class="item-list">
+    function itemsHtml(order) {
+      return `<div class="item-list">
             ${order.items.map(i => `
               <div class="item-row">
-                <span>${i.item_name}</span>
+                <span class="item-name">${esc(i.item_name)}</span>
                 <span class="item-qty">x${i.quantity}</span>
+                <span class="item-price">${money(i.price * i.quantity)}</span>
               </div>
             `).join('')}
-          </div>
-          ${btnHtml}`;
-            ordersDiv.appendChild(card);
-          });
+          </div>`;
+    }
 
-          // Orders placed but not paid yet: shown so the stall can plan, but not to be prepared.
-          if (unpaid.length) {
-            const h = document.createElement("h2");
-            h.className = "section-title";
-            h.innerHTML = `⏳ Waiting for payment (${unpaid.length})<small>Not paid yet, so don't prepare these. The customer can still change or cancel them.</small>`;
-            ordersDiv.appendChild(h);
+    function renderOrders() {
+      const query = document.getElementById("search").value.trim().toLowerCase();
+      const paid = allOrders.filter(o => o.paid);
+      const unpaid = allOrders.filter(o => !o.paid);
+      document.getElementById("count-paid").textContent = paid.length;
+      document.getElementById("count-unpaid").textContent = unpaid.length;
+
+      const list = (currentTab === 'paid' ? paid : unpaid).filter(o => matches(o, query));
+      ordersDiv.innerHTML = currentTab === 'unpaid'
+        ? `<p class="tab-note">Not paid yet, so don't prepare these. The customer can still change or cancel them.</p>`
+        : '';
+
+      if (!list.length) {
+        ordersDiv.innerHTML += `<div class="empty-state">${query ? 'No orders match your search.' : currentTab === 'paid' ? 'No paid orders yet.' : 'No orders waiting for payment.'}</div>`;
+        return;
+      }
+
+      list.forEach(order => {
+        const card = document.createElement("div");
+        if (order.paid) {
+          const status = order.status;
+          let btnHtml = '';
+
+          // Status Flow: Pending -> Accepted -> Delivered
+          if (status === 'Pending') {
+            btnHtml = `<button onclick="updateStatus('${order.id}', 'Accepted')" class="status-btn" style="background:var(--warning); color:black;">Accept Order</button>`;
+          } else if (status === 'Accepted') {
+            btnHtml = `<button onclick="updateStatus('${order.id}', 'Delivered')" class="status-btn" style="background:var(--primary); color:white;">Mark as Delivered</button>`;
+          } else if (status === 'Delivered') {
+            btnHtml = `<button onclick="updateStatus('${order.id}', 'Accepted')" class="status-btn" style="background:var(--success); color:white;">✓ Delivered (Undo)</button>`;
           }
-          unpaid.forEach(order => {
-            const card = document.createElement("div");
-            card.className = "customer-card unpaid";
-            card.innerHTML = `
+
+          card.className = "customer-card";
+          card.innerHTML = `
+          <div class="customer-header">
+            <span class="customer-name">${esc(order.name)} <span style="font-weight:normal; font-size:0.8em; margin-left:10px; padding:2px 6px; border-radius:4px; background:#eee;">${esc(status)}</span></span>
+            <span class="customer-phone">${esc(order.phone)}</span>
+          </div>
+          ${itemsHtml(order)}
+          <div class="order-total"><span>Total paid · #${order.id}</span><span>${money(order.total)}</span></div>
+          ${btnHtml}`;
+        } else {
+          // Orders placed but not paid yet: shown so the stall can plan, but not to be prepared.
+          card.className = "customer-card unpaid";
+          card.innerHTML = `
           <div class="customer-header">
             <span class="customer-name">${esc(order.name)}<span class="unpaid-tag">Not paid</span></span>
             <span class="customer-phone">${esc(order.phone)}</span>
           </div>
-          <div class="item-list">
-            ${order.items.map(i => `
-              <div class="item-row">
-                <span>${esc(i.item_name)}</span>
-                <span class="item-qty">x${i.quantity}</span>
-              </div>
-            `).join('')}
-          </div>
-          <div class="amount-due"><span>Amount due</span><span>${order.total}kr</span></div>`;
-            ordersDiv.appendChild(card);
-          });
-        })
-        .catch(() => { ordersDiv.innerHTML = '<div class="empty-state">Error loading orders.</div>'; });
+          ${itemsHtml(order)}
+          <div class="amount-due"><span>Amount due · #${order.id}</span><span>${money(order.total)}</span></div>`;
+        }
+        ordersDiv.appendChild(card);
+      });
     }
   </script>
 </body>
