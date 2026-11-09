@@ -1,7 +1,7 @@
 // WhatsApp messages the admin sends by hand: the admin page opens WhatsApp with this text
 // already written (https://wa.me/<number>?text=...), and the admin presses Send.
 const { amountDue } = require("./mailer");
-const { bookingUrl } = require("./booking-link");
+const { bookingUrl, sweetsPassUrl } = require("./booking-link");
 
 const HEADER = "🪔 *Skåne Tamil Sangam – Diwali 2026* 🪔";
 const FOOTER = `_ℹ️ Please don't reply to this message._
@@ -39,6 +39,25 @@ ${FOOTER}`;
 const MESSAGES = {
   PAYMENT_OPEN: r => message(r, "Payment for Diwali 2026 is now open."),
   PAYMENT_REMINDER: r => message(r, "Just a gentle reminder that your registration payment is still pending."),
+  // Welcome message with the family's personal QR code for collecting the Diwali sweet boxes.
+  SWEETS_PASS: r => {
+    const boxes = Number(r.adults_count) || 0;
+    const payment = paymentBlock(r);
+    return `${HEADER}
+
+Vanakkam ${r.first_name} 🙏
+Thank you for registering for our *Diwali celebration*! 🎉 We are happy to welcome you.
+
+🎁 *Your Diwali sweet boxes*
+Here is your QR code for collecting *${boxes} sweet box${boxes === 1 ? "" : "es"}* (one for each adult):
+${sweetsPassUrl(r)}
+
+👉 Open the link and *show the QR code at the sweets counter* to collect your sweet boxes. Each QR code can be used once.${payment ? `
+
+${payment}` : ""}
+
+${FOOTER}`;
+  },
   // Admin-written text. {first_name}, {amount_due} and {registration_id} are filled in per family.
   CUSTOM: (r, custom) => {
     const fill = s => String(s || "").replace(/\{first_name\}/g, r.first_name).replace(/\{amount_due\}/g, String(amountDue(r))).replace(/\{registration_id\}/g, String(r.id));

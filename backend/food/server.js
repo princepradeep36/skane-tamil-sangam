@@ -11,6 +11,7 @@ const mailer = require("./mailer");
 const wa = require("./whatsapp");
 const { validBookingKey } = require("./booking-link");
 const registerConnectionGame = require("./connection-game"); // not "whatsapp": route bodies use that name for the phone field
+const registerSweets = require("./sweets");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error("JWT_SECRET environment variable is required");
@@ -950,9 +951,10 @@ app.delete("/admin/event-registration/:id", requireAdmin, async (req, res) => {
 app.get("/admin/event-registrations", requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(`SELECT r.*, a.swish_number, a.label AS swish_label, (r.adults_count+r.kids_6_12_count+r.kids_below_6_count) AS total_participants,
-      p.uploaded_at AS payment_proof_uploaded_at
+      p.uploaded_at AS payment_proof_uploaded_at, sw.collected_at AS sweets_collected_at, sw.boxes AS sweets_boxes, sw.collected_by AS sweets_collected_by
       FROM event_registrations r LEFT JOIN event_swish_accounts a ON a.id=r.swish_account_id
-      LEFT JOIN event_payment_proofs p ON p.registration_id=r.id ORDER BY r.created_at DESC`);
+      LEFT JOIN event_payment_proofs p ON p.registration_id=r.id
+      LEFT JOIN event_sweet_collections sw ON sw.registration_id=r.id ORDER BY r.created_at DESC`);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1082,7 +1084,7 @@ app.get("/admin/email/log", requireAdmin, async (req, res) => {
 
 /* ================= WHATSAPP MESSAGES (ADMIN, SENT BY HAND) ================= */
 
-const WHATSAPP_KINDS = ['PAYMENT_REMINDER', 'PAYMENT_OPEN', 'CUSTOM'];
+const WHATSAPP_KINDS = ['PAYMENT_REMINDER', 'PAYMENT_OPEN', 'SWEETS_PASS', 'CUSTOM'];
 
 // Families to message, each with a ready-written WhatsApp text and when they last got this message.
 app.post("/admin/whatsapp/list", requireAdmin, async (req, res) => {
@@ -1154,7 +1156,7 @@ app.post("/admin/whatsapp/sent", requireAdmin, async (req, res) => {
   try {
     const q = await pool.query("SELECT id, whatsapp FROM event_registrations WHERE id=$1", [registrationId]);
     if (!q.rows.length) return res.status(404).json({ error: "Registration not found" });
-    const names = { PAYMENT_REMINDER: 'Payment reminder', PAYMENT_OPEN: 'Payment is now open', CUSTOM: 'Own message' };
+    const names = { PAYMENT_REMINDER: 'Payment reminder', PAYMENT_OPEN: 'Payment is now open', SWEETS_PASS: 'Welcome + sweet box QR', CUSTOM: 'Own message' };
     await pool.query(`INSERT INTO event_email_log(registration_id,kind,to_email,subject,status,channel) VALUES($1,$2,$3,$4,'SENT','WHATSAPP')`,
       [q.rows[0].id, kind, String(q.rows[0].whatsapp || '').slice(0, 255), `WhatsApp: ${names[kind]}`]);
     res.json({ success: true, sent_at: new Date().toISOString() });
@@ -1272,11 +1274,13 @@ app.put("/admin/order/:id/payment", requireAdmin, async (req, res) => {
 // app.get("/order/:id/details") is already available and public
 
 const ensureConnectionTables = registerConnectionGame(app, { pool, requireAdmin, imageContentType });
+const ensureSweetsTable = registerSweets(app, { pool, requireAdmin, wa });
 
 initializeDatabase()
   .then(() => ensureEventRegistrationLifecycle())
   .then(() => mailer.ensureEmailLog())
   .then(() => ensureConnectionTables())
+  .then(() => ensureSweetsTable())
   .then(() => ensureSiteSettings())
   .then(() => app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`)))
   .catch(err => { console.error('Failed to initialize event registration lifecycle:', err); process.exit(1); });
