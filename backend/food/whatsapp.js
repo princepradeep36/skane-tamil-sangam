@@ -24,21 +24,25 @@ ${bookingUrl(r)}
 After paying, upload your Swish screenshot and tap *Mark as Paid*. ✅`;
 }
 
-function message(r, sentence) {
+function message(r, sentence, note) {
   const payment = paymentBlock(r);
   return `${HEADER}
 
 Vanakkam ${r.first_name} 🙏
 ${sentence}${payment ? `
 
-${payment}` : ""}
+${payment}` : ""}${note ? `
+
+${note}` : ""}
 
 ${FOOTER}`;
 }
 
+const ALREADY_PAID_NOTE = "💡 *Already paid?* Please open the link above, upload your payment screenshot on the event registration page and tap *Mark as Paid*, so we can confirm it.";
+
 const MESSAGES = {
   PAYMENT_OPEN: r => message(r, "Payment for Diwali 2026 is now open."),
-  PAYMENT_REMINDER: r => message(r, "Just a gentle reminder that your registration payment is still pending."),
+  PAYMENT_REMINDER: r => message(r, "Just a gentle reminder that your registration payment is still pending.", ALREADY_PAID_NOTE),
   // Welcome message with the family's personal QR code for collecting the Diwali sweet boxes.
   SWEETS_PASS: r => {
     const boxes = Number(r.adults_count) || 0;
