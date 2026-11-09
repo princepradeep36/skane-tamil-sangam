@@ -40,6 +40,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ari
 .next{background:#fff;color:#111}
 .warn .next,.bad .next{background:#0f172a;color:#fff}
 .force{background:#ea580c;color:#fff}
+.closed-note{background:#fff7ed;border:1px solid #fdba74;color:#9a3412;border-radius:12px;padding:10px 12px;font-weight:600;margin-bottom:14px}
 .unuse{background:transparent;color:inherit;text-decoration:underline;font-weight:600;padding:8px}
 [hidden]{display:none!important}
 </style>
@@ -53,6 +54,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ari
     <div class="stat"><b id="sBoxes">–</b><span>boxes given</span></div>
     <div class="stat"><b id="sFamilies">–</b><span>families collected</span></div>
   </div>
+
+  <div class="closed-note" id="closedNote" hidden></div>
 
   <div id="result" hidden></div>
 
@@ -83,6 +86,7 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const when = d => new Date(d).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
 const plural = n => `${n} box${n === 1 ? '' : 'es'}`;
+const openText = d => new Date(d).toLocaleString('en-GB', { timeZone: 'Europe/Stockholm', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 let scanner = null;
 let busy = false; // a result is on screen: ignore the camera until "Scan next"
@@ -95,6 +99,8 @@ async function loadSummary() {
     const s = await r.json();
     $('sBoxes').textContent = `${s.collected_boxes} / ${s.boxes}`;
     $('sFamilies').textContent = `${s.collected_families} / ${s.families}`;
+    $('closedNote').hidden = s.open;
+    if (!s.open) $('closedNote').textContent = `🕒 Sweet boxes open on ${openText(s.opensAt)}. Before that, every scan asks you to confirm "Give anyway".`;
   } catch (e) {}
 }
 
@@ -137,6 +143,11 @@ async function check(code, force) {
       showResult('used', `⛔ Already collected<div class="big">Don't give</div>${who}
         <div class="sub">${plural(d.collected.boxes)} collected on ${esc(when(d.collected.at))}${d.collected.by ? ` by ${esc(d.collected.by)}` : ''}</div>
         ${nextBtn}<button class="btn unuse" onclick="markUnused(${d.id})">Mark this QR code as unused again</button>`);
+    } else if (d.result === 'NOT_OPEN') {
+      showResult('warn', `🕒 Not open yet<div class="big">${plural(d.boxes)}</div>${who}
+        <div class="sub">Sweet boxes open on ${esc(openText(d.opensAt))}.${d.paid ? '' : ` This registration is also not paid${d.amountDue ? ` (${d.amountDue} kr due)` : ''}.`} Give them now only if you have decided to.</div>
+        <button class="btn force" id="forceBtn">Give ${plural(d.boxes)} anyway</button>${nextBtn}`);
+      $('forceBtn').onclick = () => check(code, true);
     } else if (d.result === 'NOT_PAID') {
       showResult('warn', `⚠️ Registration not paid<div class="big">${plural(d.boxes)}</div>${who}
         <div class="sub">${d.amountDue ? `${d.amountDue} kr is still due. ` : ''}Ask them to pay first, or give the boxes anyway.</div>

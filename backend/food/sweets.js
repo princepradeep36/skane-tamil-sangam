@@ -1,7 +1,7 @@
 // Diwali sweet boxes: one box per adult in a registration. Each family gets a personal QR code
 // (a link to sweets.html with a signed pass code); at the counter an admin scans it, sees how many
 // boxes to give, and the pass is marked as used. Only an admin can mark it unused again.
-const { sweetsPassCode, readSweetsPass } = require("./booking-link");
+const { sweetsPassCode, readSweetsPass, SWEETS_OPEN_AT, sweetsOpen } = require("./booking-link");
 
 module.exports = function registerSweets(app, { pool, requireAdmin, wa }) {
   async function ensureSweetsTable() {
@@ -34,13 +34,15 @@ module.exports = function registerSweets(app, { pool, requireAdmin, wa }) {
         ...family(r),
         firstName: r.first_name,
         cancelled: r.registration_status === "CANCELLED",
+        opensAt: SWEETS_OPEN_AT, open: sweetsOpen(),
         collected: r.collected_at ? { at: r.collected_at, boxes: r.collected_boxes } : null
       });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
   // The counter scanned a pass. Gives boxes (and marks the pass used) only once per registration.
-  // An unpaid registration is shown first and only marked when the admin confirms with force.
+  // Before the opening time, or for an unpaid registration, the details are shown first and the
+  // pass is only marked when the admin confirms with force (to give a specific family early).
   app.post("/admin/sweets/scan", requireAdmin, async (req, res) => {
     try {
       const id = readSweetsPass(req.body?.code);
@@ -50,6 +52,7 @@ module.exports = function registerSweets(app, { pool, requireAdmin, wa }) {
       if (r.registration_status === "CANCELLED") return res.json({ result: "CANCELLED", ...who });
       if (r.collected_at) return res.json({ result: "ALREADY_USED", ...who, collected: { at: r.collected_at, boxes: r.collected_boxes, by: r.collected_by } });
       if (!who.boxes) return res.json({ result: "NO_ADULTS", ...who });
+      if (!sweetsOpen() && !req.body?.force) return res.json({ result: "NOT_OPEN", ...who, opensAt: SWEETS_OPEN_AT });
       if (!who.paid && !req.body?.force) return res.json({ result: "NOT_PAID", ...who });
       const saved = await pool.query(`INSERT INTO event_sweet_collections(registration_id, boxes, collected_by) VALUES($1,$2,$3)
         ON CONFLICT (registration_id) DO NOTHING RETURNING collected_at`, [r.id, who.boxes, String(req.user?.username || "admin").slice(0, 100)]);
@@ -80,7 +83,7 @@ module.exports = function registerSweets(app, { pool, requireAdmin, wa }) {
           COALESCE(SUM(c.boxes), 0)::int AS collected_boxes
         FROM event_registrations r LEFT JOIN event_sweet_collections c ON c.registration_id = r.id
         WHERE r.registration_status <> 'CANCELLED'`);
-      res.json(q.rows[0]);
+      res.json({ ...q.rows[0], opensAt: SWEETS_OPEN_AT, open: sweetsOpen() });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 

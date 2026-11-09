@@ -18,6 +18,13 @@ function validBookingKey(id, key) {
   return typeof key === "string" && key.length === expected.length && crypto.timingSafeEqual(Buffer.from(key), Buffer.from(expected));
 }
 
+// Sweet boxes are given from this moment (Swedish time); before it the counter needs an admin override.
+const SWEETS_OPEN_AT = new Date(process.env.SWEETS_OPEN_AT || "2026-11-15T15:45:00+01:00");
+const sweetsOpen = () => Date.now() >= SWEETS_OPEN_AT.getTime();
+function sweetsOpenText() {
+  return SWEETS_OPEN_AT.toLocaleString("en-GB", { timeZone: "Europe/Stockholm", weekday: "long", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true });
+}
+
 // Diwali sweet-box pass: "<id>-<signature>", shown as a QR code on sweets.html.
 function sweetsPassCode(id) {
   const sig = crypto.createHmac("sha256", process.env.JWT_SECRET || "").update(`sweets:${id}`).digest("base64url").slice(0, 12);
@@ -39,4 +46,4 @@ function readSweetsPass(value) {
   return code.length === expected.length && crypto.timingSafeEqual(Buffer.from(code), Buffer.from(expected)) ? Number(m[1]) : null;
 }
 
-module.exports = { bookingUrl, validBookingKey, sweetsPassCode, sweetsPassUrl, readSweetsPass };
+module.exports = { bookingUrl, validBookingKey, sweetsPassCode, sweetsPassUrl, readSweetsPass, SWEETS_OPEN_AT, sweetsOpen, sweetsOpenText };

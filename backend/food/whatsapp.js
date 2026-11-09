@@ -1,7 +1,7 @@
 // WhatsApp messages the admin sends by hand: the admin page opens WhatsApp with this text
 // already written (https://wa.me/<number>?text=...), and the admin presses Send.
 const { amountDue } = require("./mailer");
-const { bookingUrl, sweetsPassUrl } = require("./booking-link");
+const { bookingUrl, sweetsPassUrl, sweetsOpenText } = require("./booking-link");
 
 const HEADER = "🪔 *Skåne Tamil Sangam – Diwali 2026* 🪔";
 const FOOTER = `_ℹ️ Please don't reply to this message._
@@ -52,7 +52,8 @@ Thank you for registering for our *Diwali celebration*! 🎉 We are happy to wel
 Here is your QR code for collecting *${boxes} sweet box${boxes === 1 ? "" : "es"}* (one for each adult):
 ${sweetsPassUrl(r)}
 
-👉 Open the link and *show the QR code at the sweets counter* to collect your sweet boxes. Each QR code can be used once.${payment ? `
+👉 Open the link and *show the QR code at the sweets counter* to collect your sweet boxes. Each QR code can be used once.
+🕒 Sweet boxes are given from *${sweetsOpenText()}*.${payment ? `
 
 ${payment}` : ""}
 
