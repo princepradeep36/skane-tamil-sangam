@@ -56,6 +56,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ari
 
   <div id="result" hidden></div>
 
+  <div id="scanArea">
   <div class="card">
     <div id="reader"></div>
     <div class="cam-actions">
@@ -71,6 +72,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ari
       <button class="btn" type="submit">Check</button>
     </form>
   </div>
+  </div>
 </div>
 
 <script src="auth.js"></script>
@@ -85,6 +87,7 @@ const plural = n => `${n} box${n === 1 ? '' : 'es'}`;
 let scanner = null;
 let busy = false; // a result is on screen: ignore the camera until "Scan next"
 let lastCode = '';
+let cameraWanted = false; // the admin started the camera: reopen it after each result
 
 async function loadSummary() {
   try {
@@ -95,7 +98,10 @@ async function loadSummary() {
   } catch (e) {}
 }
 
+// While a result is shown the camera is closed, so only the result and "Scan next" are on screen.
 function showResult(cls, html) {
+  $('scanArea').hidden = true;
+  stopCamera();
   const el = $('result');
   el.className = `result ${cls}`;
   el.innerHTML = html;
@@ -107,9 +113,11 @@ function showResult(cls, html) {
 
 function scanNext() {
   $('result').hidden = true;
+  $('scanArea').hidden = false;
   busy = false;
   lastCode = '';
   $('manualCode').value = '';
+  if (cameraWanted) startCamera();
 }
 
 async function check(code, force) {
@@ -160,22 +168,29 @@ function onScan(text) {
   check(text);
 }
 
-$('startBtn').onclick = async () => {
+async function startCamera() {
   if (typeof Html5Qrcode === 'undefined') return alert('The scanner could not load. Check the internet connection, or type the code below.');
   scanner = scanner || new Html5Qrcode('reader');
+  if (scanner.isScanning) return;
   try {
     await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * 0.75); return { width: s, height: s }; } }, onScan, () => {});
+    cameraWanted = true;
     $('startBtn').hidden = true;
     $('stopBtn').hidden = false;
+    $('scanArea').scrollIntoView({ block: 'start' });
   } catch (e) {
     alert('Could not open the camera. Allow camera access for this site in the browser, then try again.');
   }
-};
-$('stopBtn').onclick = async () => {
-  try { await scanner.stop(); } catch (e) {}
+}
+
+async function stopCamera() {
+  if (scanner && scanner.isScanning) { try { await scanner.stop(); } catch (e) {} }
   $('startBtn').hidden = false;
   $('stopBtn').hidden = true;
-};
+}
+
+$('startBtn').onclick = startCamera;
+$('stopBtn').onclick = () => { cameraWanted = false; stopCamera(); };
 $('manualForm').onsubmit = e => {
   e.preventDefault();
   const code = $('manualCode').value.trim();
