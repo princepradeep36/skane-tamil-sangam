@@ -25,6 +25,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .secret small{display:block;color:#9a3412;font-weight:bold}.secret b{font-size:1.4rem}
 .turn{border-radius:12px;padding:14px;background:#f1f5f9;margin-bottom:12px}
 .turn.on{background:#dcfce7}
+.typed{background:#fff;border:2px solid #16a34a;border-radius:10px;padding:10px 12px;margin:-4px 0 12px;font-size:1.35rem;font-weight:bold;word-break:break-word}
+.typed small{display:block;font-size:.75rem;color:#166534;font-weight:bold;text-transform:uppercase;letter-spacing:.04em}
+.typed.none{border-style:dashed;border-color:#94a3b8;color:#64748b;font-size:.95rem;font-weight:normal}
 .turn .name{font-size:1.6rem;font-weight:bold;margin:2px 0 10px}
 .line{margin:8px 0 0;font-size:.95rem}
 .pill{display:inline-block;background:#eef2f7;border-radius:999px;padding:3px 10px;margin:2px;font-size:.88rem}
@@ -150,6 +153,9 @@ function renderControl(s) {
             ? `<div class="turn on"><b>${s.winner ? `🏆 ${esc(s.winner)} answered correctly${CLUES ? ` (+${pointsText(s.awarded)})` : ''}` : 'Answer shown on stage'}</b></div>`
             : s.answering
               ? `<div class="turn on"><small>🎤 Now answering (first in line)</small><div class="name">${esc(s.answering)}</div>
+                  ${s.answeringText
+                    ? `<div class="typed"><small>📝 Typed on their phone (check it, spelling may differ)</small>${esc(s.answeringText)}</div>`
+                    : `<div class="typed none">No typed answer yet: they can still type it, or say it out loud.</div>`}
                   <div class="row"><button class="go" onclick="act('correct')">✓ ${CLUES ? `+${pointsText(s.worth)}` : 'Correct'}</button><button class="bad" onclick="act('wrong')">✗ Wrong, next person</button></div>
                   ${s.waiting.length ? `<p class="line"><b>Next in line:</b> ${s.waiting.map(n => `<span class="pill">${esc(n)}</span>`).join('')}</p>` : ''}</div>`
               : `<div class="turn"><b>Waiting for someone to tap "I want to answer"…</b></div>`}

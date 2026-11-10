@@ -84,6 +84,7 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       imageNumber: q ? game.imageIndex + 1 : 0,
       imageCount: q ? q.imageIds.length : 0,
       answering: answering ? answering.name : null,
+      answeringText: answering ? answering.typed || null : null, // what they typed on their phone, if anything
       waiting: game.queue.filter(e => !e.result && e !== answering).map(e => e.name),
       wrong: game.queue.filter(e => e.result === "WRONG").map(e => e.name),
       revealed: game.revealed,
@@ -126,6 +127,7 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       score: player.score,
       canBuzz: game.status === "PLAYING" && !game.revealed && !entry,
       turn: !entry ? "NONE" : entry.result || (answering === entry ? "ANSWERING" : "WAITING"),
+      typed: entry ? entry.typed || "" : "",
       ahead
     };
   }
@@ -139,8 +141,22 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
     if (!player) return res.status(404).json({ error: "Please join the game again.", needJoin: true });
     // Single-threaded, so the order of these pushes is the order the buzzes reached the server.
     if (game.status === "PLAYING" && !game.revealed && !game.queue.some(e => e.playerId === player.id)) {
-      game.queue.push({ playerId: player.id, name: player.name, result: null });
+      game.queue.push({ playerId: player.id, name: player.name, result: null, typed: "" });
     }
+    res.json(playerView(player));
+  });
+
+  // A player in the queue types their answer on the phone. It is not checked: the admin sees it
+  // (and the stage shows it when it is their turn) and marks it correct or wrong. One answer only.
+  app.post(`/${kind}/answer`, (req, res) => {
+    const player = game.players.get(String(req.body?.token || ""));
+    if (!player) return res.status(404).json({ error: "Please join the game again.", needJoin: true });
+    const entry = game.status === "PLAYING" && !game.revealed ? game.queue.find(e => e.playerId === player.id && !e.result) : null;
+    if (!entry) return res.status(409).json({ error: "You can't send an answer right now.", ...playerView(player) });
+    if (entry.typed) return res.status(409).json({ error: "You have already sent your answer.", ...playerView(player) });
+    const text = String(req.body?.text || "").replace(/\s+/g, " ").trim().slice(0, 100);
+    if (!text) return res.status(400).json({ error: "Please type your answer." });
+    entry.typed = text;
     res.json(playerView(player));
   });
 

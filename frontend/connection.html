@@ -42,6 +42,14 @@ body.clue{background:linear-gradient(170deg,#3d0815,#64101f 55%,#9b1b33)}
 body.clue header span{color:#f6c343}
 body.clue .points div{color:#64101f}
 body.clue .points b{color:#a3122e}
+.answer{width:min(360px,100%);display:flex;flex-direction:column;gap:10px}
+.answer input{width:100%;font-size:1.2rem;padding:15px 14px;border:0;border-radius:14px;color:#1c1c1e;text-align:center}
+.answer button{font-size:1.15rem;font-weight:800;padding:14px;border:0;border-radius:14px;background:#ffc107;color:#1c1c1e;cursor:pointer}
+.answer button:disabled{opacity:.6}
+.answer .note{font-size:.88rem;opacity:.85;margin:0}
+.sent{background:#fff;color:#1c1c1e;border-radius:14px;padding:12px 14px;margin-top:12px;font-size:1.05rem}
+.sent b{display:block;font-size:1.35rem;word-break:break-word}
+body.clue .answer button{background:#f6c343;color:#3d0815}
 footer{padding:10px 16px 16px;text-align:center;font-size:.9rem;opacity:.85}
 [hidden]{display:none!important}
 </style>
@@ -90,7 +98,8 @@ const HOW_TO_PLAY = `<div class="howto"><h2>How to play</h2><ol>
     ? 'Clues appear on the stage screen one by one. Each new clue makes it easier to guess the answer.'
     : 'Pictures appear on the stage screen one by one. They are all connected to one answer.'}</div></li>
   <li><span>✋</span><div>Know the answer? Tap <b>I want to answer</b> on your phone. The fastest tap goes first.</div></li>
-  <li><span>🎤</span><div>When your phone says <b>It's your turn</b> and your name is on the stage screen, say your answer out loud.</div></li>
+  <li><span>⌨️</span><div>Then <b>type your answer</b> on your phone and send it. Spelling mistakes are fine: the quiz master decides if it is right.</div></li>
+  <li><span>🎤</span><div>When your phone says <b>It's your turn</b>, your answer appears on the stage screen.</div></li>
   <li><span>🔁</span><div>Wrong answer? The next person in line gets a chance. You get one try per question.</div></li>
   <li><span>🏆</span><div>${GAME === 'clue'
     ? 'The sooner you guess, the more points you get. The highest score wins!'
@@ -139,18 +148,13 @@ function showPlayer(me) {
   if (me.status === 'ENDED') {
     return render('ended' + me.score, `<div class="emoji">🎉</div><p class="big">Thanks for playing!</p><p class="sub">Your score: <b>${me.score}</b></p>`);
   }
-  if (me.turn === 'ANSWERING') {
-    return render('answering' + me.questionNumber, `<div class="panel go"><div class="emoji">🎤</div><p class="big">It's your turn!</p><p class="sub">Say your answer on stage now.</p></div>`);
-  }
   if (me.turn === 'CORRECT') {
     return render('correct' + me.questionNumber, `<div class="panel win"><div class="emoji">🏆</div><p class="big">Correct!</p>${GAME === 'clue' ? `<p class="big">+${pointsText(me.awarded)}</p>` : ''}<p class="sub">Well done. Next question coming up.</p></div>`);
   }
   if (me.revealed) {
     return render('revealed' + me.questionNumber, `<div class="emoji">👀</div><p class="big">Answer revealed</p><p class="sub">See the stage screen. Next question coming up.</p>`);
   }
-  if (me.turn === 'WAITING') {
-    return render(`waiting${me.questionNumber}-${me.ahead}`, `<div class="panel wait"><div class="emoji">✋</div><p class="big">You're in line</p><p class="sub">${me.ahead === 1 ? '1 person is' : me.ahead + ' people are'} ahead of you. Be ready to answer on stage!</p></div>`);
-  }
+  if (me.turn === 'ANSWERING' || me.turn === 'WAITING') return showAnswering(me);
   if (me.turn === 'WRONG') {
     return render('wrong' + me.questionNumber, `<div class="panel bad"><div class="emoji">🙈</div><p class="big">Not this time</p><p class="sub">${GAME === 'clue'
       ? "You can't answer this place again, even when the next clue comes. Your next chance is the next place."
@@ -162,6 +166,57 @@ function showPlayer(me) {
       render(key, `${GAME === 'clue' ? `<span class="worth">⭐ Worth ${pointsText(me.worth)} now</span>` : ''}<button class="buzz" id="buzz">I want<br>to answer</button><p class="sub">Tap if you know the ${GAME === 'clue' ? 'answer' : 'connection'}. You get one try per question.</p>`);
       document.getElementById('buzz').onclick = buzz;
     }
+  }
+}
+
+// After tapping "I want to answer": the player types the answer here. It is not checked;
+// the quiz master sees it and decides. The form is drawn once per question so typing is never
+// interrupted; only the status panel above it is updated.
+function turnPanel(me) {
+  const ahead = me.ahead === 1 ? '1 person is' : `${me.ahead} people are`;
+  return me.turn === 'ANSWERING'
+    ? `<div class="panel go"><div class="emoji">🎤</div><p class="big">It's your turn!</p><p class="sub">${me.typed
+        ? 'Your answer is on the stage screen. The quiz master is deciding.'
+        : 'Type your answer below and send it, or say it out loud.'}</p>${sentBox(me)}</div>`
+    : `<div class="panel wait"><div class="emoji">✋</div><p class="big">You're in line</p><p class="sub">${ahead} ahead of you. ${me.typed
+        ? 'Your answer is ready: it shows on stage when it is your turn.'
+        : 'Type your answer below now, so it is ready when it is your turn.'}</p>${sentBox(me)}</div>`;
+}
+const sentBox = me => (me.typed ? `<div class="sent">Your answer<b>${esc(me.typed)}</b></div>` : '');
+
+function showAnswering(me) {
+  if (me.typed) return render(`sent${me.questionNumber}-${me.turn}-${me.ahead}`, turnPanel(me));
+  if (lastView !== 'type' + me.questionNumber) {
+    render('type' + me.questionNumber, `<div id="turnBox"></div>
+      <form class="answer" id="answerForm">
+        <input id="answerText" maxlength="100" autocomplete="off" autocapitalize="words" placeholder="Type your answer" aria-label="Your answer" required>
+        <button type="submit">Send answer</button>
+        <p class="note">You can send one answer. Spelling mistakes are fine: the quiz master decides.</p>
+      </form>`);
+    document.getElementById('answerForm').onsubmit = sendAnswer;
+  }
+  const box = document.getElementById('turnBox');
+  const html = turnPanel(me);
+  if (box.dataset.html !== html) { box.dataset.html = html; box.innerHTML = html; }
+}
+
+async function sendAnswer(e) {
+  e.preventDefault();
+  const input = document.getElementById('answerText');
+  const btn = e.target.querySelector('button');
+  if (!input.value.trim()) return;
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  try {
+    const r = await fetch(`${API}/${GAME}/answer`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: store.get(), text: input.value }) });
+    const me = await r.json().catch(() => ({}));
+    if (!r.ok && !me.turn) throw new Error(me.error || 'Could not send. Please try again.');
+    lastView = '';
+    showPlayer(me);
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Send answer';
+    alert(err.message);
   }
 }
 

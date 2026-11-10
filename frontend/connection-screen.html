@@ -88,6 +88,8 @@ body.clue .status.answer{background:#f6c343;color:#3d0815;font-size:5vh}
 .status.answering{background:#16a34a;font-size:6vh}
 .status.answer{background:#ffc107;color:#3d2c06;font-size:7vh}
 .status.idle{background:rgba(255,255,255,.1);font-size:3.4vh;font-weight:700}
+.status .typed-ans{display:block;font-size:6vh;font-weight:900;margin-top:.4vh;word-break:break-word}
+.status .typed-wait{display:block;font-size:2.6vh;font-weight:700;opacity:.85;margin-top:.4vh}
 .status small{display:block;font-size:2.6vh;font-weight:700;opacity:.9}
 /* End */
 .end{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh}
@@ -110,7 +112,7 @@ body.clue .lb div:first-child{background:#f6c343;color:#3d0815}
     <div class="qr-card"><div id="qr"></div><div class="join-url" id="joinUrl"></div></div>
     <div class="players"><h2><span id="count">0</span> <span id="countWord">players</span> joined</h2><div class="names" id="names"></div></div>
   </div>
-  <div class="howto"><div><b>1</b><span>Scan &amp; type your name</span></div><div><b>2</b><span>Know it? Tap <u>I want to answer</u></span></div><div><b>3</b><span>Your name shows: say your answer</span></div><div id="howtoPoints"><b>4</b><span>1 point per correct answer</span></div></div>
+  <div class="howto"><div><b>1</b><span>Scan &amp; type your name</span></div><div><b>2</b><span>Know it? Tap <u>I want to answer</u></span></div><div><b>3</b><span>Type your answer on your phone</span></div><div id="howtoPoints"><b>4</b><span>1 point per correct answer</span></div></div>
 </div>
 
 <div class="view" id="rules" hidden>
@@ -178,7 +180,8 @@ function cluePanel(s) {
 const RULES = [
   GAME === 'clue' ? 'Each place has <b>3 clues</b>, shown one at a time on this screen.' : 'Each question has <b>several pictures</b>, shown one at a time. They are all connected to one answer.',
   'Know the answer? Tap <b>I want to answer</b> on your phone. The fastest tap goes first.',
-  'When your name appears here and your phone says <b>It&#39;s your turn</b>, say your answer out loud.',
+  'Then <b>type your answer</b> on your phone and send it. Spelling mistakes are fine: the quiz master decides if it is right.',
+  'When it is your turn, your answer appears here on the screen.',
   'Wrong answer? The next person in line gets a chance. <b>One try per question</b> for each player.',
   GAME === 'clue' ? 'The sooner you guess, the more points you get (see below).' : 'Each correct answer is <b>1 point</b>. The highest score wins!',
   'Same points? Whoever reached that score <b>first</b> ranks higher.',
@@ -220,7 +223,9 @@ function render(s) {
         : `<div>${esc(s.answer)}${s.winner ? `<small>🏆 ${esc(s.winner)} got it right!</small>` : ''}</div>`);
     } else if (s.answering) {
       st.className = 'status answering';
-      setHtml(st, `<div>🎤 ${esc(s.answering)}${s.waiting.length ? `<small>Next: ${s.waiting.slice(0, 3).map(esc).join(', ')}${s.waiting.length > 3 ? ` +${s.waiting.length - 3}` : ''}</small>` : ''}</div>`);
+      setHtml(st, `<div>🎤 ${esc(s.answering)}${s.answeringText
+        ? `<span class="typed-ans">“${esc(s.answeringText)}”</span>`
+        : '<span class="typed-wait">is answering…</span>'}${s.waiting.length ? `<small>Next: ${s.waiting.slice(0, 3).map(esc).join(', ')}${s.waiting.length > 3 ? ` +${s.waiting.length - 3}` : ''}</small>` : ''}</div>`);
     } else {
       st.className = 'status idle';
       setHtml(st, `<div>Know the ${GAME === 'clue' ? 'answer' : 'connection'}? Tap <b>I want to answer</b> on your phone!${s.wrong.length ? `<small>Not this time: ${s.wrong.map(esc).join(', ')}</small>` : ''}</div>`);
