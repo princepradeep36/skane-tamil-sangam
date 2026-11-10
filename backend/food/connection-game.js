@@ -114,7 +114,8 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
 
   function playerView(player) {
     const view = { kind, status: game.status, questionNumber: game.qIndex + 1, questionTotal: game.questions.length, revealed: game.revealed,
-      worth: game.status === "PLAYING" ? worth() : 0, awarded: game.awarded };
+      worth: game.status === "PLAYING" ? worth() : 0, awarded: game.awarded,
+      step: game.imageIndex + 1, steps: currentQuestion() ? currentQuestion().imageIds.length : 0 };
     if (!player) return { ...view, needJoin: true };
     const entry = game.queue.find(e => e.playerId === player.id);
     const answering = answeringEntry();

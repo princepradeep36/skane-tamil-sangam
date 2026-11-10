@@ -127,7 +127,9 @@ function showJoin(status) {
 function showPlayer(me) {
   document.getElementById('who').textContent = `Playing as ${me.name} · Score: ${me.score}`;
   document.getElementById('progress').textContent = me.status === 'PLAYING'
-    ? `Question ${me.questionNumber} of ${me.questionTotal}${GAME === 'clue' && !me.revealed ? ` · Worth ${pointsText(me.worth)} now` : ''}`
+    ? (GAME === 'clue'
+      ? `Place ${me.questionNumber} of ${me.questionTotal} · ${me.revealed ? 'Answer shown' : `Clue ${me.step} of ${me.steps} · Worth ${pointsText(me.worth)}`}`
+      : `Question ${me.questionNumber} of ${me.questionTotal}`)
     : 'Skåne Tamil Sangam';
   if (me.turn === 'ANSWERING' && lastTurn !== 'ANSWERING' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
   lastTurn = me.turn;
@@ -150,7 +152,9 @@ function showPlayer(me) {
     return render(`waiting${me.questionNumber}-${me.ahead}`, `<div class="panel wait"><div class="emoji">✋</div><p class="big">You're in line</p><p class="sub">${me.ahead === 1 ? '1 person is' : me.ahead + ' people are'} ahead of you. Be ready to answer on stage!</p></div>`);
   }
   if (me.turn === 'WRONG') {
-    return render('wrong' + me.questionNumber, `<div class="panel bad"><div class="emoji">🙈</div><p class="big">Not this time</p><p class="sub">You can try again on the next question.</p></div>`);
+    return render('wrong' + me.questionNumber, `<div class="panel bad"><div class="emoji">🙈</div><p class="big">Not this time</p><p class="sub">${GAME === 'clue'
+      ? "You can't answer this place again, even when the next clue comes. Your next chance is the next place."
+      : 'You can try again on the next question.'}</p></div>`);
   }
   if (me.canBuzz) {
     const key = `buzz${me.questionNumber}-${me.worth}`;
