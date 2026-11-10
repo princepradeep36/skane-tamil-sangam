@@ -128,7 +128,7 @@ function showPlayer(me) {
   document.getElementById('who').textContent = `Playing as ${me.name} · Score: ${me.score}`;
   document.getElementById('progress').textContent = me.status === 'PLAYING'
     ? (GAME === 'clue'
-      ? `Place ${me.questionNumber} of ${me.questionTotal} · ${me.revealed ? 'Answer shown' : `Clue ${me.step} of ${me.steps} · Worth ${pointsText(me.worth)}`}`
+      ? `Place ${me.questionNumber} of ${me.questionTotal} · ${me.revealed ? 'Answer shown' : `Clue ${me.step} of ${me.steps} · Worth ${pointsText(me.worth)} now`}`
       : `Question ${me.questionNumber} of ${me.questionTotal}`)
     : 'Skåne Tamil Sangam';
   if (me.turn === 'ANSWERING' && lastTurn !== 'ANSWERING' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
