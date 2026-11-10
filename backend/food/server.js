@@ -12,6 +12,7 @@ const wa = require("./whatsapp");
 const { validBookingKey } = require("./booking-link");
 const registerConnectionGame = require("./connection-game"); // not "whatsapp": route bodies use that name for the phone field
 const registerSweets = require("./sweets");
+const registerStaff = require("./staff");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error("JWT_SECRET environment variable is required");
@@ -39,9 +40,20 @@ function authenticateToken(req, res, next) {
 function requireAdmin(req, res, next) {
   authenticateToken(req, res, () => req.user.role === "admin" ? next() : res.status(403).json({ error: "Admin access required" }));
 }
+// Vendors, admins, and staff accounts with the Food area. Food staff act as an admin for this
+// request, so they can see every vendor like an admin does.
 function requireVendor(req, res, next) {
-  authenticateToken(req, res, () => ["vendor", "admin"].includes(req.user.role) ? next() : res.status(403).json({ error: "Vendor access required" }));
+  authenticateToken(req, res, async () => {
+    if (["vendor", "admin"].includes(req.user.role)) return next();
+    try {
+      const perms = await permissionsOf(req.user);
+      if (perms && perms.includes("food")) { req.user = { ...req.user, role: "admin" }; return next(); }
+    } catch (err) { return res.status(500).json({ error: err.message }); }
+    res.status(403).json({ error: "Vendor access required" });
+  });
 }
+const { requirePerm, hasPerm, permissionsOf, ensureStaffColumns } = registerStaff({ app, pool, authenticateToken, requireAdmin, bcrypt });
+
 function vendorScope(req, requestedVendorId) {
   if (req.user.role === "admin") return Number(requestedVendorId);
   if (!req.user.vendorId) return null;
@@ -92,7 +104,7 @@ app.get("/settings", async (req, res) => {
   try { res.json(await getSettings()); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put("/admin/settings", requireAdmin, async (req, res) => {
+app.put("/admin/settings", requirePerm("settings"), async (req, res) => {
   try {
     for (const key of Object.keys(SETTING_DEFAULTS)) {
       if (typeof req.body[key] === "boolean") {
@@ -116,7 +128,7 @@ app.post("/login", async (req, res) => {
 
     const { id, role, vendor_id } = user.rows[0];
     const token = jwt.sign({ userId: id, username, role, vendorId: vendor_id }, JWT_SECRET, { expiresIn: "8h" });
-    res.json({ role, vendor_id, token });
+    res.json({ role, vendor_id, token, permissions: await permissionsOf({ userId: id, role }) });
   } catch (err) {
     res.status(500).send(err.message);
   }
@@ -138,7 +150,7 @@ app.post("/admin/users", requireAdmin, async (req, res) => {
 
 /* ================= ADMIN ROUTES (Crucial - Do not remove) ================= */
 
-app.post("/admin/vendor", requireAdmin, async (req, res) => {
+app.post("/admin/vendor", requirePerm("food"), async (req, res) => {
   const { name, phone, swish } = req.body;
   try {
     await pool.query("INSERT INTO vendors(name, phone, swish) VALUES($1,$2,$3)", [name, phone, swish]);
@@ -146,7 +158,7 @@ app.post("/admin/vendor", requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-app.post("/admin/vendor-full", requireAdmin, async (req, res) => {
+app.post("/admin/vendor-full", requirePerm("food"), async (req, res) => {
   const { name, phone, swish } = req.body;
   try {
     // 1. Create Vendor
@@ -174,14 +186,14 @@ app.post("/admin/vendor-full", requireAdmin, async (req, res) => {
 });
 
 // Passwords are stored hashed, so admins see usernames and can issue a fresh password to re-share.
-app.get("/admin/vendor-logins", requireAdmin, async (req, res) => {
+app.get("/admin/vendor-logins", requirePerm("food"), async (req, res) => {
   try {
     const q = await pool.query("SELECT vendor_id, username FROM users WHERE role='vendor' AND vendor_id IS NOT NULL ORDER BY id");
     res.json(q.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post("/admin/vendor/:id/reset-password", requireAdmin, async (req, res) => {
+app.post("/admin/vendor/:id/reset-password", requirePerm("food"), async (req, res) => {
   try {
     const vendorRes = await pool.query("SELECT id, name FROM vendors WHERE id=$1", [req.params.id]);
     if (!vendorRes.rows.length) return res.status(404).json({ error: "Vendor not found" });
@@ -213,7 +225,7 @@ function normalizeMenuText(value) {
   return text || null;
 }
 
-app.post("/admin/menu", requireAdmin, async (req, res) => {
+app.post("/admin/menu", requirePerm("food"), async (req, res) => {
   const { vendor_id, item_name, price, max_quantity, category, description, ingredients } = req.body;
   try {
     await pool.query("INSERT INTO menu_items(vendor_id,item_name,price,max_quantity,category,description,ingredients) VALUES($1,$2,$3,$4,$5,$6,$7)",
@@ -222,7 +234,7 @@ app.post("/admin/menu", requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-app.put("/admin/menu/:id", requireAdmin, async (req,res) => {
+app.put("/admin/menu/:id", requirePerm("food"), async (req,res) => {
   const { item_name, price, max_quantity, category, description, ingredients } = req.body;
   // description/ingredients are only changed when sent, so older clients don't wipe them.
   const q=await pool.query(`UPDATE menu_items SET item_name=$1,price=$2,max_quantity=$3,category=COALESCE($5,category),
@@ -234,7 +246,7 @@ app.put("/admin/menu/:id", requireAdmin, async (req,res) => {
   res.json({success:true});
 });
 
-app.delete("/admin/vendor/:id", requireAdmin, async (req,res) => {
+app.delete("/admin/vendor/:id", requirePerm("food"), async (req,res) => {
   try {
     await pool.query("DELETE FROM vendors WHERE id=$1",[req.params.id]);
     res.json({success:true});
@@ -277,7 +289,7 @@ app.get("/vendors", async (req, res) => {
   res.json(vendors.rows);
 });
 
-app.delete("/admin/menu/:id", requireAdmin, async (req, res) => {
+app.delete("/admin/menu/:id", requirePerm("food"), async (req, res) => {
   // Soft delete to preserve order history constraints
   await pool.query("UPDATE menu_items SET is_active = FALSE WHERE id=$1", [req.params.id]);
   res.send("Deleted (Soft)");
@@ -857,7 +869,7 @@ app.put("/event/registration/:id", requireEventRegistrationOpen, (req, res) => s
 
 // Admins can correct any registration (names, contact details, counts), even when registration is closed.
 // The photo consent is the family's own choice, so an admin edit keeps whatever they chose.
-app.put("/admin/event-registration/:id", requireAdmin, (req, res) => saveRegistrationEdit(req, res, true));
+app.put("/admin/event-registration/:id", requirePerm("registrations"), (req, res) => saveRegistrationEdit(req, res, true));
 
 async function saveRegistrationEdit(req, res, byAdmin) {
   const { firstName, lastName, email, phone, whatsapp, adultsCount, kids6to12Count, kidsBelow6Count, volunteerInterest, culturalInterest, culturalActivityType, comments } = req.body;
@@ -926,7 +938,7 @@ app.put("/event/registration/:id/pay", express.raw({ type: 'image/*', limit: '5m
   } finally { client.release(); }
 });
 
-app.get("/admin/event-registration/:id/payment-proof", requireAdmin, async (req, res) => {
+app.get("/admin/event-registration/:id/payment-proof", requirePerm("registrations"), async (req, res) => {
   try {
     const q = await pool.query("SELECT content_type,image FROM event_payment_proofs WHERE registration_id=$1", [req.params.id]);
     if (!q.rows.length) return res.status(404).json({ error: "No payment screenshot uploaded" });
@@ -934,7 +946,7 @@ app.get("/admin/event-registration/:id/payment-proof", requireAdmin, async (req,
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete("/admin/event-registration/:id", requireAdmin, async (req, res) => {
+app.delete("/admin/event-registration/:id", requirePerm("registrations"), async (req, res) => {
   try {
     // Soft-cancel for audit history. Summary queries exclude CANCELLED rows and
     // clearing swish_account_id immediately releases that allocation.
@@ -948,7 +960,7 @@ app.delete("/admin/event-registration/:id", requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get("/admin/event-registrations", requireAdmin, async (req, res) => {
+app.get("/admin/event-registrations", requirePerm("registrations"), async (req, res) => {
   try {
     const result = await pool.query(`SELECT r.*, a.swish_number, a.label AS swish_label, (r.adults_count+r.kids_6_12_count+r.kids_below_6_count) AS total_participants,
       p.uploaded_at AS payment_proof_uploaded_at, sw.collected_at AS sweets_collected_at, sw.boxes AS sweets_boxes, sw.collected_by AS sweets_collected_by,
@@ -961,7 +973,7 @@ app.get("/admin/event-registrations", requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get("/admin/event-registration-summary", requireAdmin, async (req, res) => {
+app.get("/admin/event-registration-summary", requirePerm("registrations"), async (req, res) => {
   try {
     const result = await pool.query(`SELECT COUNT(*)::int AS total_registrations,
       COALESCE(SUM(adults_count),0)::int AS total_adults,
@@ -979,7 +991,7 @@ app.get("/admin/event-registration-summary", requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put("/admin/event-registration/:id/payment", requireAdmin, async (req, res) => {
+app.put("/admin/event-registration/:id/payment", requirePerm("registrations"), async (req, res) => {
   const { status } = req.body;
   if (!['PENDING','PAID'].includes(status)) return res.status(400).json({ error: "Invalid payment status" });
   try {
@@ -1024,11 +1036,11 @@ function readGroupEmail(body) {
   return { audience, kind, skipHours, custom: { subject: String(subject || '').trim(), body: String(message || '').trim(), includePayment: !!includePayment } };
 }
 
-app.get("/admin/email/status", requireAdmin, (req, res) => {
+app.get("/admin/email/status", requirePerm("messages"), (req, res) => {
   res.json({ configured: mailer.configured(), from: mailer.fromAddress() || null });
 });
 
-app.post("/admin/email/preview", requireAdmin, async (req, res) => {
+app.post("/admin/email/preview", requirePerm("messages"), async (req, res) => {
   try {
     const g = readGroupEmail(req.body);
     const recipients = await emailRecipients(g.audience, g.kind, g.skipHours);
@@ -1038,7 +1050,7 @@ app.post("/admin/email/preview", requireAdmin, async (req, res) => {
   } catch (err) { res.status(err.status || 500).json({ error: err.message }); }
 });
 
-app.post("/admin/email/send", requireAdmin, async (req, res) => {
+app.post("/admin/email/send", requirePerm("messages"), async (req, res) => {
   try {
     const g = readGroupEmail(req.body);
     const recipients = await emailRecipients(g.audience, g.kind, g.skipHours);
@@ -1059,13 +1071,13 @@ app.post("/admin/email/send", requireAdmin, async (req, res) => {
   } catch (err) { if (!res.headersSent) res.status(err.status || 500).json({ error: err.message }); }
 });
 
-app.get("/admin/email/batch/:id", requireAdmin, (req, res) => {
+app.get("/admin/email/batch/:id", requirePerm("messages"), (req, res) => {
   const batch = emailBatches.get(req.params.id);
   if (!batch) return res.status(404).json({ error: "Unknown batch" });
   res.json(batch);
 });
 
-app.post("/admin/email/test", requireAdmin, async (req, res) => {
+app.post("/admin/email/test", requirePerm("messages"), async (req, res) => {
   const to = String(req.body?.to || '').trim();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return res.status(400).json({ error: "Enter a valid email address." });
   if (!mailer.configured()) return res.status(400).json({ error: "Email sending is not set up yet. Add the SMTP settings on the server first." });
@@ -1075,7 +1087,7 @@ app.post("/admin/email/test", requireAdmin, async (req, res) => {
   } catch (err) { res.status(502).json({ error: `Could not send: ${err.message}` }); }
 });
 
-app.get("/admin/email/log", requireAdmin, async (req, res) => {
+app.get("/admin/email/log", requirePerm("messages"), async (req, res) => {
   try {
     const q = await pool.query(`SELECT l.id, l.registration_id, l.kind, l.channel, l.to_email, l.subject, l.status, l.error, l.created_at,
       r.first_name, r.last_name FROM event_email_log l LEFT JOIN event_registrations r ON r.id = l.registration_id
@@ -1089,7 +1101,7 @@ app.get("/admin/email/log", requireAdmin, async (req, res) => {
 const WHATSAPP_KINDS = ['PAYMENT_REMINDER', 'PAYMENT_OPEN', 'SWEETS_PASS', 'CUSTOM'];
 
 // Families to message, each with a ready-written WhatsApp text and when they last got this message.
-app.post("/admin/whatsapp/list", requireAdmin, async (req, res) => {
+app.post("/admin/whatsapp/list", requirePerm("messages"), async (req, res) => {
   const { audience, kind, message, includePayment } = req.body || {};
   const where = EMAIL_AUDIENCES[audience];
   if (!where || !WHATSAPP_KINDS.includes(kind)) return res.status(400).json({ error: "Unknown message or audience." });
@@ -1113,7 +1125,7 @@ app.post("/admin/whatsapp/list", requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get("/admin/whatsapp/status", requireAdmin, (req, res) => {
+app.get("/admin/whatsapp/status", requirePerm("messages"), (req, res) => {
   res.json({ apiConfigured: wa.apiConfigured(), confirmations: wa.confirmationsOn(), templates: wa.TEMPLATE_NAMES });
 });
 
@@ -1130,7 +1142,7 @@ async function whatsappUnpaidRecipients(kind, skipHours) {
   return q.rows;
 }
 
-app.post("/admin/whatsapp/send-all", requireAdmin, async (req, res) => {
+app.post("/admin/whatsapp/send-all", requirePerm("messages"), async (req, res) => {
   const { kind, skipHours, dryRun } = req.body || {};
   if (!['PAYMENT_REMINDER', 'PAYMENT_OPEN'].includes(kind)) return res.status(400).json({ error: "Only payment reminders and payment-open messages can be sent to everyone." });
   try {
@@ -1152,7 +1164,7 @@ app.post("/admin/whatsapp/send-all", requireAdmin, async (req, res) => {
 });
 
 // The admin tapped "Send on WhatsApp" for this family: remember it so the list shows it as done.
-app.post("/admin/whatsapp/sent", requireAdmin, async (req, res) => {
+app.post("/admin/whatsapp/sent", requirePerm("messages"), async (req, res) => {
   const { registrationId, kind } = req.body || {};
   if (!WHATSAPP_KINDS.includes(kind)) return res.status(400).json({ error: "Unknown message." });
   try {
@@ -1166,12 +1178,12 @@ app.post("/admin/whatsapp/sent", requireAdmin, async (req, res) => {
 });
 
 /* ================= EVENT SWISH ADMIN ================= */
-app.get('/admin/event-swish-accounts', requireAdmin, async (req,res)=>{try{const q=await pool.query(`SELECT a.*,
+app.get('/admin/event-swish-accounts', requirePerm("swish"), async (req,res)=>{try{const q=await pool.query(`SELECT a.*,
   COALESCE(SUM(r.total_amount),0)::int allocated_amount,
   COALESCE(SUM(LEAST(r.paid_amount, r.total_amount)),0)::int paid_amount
   FROM event_swish_accounts a LEFT JOIN event_registrations r ON r.swish_account_id=a.id AND r.registration_status <> 'CANCELLED'
   GROUP BY a.id ORDER BY a.priority,a.id`);res.json(q.rows)}catch(e){res.status(500).json({error:e.message})}});
-app.post('/admin/event-swish-accounts', requireAdmin, async (req,res)=>{
+app.post('/admin/event-swish-accounts', requirePerm("swish"), async (req,res)=>{
   const {label,swishNumber,limitAmount,priority=1,active=true}=req.body;
   if(!/^\d{10}$/.test(String(swishNumber||''))||Number(limitAmount)<=0) return res.status(400).json({error:'Swish number must be 10 digits and limit must be greater than 0.'});
   const client=await pool.connect();
@@ -1183,7 +1195,7 @@ app.post('/admin/event-swish-accounts', requireAdmin, async (req,res)=>{
     res.status(201).json({...q.rows[0],pending_registrations_assigned:assigned});
   } catch(e) { await client.query('ROLLBACK'); res.status(e.code==='23505'?409:500).json({error:e.message}); } finally { client.release(); }
 });
-app.put('/admin/event-swish-accounts/:id', requireAdmin, async (req,res)=>{
+app.put('/admin/event-swish-accounts/:id', requirePerm("swish"), async (req,res)=>{
   const {label,swishNumber,limitAmount,priority=1,active=true}=req.body;
   if(!/^\d{10}$/.test(String(swishNumber||''))||Number(limitAmount)<=0) return res.status(400).json({error:'Swish number must be 10 digits and limit must be greater than 0.'});
   const client=await pool.connect();
@@ -1196,7 +1208,7 @@ app.put('/admin/event-swish-accounts/:id', requireAdmin, async (req,res)=>{
     res.json({...q.rows[0],pending_registrations_assigned:assigned});
   } catch(e) { await client.query('ROLLBACK'); res.status(e.code==='23505'?409:500).json({error:e.message}); } finally { client.release(); }
 });
-app.delete('/admin/event-swish-accounts/:id', requireAdmin, async (req,res)=>{try{const used=await pool.query("SELECT COUNT(*)::int c FROM event_registrations WHERE swish_account_id=$1 AND registration_status <> 'CANCELLED'",[req.params.id]);if(used.rows[0].c>0)return res.status(409).json({error:'This Swish number is already assigned to registrations. Deactivate it instead.'});await pool.query('DELETE FROM event_swish_accounts WHERE id=$1',[req.params.id]);res.json({success:true})}catch(e){res.status(500).json({error:e.message})}});
+app.delete('/admin/event-swish-accounts/:id', requirePerm("swish"), async (req,res)=>{try{const used=await pool.query("SELECT COUNT(*)::int c FROM event_registrations WHERE swish_account_id=$1 AND registration_status <> 'CANCELLED'",[req.params.id]);if(used.rows[0].c>0)return res.status(409).json({error:'This Swish number is already assigned to registrations. Deactivate it instead.'});await pool.query('DELETE FROM event_swish_accounts WHERE id=$1',[req.params.id]);res.json({success:true})}catch(e){res.status(500).json({error:e.message})}});
 
 const PORT = process.env.PORT || 3000;
 
@@ -1215,7 +1227,7 @@ async function recalcOrderTotal(orderId) {
   await pool.query("UPDATE orders SET total = $1 WHERE id = $2", [newTotal, orderId]);
 }
 
-app.get("/admin/orders", requireAdmin, async (req, res) => {
+app.get("/admin/orders", requirePerm("food"), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT o.id, o.total, o.payment_status, o.delivery_status, o.created_at,
@@ -1229,14 +1241,14 @@ app.get("/admin/orders", requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-app.delete("/admin/order/:id", requireAdmin, async (req, res) => {
+app.delete("/admin/order/:id", requirePerm("food"), async (req, res) => {
   try {
     await pool.query("DELETE FROM orders WHERE id=$1", [req.params.id]);
     res.json({ success: true });
   } catch (err) { res.status(500).send(err.message); }
 });
 
-app.delete("/admin/order-item/:id", requireAdmin, async (req, res) => {
+app.delete("/admin/order-item/:id", requirePerm("food"), async (req, res) => {
   try {
     const del = await pool.query("DELETE FROM order_items WHERE id=$1 RETURNING order_id", [req.params.id]);
     if (del.rows.length > 0) {
@@ -1248,7 +1260,7 @@ app.delete("/admin/order-item/:id", requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-app.put("/admin/order-item/:id", requireAdmin, async (req, res) => {
+app.put("/admin/order-item/:id", requirePerm("food"), async (req, res) => {
   const { quantity } = req.body;
   if (quantity < 1) return res.status(400).send("Qty must be positive");
   try {
@@ -1262,7 +1274,7 @@ app.put("/admin/order-item/:id", requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-app.put("/admin/order/:id/payment", requireAdmin, async (req, res) => {
+app.put("/admin/order/:id/payment", requirePerm("food"), async (req, res) => {
   const { status } = req.body; // 'PAID' or 'UNPAID'
   if (!['PAID', 'UNPAID'].includes(status)) return res.status(400).send("Invalid status");
   
@@ -1275,15 +1287,16 @@ app.put("/admin/order/:id/payment", requireAdmin, async (req, res) => {
 // Reuse existing details endpoint for fetching items of an order
 // app.get("/order/:id/details") is already available and public
 
-const ensureConnectionTables = registerConnectionGame(app, { pool, requireAdmin, imageContentType });
-const ensureClueTables = registerConnectionGame(app, { pool, requireAdmin, imageContentType, kind: "clue" });
-const ensureSweetsTable = registerSweets(app, { pool, requireAdmin, authenticateToken, bcrypt, wa });
+const ensureConnectionTables = registerConnectionGame(app, { pool, requireAdmin: requirePerm("games"), imageContentType });
+const ensureClueTables = registerConnectionGame(app, { pool, requireAdmin: requirePerm("games"), imageContentType, kind: "clue" });
+const ensureSweetsTable = registerSweets(app, { pool, requirePerm, hasPerm, wa });
 
 initializeDatabase()
   .then(() => ensureEventRegistrationLifecycle())
   .then(() => mailer.ensureEmailLog())
   .then(() => ensureConnectionTables())
   .then(() => ensureClueTables())
+  .then(() => ensureStaffColumns())
   .then(() => ensureSweetsTable())
   .then(() => ensureSiteSettings())
   .then(() => app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`)))

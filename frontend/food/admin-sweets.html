@@ -58,13 +58,6 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ari
 .closed-note{background:#fff7ed;border:1px solid #fdba74;color:#9a3412;border-radius:12px;padding:10px 12px;font-weight:600;margin-bottom:14px}
 .logout{background:#dc2626;color:#fff}
 .ask{margin-top:12px;background:#fff;border:1px dashed #fdba74;border-radius:10px;padding:10px;font-weight:700}
-.users h2{margin:0 0 4px;font-size:1.1rem}
-.user-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #eef2f7}
-.user-row b{flex:1;min-width:0;word-break:break-all}
-.user-row button{padding:7px 10px;font-size:.85rem}
-.add-user{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-top:10px}
-.add-user input{min-width:0;padding:10px;border:1px solid #d0d5dd;border-radius:10px;font-size:15px}
-@media(max-width:480px){.add-user{grid-template-columns:1fr}}
 .unuse{background:transparent;color:inherit;text-decoration:underline;font-weight:600;padding:8px}
 [hidden]{display:none!important}
 @media(max-width:380px){.people{grid-template-columns:repeat(2,1fr)}}
@@ -107,24 +100,14 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ari
   </div>
   </div>
 
-  <div class="card users" id="usersCard" hidden>
-    <h2>👥 Scanner logins</h2>
-    <p class="hint">Volunteers with these logins can only use this scanner: entrance check-in and sweet boxes. "Give anyway" and undo stay with admins.</p>
-    <div id="userList"></div>
-    <form class="add-user" id="addUser">
-      <input id="newUser" placeholder="Username, e.g. gate1" autocomplete="off" autocapitalize="off" aria-label="Username" required>
-      <input id="newPass" placeholder="Password (8+ characters)" autocomplete="new-password" aria-label="Password" required minlength="8">
-      <button class="btn start" type="submit">+ Add</button>
-    </form>
-  </div>
 </div>
 
 <script src="auth.js"></script>
 <script>
-checkAuth('scanner');
+checkAuth('scan');
 const API = '/food-api';
-// Admins can override warnings, undo scans and manage scanner logins; scanner logins can only scan.
-const IS_ADMIN = sessionStorage.getItem('user_role') === 'admin';
+// "Give anyway" and undo need the scan_override access (full admins always have it).
+const IS_ADMIN = hasAccess('scan_override');
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const when = d => new Date(d).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
@@ -320,45 +303,8 @@ $('manualForm').onsubmit = e => {
   if (code) { busy = false; check(code); }
 };
 
-/* ---------- Scanner logins (admins only) ---------- */
-async function loadUsers() {
-  const r = await authFetch(`${API}/admin/scanner-users`, { cache: 'no-store' });
-  const list = await r.json().catch(() => []);
-  $('userList').innerHTML = list.map(u => `<div class="user-row"><b>${esc(u.username)}</b>
-      <button class="btn stop" onclick="resetPassword(${u.id}, '${esc(u.username)}')">New password</button>
-      <button class="btn used" onclick="removeUser(${u.id}, '${esc(u.username)}')">Remove</button></div>`).join('')
-    || '<p class="hint">No scanner logins yet. Add one below for each volunteer or scanning phone.</p>';
-}
-$('addUser').onsubmit = async e => {
-  e.preventDefault();
-  const r = await authFetch(`${API}/admin/scanner-users`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: $('newUser').value, password: $('newPass').value }) });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) return alert(d.error || 'Could not add the login.');
-  alert(`Login created.
-
-Username: ${$('newUser').value.trim().toLowerCase()}
-Password: the one you typed
-
-The volunteer logs in at the staff login page and goes straight to this scanner.`);
-  $('newUser').value = ''; $('newPass').value = '';
-  loadUsers();
-};
-async function resetPassword(id, name) {
-  const password = prompt(`New password for ${name} (8+ characters):`);
-  if (password === null) return;
-  const r = await authFetch(`${API}/admin/scanner-users/${id}/password`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
-  const d = await r.json().catch(() => ({}));
-  alert(r.ok ? `Password changed for ${name}.` : (d.error || 'Could not change the password.'));
-}
-async function removeUser(id, name) {
-  if (!confirm(`Remove the scanner login "${name}"? That volunteer can no longer log in.`)) return;
-  const r = await authFetch(`${API}/admin/scanner-users/${id}`, { method: 'DELETE' });
-  if (!r.ok) alert((await r.json().catch(() => ({}))).error || 'Could not remove it.');
-  loadUsers();
-}
-
-if (IS_ADMIN) { $('usersCard').hidden = false; loadUsers(); }
-else { $('homeBtn').hidden = true; $('logoutBtn').hidden = false; }
+// Scanner-only accounts get a Log out button instead of Admin Home.
+if (sessionStorage.getItem('user_role') === 'scanner') { $('homeBtn').hidden = true; $('logoutBtn').hidden = false; }
 
 setMode(mode);
 </script>

@@ -4,21 +4,12 @@
 //  2. Sweet boxes: one box per adult. The pass is marked as used once the boxes are given. Before
 //     that, the family should have checked in (and paid, and the counter should be open); an admin
 //     can still give the boxes after confirming. Only an admin can mark either step as not done again.
-// Volunteers can get "scanner" logins: they may only scan (check-in and sweet boxes). Overriding a
-// warning ("Give anyway") and undoing a scan stay with admins.
+// Who may do what comes from staff accounts (staff.js): "scan" to scan, "scan_override" to give
+// boxes anyway and to undo a scan; full admins can do everything.
 const { sweetsPassCode, readSweetsPass, SWEETS_OPEN_AT, SWEETS_START_AT, sweetsOpen } = require("./booking-link");
 
-module.exports = function registerSweets(app, { pool, requireAdmin, authenticateToken, bcrypt, wa }) {
-  function requireScanner(req, res, next) {
-    authenticateToken(req, res, () => ["scanner", "admin"].includes(req.user.role) ? next() : res.status(403).json({ error: "Scanner access required" }));
-  }
-
+module.exports = function registerSweets(app, { pool, requirePerm, hasPerm, wa }) {
   async function ensureSweetsTable() {
-    // Allow the "scanner" role next to admin and vendor.
-    const checks = await pool.query(`SELECT conname FROM pg_constraint WHERE conrelid = 'users'::regclass AND contype = 'c'
-      AND pg_get_constraintdef(oid) ILIKE '%role%'`);
-    for (const { conname } of checks.rows) await pool.query(`ALTER TABLE users DROP CONSTRAINT "${conname}"`);
-    await pool.query("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin', 'vendor', 'scanner'))");
     await pool.query(`CREATE TABLE IF NOT EXISTS event_sweet_collections (
       registration_id INTEGER PRIMARY KEY REFERENCES event_registrations(id) ON DELETE CASCADE,
       boxes INTEGER NOT NULL,
@@ -72,7 +63,7 @@ module.exports = function registerSweets(app, { pool, requireAdmin, authenticate
   });
 
   // Entrance: shows who is registered and marks the registration as checked in (once).
-  app.post("/admin/checkin/scan", requireScanner, async (req, res) => {
+  app.post("/admin/checkin/scan", requirePerm("scan"), async (req, res) => {
     try {
       const id = readSweetsPass(req.body?.code);
       const r = id && await registrationWithCollection(id);
@@ -87,7 +78,7 @@ module.exports = function registerSweets(app, { pool, requireAdmin, authenticate
   });
 
   // Admin only: undo a check-in (for example after scanning the wrong code).
-  app.delete("/admin/checkin/:id", requireAdmin, async (req, res) => {
+  app.delete("/admin/checkin/:id", requirePerm("scan_override"), async (req, res) => {
     try {
       const q = await pool.query("DELETE FROM event_checkins WHERE registration_id = $1 RETURNING registration_id", [req.params.id]);
       if (!q.rows.length) return res.status(404).json({ error: "This registration is not checked in." });
@@ -98,9 +89,9 @@ module.exports = function registerSweets(app, { pool, requireAdmin, authenticate
   // Sweet boxes: gives boxes (and marks the pass used) only once per registration. If the counter is
   // not open yet, the family has not checked in, or the registration is unpaid, the details are shown
   // first and the pass is only marked when the admin confirms with force.
-  app.post("/admin/sweets/scan", requireScanner, async (req, res) => {
+  app.post("/admin/sweets/scan", requirePerm("scan"), async (req, res) => {
     try {
-      const force = !!req.body?.force && req.user.role === "admin"; // only admins can give anyway
+      const force = !!req.body?.force && hasPerm(req, "scan_override"); // "Give anyway" needs that access
       const id = readSweetsPass(req.body?.code);
       const r = id && await registrationWithCollection(id);
       if (!r) return res.status(404).json({ result: "INVALID", error: "This is not a valid Diwali QR code." });
@@ -122,7 +113,7 @@ module.exports = function registerSweets(app, { pool, requireAdmin, authenticate
   });
 
   // Admin only: make a used pass usable again (for example after a scan by mistake).
-  app.delete("/admin/sweets/:id", requireAdmin, async (req, res) => {
+  app.delete("/admin/sweets/:id", requirePerm("scan_override"), async (req, res) => {
     try {
       const q = await pool.query("DELETE FROM event_sweet_collections WHERE registration_id = $1 RETURNING registration_id", [req.params.id]);
       if (!q.rows.length) return res.status(404).json({ error: "This pass is not marked as used." });
@@ -131,7 +122,7 @@ module.exports = function registerSweets(app, { pool, requireAdmin, authenticate
   });
 
   // Totals for the scanner page.
-  app.get("/admin/sweets/summary", requireScanner, async (req, res) => {
+  app.get("/admin/sweets/summary", requirePerm("scan"), async (req, res) => {
     try {
       const q = await pool.query(`SELECT
           COUNT(*)::int AS registrations,
@@ -151,53 +142,13 @@ module.exports = function registerSweets(app, { pool, requireAdmin, authenticate
   });
 
   // The ready-written WhatsApp message with one family's QR link (Registrations page button).
-  app.get("/admin/sweets/:id/whatsapp", requireAdmin, async (req, res) => {
+  app.get("/admin/sweets/:id/whatsapp", requirePerm("registrations", "messages"), async (req, res) => {
     try {
       const q = await pool.query(`SELECT r.*, GREATEST(r.total_amount - r.paid_amount, 0) AS amount_due, a.swish_number
         FROM event_registrations r LEFT JOIN event_swish_accounts a ON a.id = r.swish_account_id WHERE r.id = $1`, [req.params.id]);
       if (!q.rows.length) return res.status(404).json({ error: "Registration not found" });
       const r = q.rows[0];
       res.json({ digits: wa.whatsappDigits(r.whatsapp), whatsapp: r.whatsapp, code: sweetsPassCode(r.id), text: wa.MESSAGES.SWEETS_PASS(r) });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-  });
-
-  /* ---------- Scanner logins (admin only) ---------- */
-
-  app.get("/admin/scanner-users", requireAdmin, async (req, res) => {
-    try {
-      const q = await pool.query("SELECT id, username FROM users WHERE role = 'scanner' ORDER BY username");
-      res.json(q.rows);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-  });
-
-  app.post("/admin/scanner-users", requireAdmin, async (req, res) => {
-    const username = String(req.body?.username || "").trim().toLowerCase();
-    const password = String(req.body?.password || "");
-    if (!/^[a-z0-9._-]{3,40}$/.test(username)) return res.status(400).json({ error: "Username: 3 to 40 letters or numbers (no spaces)." });
-    if (password.length < 8) return res.status(400).json({ error: "The password must be at least 8 characters." });
-    try {
-      const taken = await pool.query("SELECT 1 FROM users WHERE username = $1", [username]);
-      if (taken.rows.length) return res.status(409).json({ error: "That username is already taken." });
-      await pool.query("INSERT INTO users(username, password, role) VALUES($1, $2, 'scanner')", [username, await bcrypt.hash(password, 12)]);
-      res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-  });
-
-  app.put("/admin/scanner-users/:id/password", requireAdmin, async (req, res) => {
-    const password = String(req.body?.password || "");
-    if (password.length < 8) return res.status(400).json({ error: "The password must be at least 8 characters." });
-    try {
-      const q = await pool.query("UPDATE users SET password = $1 WHERE id = $2 AND role = 'scanner' RETURNING id", [await bcrypt.hash(password, 12), req.params.id]);
-      if (!q.rows.length) return res.status(404).json({ error: "Scanner login not found." });
-      res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-  });
-
-  app.delete("/admin/scanner-users/:id", requireAdmin, async (req, res) => {
-    try {
-      const q = await pool.query("DELETE FROM users WHERE id = $1 AND role = 'scanner' RETURNING id", [req.params.id]);
-      if (!q.rows.length) return res.status(404).json({ error: "Scanner login not found." });
-      res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 

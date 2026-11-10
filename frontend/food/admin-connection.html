@@ -87,7 +87,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
 <script src="auth.js"></script>
 <script>
-checkAuth('admin');
+checkAuth('games');
 const API = '/food-api';
 // ?game=clue manages the Clue game (text clues); otherwise the Connection game (images).
 const GAME = new URLSearchParams(location.search).get('game') === 'clue' ? 'clue' : 'connection';

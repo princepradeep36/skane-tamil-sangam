@@ -189,7 +189,7 @@ th{background:#f8fafc}
 
 <script src="auth.js"></script>
 <script>
-checkAuth('admin');
+checkAuth('messages');
 const API = '/food-api';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const KIND_NAMES = { REGISTRATION: 'Registration confirmed', PAYMENT_RECEIVED: 'Payment received', PAYMENT_OPEN: 'Payment is open', PAYMENT_REMINDER: 'Payment reminder', SWEETS_PASS: 'Welcome + Diwali QR code', CUSTOM: 'Own message' };

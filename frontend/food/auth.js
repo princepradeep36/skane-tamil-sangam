@@ -1,4 +1,18 @@
 /** JWT authentication helper for staff pages. */
+// Admin areas a staff account can be given (see backend/food/staff.js). Full admins can open all of them.
+const STAFF_AREAS = ["registrations", "swish", "messages", "scan", "scan_override", "games", "food", "settings"];
+
+function userPerms() {
+  try { return JSON.parse(sessionStorage.getItem("user_perms") || "[]") || []; } catch (e) { return []; }
+}
+// True when the logged-in user may use this admin area.
+function hasAccess(area) {
+  const role = sessionStorage.getItem("user_role");
+  if (role === "admin") return true;
+  if (role === "scanner") return area === "scan";
+  return role === "staff" && userPerms().includes(area);
+}
+
 function checkAuth(requiredRole) {
   window.addEventListener("pageshow", e => { if (e.persisted) validateSession(requiredRole); });
   validateSession(requiredRole);
@@ -8,8 +22,14 @@ function validateSession(requiredRole) {
   const token=sessionStorage.getItem("auth_token");
   if (!role || !token) return logout();
   if (requiredRole === "admin" && role !== "admin") return logout();
-  if (requiredRole === "vendor" && !["vendor","admin"].includes(role)) return logout();
-  if (requiredRole === "scanner" && !["scanner","admin"].includes(role)) return logout();
+  if (requiredRole === "vendor" && !["vendor","admin"].includes(role) && !hasAccess("food")) return logout();
+  // Admin Home: full admins and staff accounts.
+  if (requiredRole === "staff" && !["admin","staff","scanner"].includes(role)) return logout();
+  // A page for one admin area: staff without that area go back to Admin Home.
+  if (STAFF_AREAS.includes(requiredRole) && !hasAccess(requiredRole)) {
+    if (["staff","scanner"].includes(role)) return window.location.replace("admin.html");
+    return logout();
+  }
 }
 async function authFetch(url, options={}) {
   const token=sessionStorage.getItem("auth_token");

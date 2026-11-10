@@ -164,6 +164,9 @@
         .card:nth-child(10) { --accent: #7c3aed; --tint: #ede9fe; }
         .card:nth-child(11) { --accent: #ea580c; --tint: #ffedd5; }
         .card:nth-child(12) { --accent: #0891b2; --tint: #cffafe; }
+        .card:nth-child(13) { --accent: #334155; --tint: #e2e8f0; }
+        .card[hidden] { display: none; }
+        .who { margin: -18px 0 24px; color: #64748b; font-size: .9rem; }
 
         @media (max-width: 560px) {
             body { align-items: flex-start; padding-top: 76px; }
@@ -185,6 +188,7 @@
         <div class="badge">Skåne Tamil Sangam · Diwali 2026</div>
         <h1>Click2Eat Admin Portal</h1>
         <p class="subtitle">Manage event registrations, food stalls and orders</p>
+        <p class="who" id="who" hidden></p>
 
         <div class="grid">
             <a href="admin-orders.html?admin=true" class="card">
@@ -251,14 +255,37 @@
                 <div class="title">Clue Game</div>
                 <div class="desc">Stage game with text clues shown one by one; players join by QR code and buzz in</div>
             </a>
+
+            <a href="admin-staff.html?admin=true" class="card" data-area="admin">
+                <div class="icon">👥</div>
+                <div class="title">Staff Accounts</div>
+                <div class="desc">Create logins for volunteers and choose which admin options each one can use</div>
+            </a>
         </div>
     </div>
 
     <script src="auth.js"></script>
     <script>
-        checkAuth('admin');
+        checkAuth('staff');
 
         const API = '/food-api';
+        // Staff accounts only see the cards for the areas they were given.
+        const CARD_AREAS = {
+            'admin-orders.html': 'food', 'admin-vendors.html': 'food', 'vendor-live.html': 'food', 'vendor-stats.html': 'food',
+            'admin-event-registrations.html': 'registrations', 'admin-event-summary.html': 'registrations',
+            'admin-event-swish.html': 'swish', 'admin-event-email.html': 'messages', 'admin-settings.html': 'settings',
+            'admin-sweets.html': 'scan', 'admin-connection.html': 'games', 'admin-staff.html': 'admin'
+        };
+        const role = sessionStorage.getItem('user_role');
+        document.querySelectorAll('.grid .card').forEach(card => {
+            const area = CARD_AREAS[card.getAttribute('href').split('?')[0]];
+            card.hidden = area === 'admin' ? role !== 'admin' : !hasAccess(area);
+        });
+        if (role !== 'admin') {
+            const who = document.getElementById('who');
+            who.hidden = false;
+            who.textContent = 'You can use the options below. Ask an admin if you need more.';
+        }
     </script>
 </body>
 

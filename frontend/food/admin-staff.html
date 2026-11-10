@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Staff Accounts</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f4f7f9;color:#1c1c1e}
+.wrap{max-width:900px;margin:0 auto;padding:20px 16px 40px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.top h1{margin:0;font-size:1.6rem}
+.top p{margin:4px 0 0;color:#667085}
+.btn{display:inline-block;border:0;border-radius:10px;padding:10px 14px;font-weight:700;text-decoration:none;cursor:pointer;font-size:.95rem}
+.back{background:#476cff;color:#fff}
+.primary{background:#16a34a;color:#fff}
+.ghost{background:#eef2f7;color:#1f2937}
+.danger{background:#fee2e2;color:#991b1b}
+.card{background:#fff;border-radius:16px;padding:18px;box-shadow:0 3px 12px #0001;margin-top:18px}
+.card h2{margin:0 0 4px;font-size:1.15rem}
+.hint{color:#667085;font-size:.88rem;margin:0}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.fields label{display:flex;flex-direction:column;gap:4px;font-weight:700;font-size:.85rem}
+.fields input{padding:10px 12px;border:1px solid #d0d5dd;border-radius:10px;font-size:15px;font-weight:normal}
+.areas{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.areas label{display:flex;gap:8px;align-items:flex-start;border:1px solid #e5e7eb;border-radius:10px;padding:9px 10px;cursor:pointer;font-size:.92rem;line-height:1.35}
+.areas input{margin-top:3px;width:17px;height:17px;flex:0 0 auto}
+.areas label:has(input:checked){border-color:#16a34a;background:#f0fdf4}
+.presets{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.presets button{padding:7px 10px;font-size:.82rem}
+.actions{display:flex;gap:10px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+.user{border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-top:12px}
+.user-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.user-head b{font-size:1.1rem;word-break:break-all}
+.empty{color:#667085;padding:12px 0}
+.msg{margin-top:10px;font-weight:700;color:#166534;min-height:1.2em}
+@media(max-width:640px){.fields,.areas{grid-template-columns:1fr}}
+</style>
+<link rel="stylesheet" href="../responsive.css?v=20261015">
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div><h1>👥 Staff Accounts</h1><p>Logins for volunteers and helpers. Tick which admin options each one may use.</p></div>
+    <a class="btn back" href="admin.html?admin=true">Admin Home</a>
+  </div>
+
+  <form class="card" id="addForm">
+    <h2>Add a staff account</h2>
+    <p class="hint">They log in on the normal staff login page. A changed or removed account takes effect straight away.</p>
+    <div class="fields">
+      <label>Username<input id="newUser" placeholder="e.g. gate1 or priya" autocomplete="off" autocapitalize="off" required></label>
+      <label>Password (8+ characters)<input id="newPass" autocomplete="new-password" required minlength="8"></label>
+    </div>
+    <div class="presets" aria-label="Quick choices">
+      <span class="hint" style="align-self:center">Quick choice:</span>
+      <button type="button" class="btn ghost" data-preset="scan">Entrance / sweets scanner</button>
+      <button type="button" class="btn ghost" data-preset="scan,scan_override">Scanner + give anyway</button>
+      <button type="button" class="btn ghost" data-preset="registrations,swish,messages">Registrations team</button>
+      <button type="button" class="btn ghost" data-preset="games">Stage games</button>
+      <button type="button" class="btn ghost" data-preset="food">Food team</button>
+    </div>
+    <div class="areas" id="newAreas"></div>
+    <div class="actions"><button class="btn primary" type="submit">+ Create account</button></div>
+    <div class="msg" id="addMsg"></div>
+  </form>
+
+  <div class="card">
+    <h2>Staff accounts</h2>
+    <p class="hint">Full admins are not listed here; they can always use everything.</p>
+    <div id="list"><p class="empty">Loading…</p></div>
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script>
+checkAuth('admin');
+const API = '/food-api';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const json = { 'Content-Type': 'application/json' };
+let PERMS = {};
+
+const areaBoxes = (name, chosen = []) => Object.entries(PERMS).map(([key, label]) =>
+  `<label><input type="checkbox" name="${name}" value="${key}" ${chosen.includes(key) ? 'checked' : ''}><span>${esc(label)}</span></label>`).join('');
+const ticked = scope => [...scope.querySelectorAll('input[type=checkbox]:checked')].map(i => i.value);
+
+async function load() {
+  const r = await authFetch(`${API}/admin/staff`, { cache: 'no-store' });
+  const d = await r.json();
+  PERMS = d.permissions;
+  if (!$('newAreas').children.length) $('newAreas').innerHTML = areaBoxes('new');
+  $('list').innerHTML = d.users.map(u => `<div class="user" data-id="${u.id}">
+      <div class="user-head"><b>${esc(u.username)}</b>
+        <span><button type="button" class="btn ghost" onclick="newPassword(${u.id}, '${esc(u.username)}')">New password</button>
+        <button type="button" class="btn danger" onclick="removeUser(${u.id}, '${esc(u.username)}')">Remove</button></span></div>
+      <div class="areas">${areaBoxes('u' + u.id, u.permissions)}</div>
+      <div class="actions"><button type="button" class="btn primary" onclick="saveAreas(${u.id})">Save access</button></div>
+      <div class="msg" id="msg${u.id}"></div>
+    </div>`).join('') || '<p class="empty">No staff accounts yet. Add the first one above.</p>';
+}
+
+document.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => {
+  const want = b.dataset.preset.split(',');
+  $('newAreas').querySelectorAll('input').forEach(i => { i.checked = want.includes(i.value); });
+});
+
+$('addForm').onsubmit = async e => {
+  e.preventDefault();
+  const body = { username: $('newUser').value, password: $('newPass').value, permissions: ticked($('newAreas')) };
+  const r = await authFetch(`${API}/admin/staff`, { method: 'POST', headers: json, body: JSON.stringify(body) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { $('addMsg').style.color = '#b42318'; $('addMsg').textContent = d.error || 'Could not create the account.'; return; }
+  $('addMsg').style.color = '#166534';
+  $('addMsg').textContent = `✓ Account "${body.username.trim().toLowerCase()}" created. Give them the username and password you typed.`;
+  $('newUser').value = ''; $('newPass').value = '';
+  $('newAreas').querySelectorAll('input').forEach(i => { i.checked = false; });
+  load();
+};
+
+async function saveAreas(id) {
+  const box = document.querySelector(`.user[data-id="${id}"]`);
+  const r = await authFetch(`${API}/admin/staff/${id}/permissions`, { method: 'PUT', headers: json, body: JSON.stringify({ permissions: ticked(box) }) });
+  const d = await r.json().catch(() => ({}));
+  const msg = $('msg' + id);
+  msg.style.color = r.ok ? '#166534' : '#b42318';
+  msg.textContent = r.ok ? '✓ Saved. It applies straight away.' : (d.error || 'Could not save.');
+}
+
+async function newPassword(id, name) {
+  const password = prompt(`New password for ${name} (8+ characters):`);
+  if (password === null) return;
+  const r = await authFetch(`${API}/admin/staff/${id}/password`, { method: 'PUT', headers: json, body: JSON.stringify({ password }) });
+  const d = await r.json().catch(() => ({}));
+  alert(r.ok ? `Password changed for ${name}.` : (d.error || 'Could not change the password.'));
+}
+
+async function removeUser(id, name) {
+  if (!confirm(`Remove the account "${name}"? They will not be able to log in any more.`)) return;
+  const r = await authFetch(`${API}/admin/staff/${id}`, { method: 'DELETE' });
+  if (!r.ok) alert((await r.json().catch(() => ({}))).error || 'Could not remove it.');
+  load();
+}
+
+load();
+</script>
+</body>
+</html>
