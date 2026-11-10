@@ -35,14 +35,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-s
 /* Rules slide (lobby, before the game starts) */
 .rules-body{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3vh}
 .rules{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1.8vh;width:min(86vw,1400px);counter-reset:r}
-.rules li{counter-increment:r;display:flex;gap:2vw;align-items:center;background:rgba(255,255,255,.1);border-radius:1.8vh;padding:1.8vh 2.4vw;font-size:3.6vh;font-weight:700;line-height:1.3}
+.rules li{counter-increment:r;display:flex;gap:2vw;align-items:center;background:rgba(255,255,255,.1);border-radius:1.8vh;padding:1.4vh 2.4vw;font-size:3.3vh;font-weight:700;line-height:1.3}
 .rules li::before{content:counter(r);flex:0 0 auto;width:6.4vh;height:6.4vh;border-radius:50%;background:#ffc107;color:#3d2c06;display:flex;align-items:center;justify-content:center;font-size:3.4vh;font-weight:900}
 body.clue .rules li{background:linear-gradient(90deg,#b3203d,#9a1a34);border-left:.8vh solid #f6c343}
 body.clue .rules li::before{background:#f6c343;color:#3d0815}
-body.clue .rules{gap:1.2vh}
-body.clue .rules li{font-size:3.1vh;font-weight:500;padding:1.2vh 2.2vw}
+body.clue .rules{gap:1vh}
+body.clue .rules li{font-size:2.8vh;font-weight:500;padding:1vh 2.2vw}
 body.clue .rules li b{font-weight:800;color:#f6c343}
-body.clue .rules li::before{width:5.4vh;height:5.4vh;font-size:3vh}
+body.clue .rules li::before{width:4.8vh;height:4.8vh;font-size:2.7vh}
 body.clue .rules-body{gap:2vh;justify-content:flex-start;padding-top:1.5vh}
 .rules-body .howto.points{margin:0}
 .rules-body .howto .pts{font-size:3.2vh;padding:1.6vh 2vw}
@@ -181,6 +181,7 @@ const RULES = [
   'When your name appears here and your phone says <b>It&#39;s your turn</b>, say your answer out loud.',
   'Wrong answer? The next person in line gets a chance. <b>One try per question</b> for each player.',
   GAME === 'clue' ? 'The sooner you guess, the more points you get (see below).' : 'Each correct answer is <b>1 point</b>. The highest score wins!',
+  'Same points? Whoever reached that score <b>first</b> ranks higher.',
   "The quiz master's decision is final. Have fun! 🎉"
 ];
 $('rulesList').innerHTML = RULES.map(r => `<li><span>${r}</span></li>`).join('');

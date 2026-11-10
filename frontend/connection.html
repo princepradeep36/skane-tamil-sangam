@@ -95,6 +95,7 @@ const HOW_TO_PLAY = `<div class="howto"><h2>How to play</h2><ol>
   <li><span>🏆</span><div>${GAME === 'clue'
     ? 'The sooner you guess, the more points you get. The highest score wins!'
     : 'Each correct answer is 1 point. The highest score wins!'}</div></li>
+  <li><span>⏱️</span><div>Same points? Whoever reached that score first ranks higher.</div></li>
 </ol>${GAME === 'clue' ? POINT_CARDS : ''}</div>`;
 
 function showJoin(status) {

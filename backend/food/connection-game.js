@@ -30,7 +30,8 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
     return {
       status: "IDLE", // IDLE → LOBBY → PLAYING → ENDED
       showRules: false, // in the lobby, the stage shows the rules instead of the QR code
-      players: new Map(), // token → { id, name, score }
+      players: new Map(), // token → { id, name, score, reachedAt }
+      scoreTick: 0, // counts correct answers, so equal scores can be ranked by who reached them first
       questions: [], // [{ id, answer, imageIds, clues }], loaded when the game starts
       qIndex: -1,
       imageIndex: 0, // the image or clue being shown
@@ -46,7 +47,10 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
   const currentQuestion = () => game.questions[game.qIndex] || null;
   const answeringEntry = () => (game.status === "PLAYING" && !game.revealed ? game.queue.find(e => !e.result) || null : null);
   const worth = () => (CLUES ? Math.max(1, CLUES_PER_QUESTION - game.imageIndex) : 1);
-  const leaderboard = () => [...game.players.values()].filter(p => p.score > 0).sort((a, b) => b.score - a.score).map(p => ({ name: p.name, score: p.score }));
+  // Highest score first; on equal scores, whoever reached that score first ranks higher.
+  const byRank = (a, b) => b.score - a.score || a.reachedAt - b.reachedAt;
+  const ranked = () => [...game.players.values()].filter(p => p.score > 0).sort(byRank);
+  const leaderboard = () => ranked().map(p => ({ name: p.name, score: p.score }));
 
   function showImage(index) {
     const q = currentQuestion();
@@ -103,7 +107,7 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
     let name = wanted;
     for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${wanted} ${n}`;
     const token = crypto.randomBytes(16).toString("hex");
-    const player = { id: nextPlayerId++, name, score: 0 };
+    const player = { id: nextPlayerId++, name, score: 0, reachedAt: 0 };
     game.players.set(token, player);
     res.json({ token, name });
   });
@@ -292,7 +296,8 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       secretAnswer: q ? q.answer : null,
       secretTamil: q && q.details ? q.details.answerTamil : "",
       allClues: q && CLUES ? q.clues : [],
-      players: [...game.players.values()].map(p => ({ name: p.name, score: p.score })).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)),
+      players: [...ranked(), ...[...game.players.values()].filter(p => !p.score).sort((a, b) => a.name.localeCompare(b.name))]
+        .map(p => ({ name: p.name, score: p.score })),
       hasMoreQuestions: game.qIndex + 1 < game.questions.length
     };
   }
@@ -331,7 +336,7 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
           answering.result = "CORRECT";
           game.awarded = worth();
           const player = [...game.players.values()].find(p => p.id === answering.playerId);
-          if (player) player.score += game.awarded;
+          if (player) { player.score += game.awarded; player.reachedAt = ++game.scoreTick; }
           game.revealed = true;
         } else if (action === "reveal") game.revealed = true;
         else if (action === "next-question") {
