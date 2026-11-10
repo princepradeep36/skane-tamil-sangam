@@ -17,6 +17,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ari
 .modes button{flex:1;border:0;background:transparent;padding:12px 8px;border-radius:10px;font-size:1rem;font-weight:800;color:#555;cursor:pointer}
 .modes button.active{background:#fff;color:#0056b3;box-shadow:0 2px 8px rgba(0,0,0,.08)}
 .modes button.active.sweets{color:#c2410c}
+.modes[hidden],.modes button[hidden]{display:none}
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
 .stat{background:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 2px 10px #0001}
 .stat b{display:block;font-size:1.5rem}
@@ -66,7 +67,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ari
 </head>
 <body>
 <div class="wrap">
-  <div class="top"><h1>🎟️ Diwali QR Scanner</h1><a class="btn back" id="homeBtn" href="admin.html?admin=true">Admin Home</a><button class="btn logout" id="logoutBtn" hidden onclick="logout()">Log out</button></div>
+  <div class="top"><h1 id="pageTitle">🎟️ Diwali QR Scanner</h1><a class="btn back" id="homeBtn" href="admin.html?admin=true">Admin Home</a><button class="btn logout" id="logoutBtn" hidden onclick="logout()">Log out</button></div>
 
   <div class="modes" role="tablist">
     <button type="button" data-mode="checkin" role="tab">🎟️ Entrance check-in</button>
@@ -116,9 +117,16 @@ const openText = d => new Date(d).toLocaleString('en-GB', { timeZone: 'Europe/St
 
 // The same family QR code is scanned twice: at the entrance (check-in) and at the sweets counter.
 // Each scanning phone stays in the mode it was last set to.
+// A staff account may have only one of the two scanner functions: then only that tab is shown.
 let mode = new URLSearchParams(location.search).get('mode');
 if (!['checkin', 'sweets'].includes(mode)) { try { mode = localStorage.getItem('qrScannerMode'); } catch (e) {} }
-if (!['checkin', 'sweets'].includes(mode)) mode = 'checkin';
+function applyAllowedModes() {
+  const allowed = ['checkin', 'sweets'].filter(hasAccess);
+  document.querySelectorAll('.modes button').forEach(b => { b.hidden = !allowed.includes(b.dataset.mode); });
+  document.querySelector('.modes').hidden = allowed.length < 2;
+  if (!allowed.includes(mode)) mode = allowed[0] || 'checkin';
+}
+applyAllowedModes();
 
 let scanner = null;
 let busy = false; // a result is on screen: ignore the camera until "Scan next"
@@ -129,6 +137,9 @@ function setMode(m) {
   mode = m;
   try { localStorage.setItem('qrScannerMode', m); } catch (e) {}
   document.querySelectorAll('.modes button').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+  $('pageTitle').textContent = document.querySelector('.modes').hidden
+    ? (m === 'checkin' ? '🎟️ Entrance check-in' : '🎁 Sweet boxes')
+    : '🎟️ Diwali QR Scanner';
   $('modeHint').textContent = m === 'checkin'
     ? 'Entrance: scan the family’s QR code to check in their registration and see how many adults and kids are registered.'
     : 'Sweets counter: scan the same QR code to give one sweet box per adult, once. Families should check in at the entrance first.';
@@ -307,6 +318,7 @@ $('manualForm').onsubmit = e => {
 if (sessionStorage.getItem('user_role') === 'scanner') { $('homeBtn').hidden = true; $('logoutBtn').hidden = false; }
 
 setMode(mode);
+if (sessionStorage.getItem('user_role') !== 'admin') refreshAccess(() => { applyAllowedModes(); setMode(mode); });
 </script>
 </body>
 </html>

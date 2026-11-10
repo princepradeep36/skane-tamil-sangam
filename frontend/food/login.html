@@ -190,7 +190,7 @@
                 } else if (data.role === 'staff') {
                     // Straight to the scanner when that is all they may use, otherwise their Admin Home.
                     const perms = data.permissions || [];
-                    window.location.href = perms.length && perms.every(p => p === 'scan' || p === 'scan_override') ? "admin-sweets.html" : "admin.html?admin=true";
+                    window.location.href = perms.length && perms.every(p => ['checkin', 'sweets', 'scan_override'].includes(p)) ? "admin-sweets.html" : "admin.html?admin=true";
                 }
             } catch (err) {
                 errDiv.style.display = "block";

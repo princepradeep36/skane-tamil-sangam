@@ -4,8 +4,8 @@
 //  2. Sweet boxes: one box per adult. The pass is marked as used once the boxes are given. Before
 //     that, the family should have checked in (and paid, and the counter should be open); an admin
 //     can still give the boxes after confirming. Only an admin can mark either step as not done again.
-// Who may do what comes from staff accounts (staff.js): "scan" to scan, "scan_override" to give
-// boxes anyway and to undo a scan; full admins can do everything.
+// Who may do what comes from staff accounts (staff.js): "checkin" for the entrance, "sweets" for the
+// sweets counter, "scan_override" to give boxes anyway and to undo a scan; full admins can do everything.
 const { sweetsPassCode, readSweetsPass, SWEETS_OPEN_AT, SWEETS_START_AT, sweetsOpen } = require("./booking-link");
 
 module.exports = function registerSweets(app, { pool, requirePerm, hasPerm, wa }) {
@@ -63,7 +63,7 @@ module.exports = function registerSweets(app, { pool, requirePerm, hasPerm, wa }
   });
 
   // Entrance: shows who is registered and marks the registration as checked in (once).
-  app.post("/admin/checkin/scan", requirePerm("scan"), async (req, res) => {
+  app.post("/admin/checkin/scan", requirePerm("checkin"), async (req, res) => {
     try {
       const id = readSweetsPass(req.body?.code);
       const r = id && await registrationWithCollection(id);
@@ -89,7 +89,7 @@ module.exports = function registerSweets(app, { pool, requirePerm, hasPerm, wa }
   // Sweet boxes: gives boxes (and marks the pass used) only once per registration. If the counter is
   // not open yet, the family has not checked in, or the registration is unpaid, the details are shown
   // first and the pass is only marked when the admin confirms with force.
-  app.post("/admin/sweets/scan", requirePerm("scan"), async (req, res) => {
+  app.post("/admin/sweets/scan", requirePerm("sweets"), async (req, res) => {
     try {
       const force = !!req.body?.force && hasPerm(req, "scan_override"); // "Give anyway" needs that access
       const id = readSweetsPass(req.body?.code);
@@ -122,7 +122,7 @@ module.exports = function registerSweets(app, { pool, requirePerm, hasPerm, wa }
   });
 
   // Totals for the scanner page.
-  app.get("/admin/sweets/summary", requirePerm("scan"), async (req, res) => {
+  app.get("/admin/sweets/summary", requirePerm("checkin", "sweets"), async (req, res) => {
     try {
       const q = await pool.query(`SELECT
           COUNT(*)::int AS registrations,

@@ -1,13 +1,14 @@
 // Staff accounts with chosen access. Full admins (role "admin") can do everything; a "staff" account
 // can only use the admin areas ticked for it. The ticks are read from the database on every request,
-// so changing or removing an account takes effect straight away. Older "scanner" logins count as
-// staff with only the QR scanner.
+// so changing or removing an account takes effect straight away. Older "scanner" logins, and the
+// older "scan" tick, count as both scanner functions (entrance check-in and sweet boxes).
 
 const PERMISSIONS = {
   registrations: "Event registrations & summary",
   swish: "Event Swish accounts",
   messages: "Event messages (email & WhatsApp)",
-  scan: "QR scanner: entrance check-in & sweet boxes",
+  checkin: "QR scanner: entrance check-in",
+  sweets: "QR scanner: sweet boxes",
   scan_override: "QR scanner: “Give anyway” & undo",
   games: "Stage games (Connection & Clue)",
   food: "Food: orders, vendors, menus, live dashboard, sales",
@@ -15,15 +16,16 @@ const PERMISSIONS = {
 };
 
 module.exports = function registerStaff({ app, pool, authenticateToken, requireAdmin, bcrypt }) {
-  const clean = list => [...new Set((Array.isArray(list) ? list : []).filter(p => PERMISSIONS[p]))];
+  const expand = list => [...new Set(list.flatMap(p => (p === "scan" ? ["checkin", "sweets"] : [p])))];
+  const clean = list => [...new Set(expand(Array.isArray(list) ? list : []).filter(p => PERMISSIONS[p]))];
 
   // null means "everything" (full admin).
   async function permissionsOf(user) {
     if (user.role === "admin") return null;
-    if (user.role === "scanner") return ["scan"];
+    if (user.role === "scanner") return ["checkin", "sweets"];
     if (user.role !== "staff") return [];
     const q = await pool.query("SELECT permissions FROM users WHERE id = $1 AND role = 'staff'", [user.userId]);
-    return q.rows.length ? String(q.rows[0].permissions || "").split(",").filter(Boolean) : [];
+    return q.rows.length ? expand(String(q.rows[0].permissions || "").split(",").filter(Boolean)) : [];
   }
 
   // Lets the request through for a full admin or a staff account with any of the given areas.
@@ -53,7 +55,7 @@ module.exports = function registerStaff({ app, pool, authenticateToken, requireA
       const q = await pool.query("SELECT id, username, role, permissions FROM users WHERE role IN ('staff', 'scanner') ORDER BY username");
       res.json({
         permissions: PERMISSIONS,
-        users: q.rows.map(u => ({ id: u.id, username: u.username, permissions: u.role === "scanner" ? ["scan"] : String(u.permissions || "").split(",").filter(Boolean) }))
+        users: q.rows.map(u => ({ id: u.id, username: u.username, permissions: u.role === "scanner" ? ["checkin", "sweets"] : expand(String(u.permissions || "").split(",").filter(Boolean)) }))
       });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });

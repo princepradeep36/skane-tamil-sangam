@@ -277,10 +277,14 @@
             'admin-sweets.html': 'scan', 'admin-connection.html': 'games', 'admin-staff.html': 'admin'
         };
         const role = sessionStorage.getItem('user_role');
-        document.querySelectorAll('.grid .card').forEach(card => {
-            const area = CARD_AREAS[card.getAttribute('href').split('?')[0]];
-            card.hidden = area === 'admin' ? role !== 'admin' : !hasAccess(area);
-        });
+        function showCards() {
+            document.querySelectorAll('.grid .card').forEach(card => {
+                const area = CARD_AREAS[card.getAttribute('href').split('?')[0]];
+                card.hidden = area === 'admin' ? role !== 'admin' : !hasAccess(area);
+            });
+        }
+        showCards();
+        if (role !== 'admin') refreshAccess(showCards);
         if (role !== 'admin') {
             const who = document.getElementById('who');
             who.hidden = false;
