@@ -29,21 +29,32 @@ main{flex:1;display:flex;flex-direction:column;align-items:center;justify-conten
 .panel.bad{background:rgba(220,38,38,.35)}
 .panel.win{background:#16a34a}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,.6)}50%{box-shadow:0 0 0 18px rgba(255,255,255,0)}}
+.howto{width:min(360px,100%);background:rgba(255,255,255,.12);border-radius:18px;padding:16px 18px;text-align:left}
+.howto h2{margin:0 0 10px;font-size:1.1rem;color:#ffd76a}
+.howto ol{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+.howto li{display:flex;gap:10px;align-items:flex-start;line-height:1.4;font-size:.98rem}
+.howto li span{flex:0 0 auto;font-size:1.2rem;line-height:1.3}
 footer{padding:10px 16px 16px;text-align:center;font-size:.9rem;opacity:.85}
 [hidden]{display:none!important}
 </style>
 </head>
 <body>
-<header><b>🪔 Connection Game</b><span id="progress">Skåne Tamil Sangam</span></header>
+<header><b id="gameTitle">🪔 Connection Game</b><span id="progress">Skåne Tamil Sangam</span></header>
 <main id="app"></main>
 <footer id="who"></footer>
 <script>
 const API = '/food-api';
+// ?game=clue runs the Clue game (text clues); otherwise the Connection game (images).
+const GAME = new URLSearchParams(location.search).get('game') === 'clue' ? 'clue' : 'connection';
+const GAME_TITLE = GAME === 'clue' ? '🔎 Clue Game' : '🪔 Connection Game';
+document.getElementById('gameTitle').textContent = GAME_TITLE;
+document.title = `${GAME_TITLE.slice(3)} | Skåne Tamil Sangam`;
+const TOKEN_KEY = `${GAME}Token`;
 const app = document.getElementById('app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const store = {
-  get() { try { return localStorage.getItem('connectionToken'); } catch (e) { return memoryToken; } },
-  set(v) { memoryToken = v; try { v ? localStorage.setItem('connectionToken', v) : localStorage.removeItem('connectionToken'); } catch (e) {} }
+  get() { try { return localStorage.getItem(TOKEN_KEY); } catch (e) { return memoryToken; } },
+  set(v) { memoryToken = v; try { v ? localStorage.setItem(TOKEN_KEY, v) : localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
 };
 let memoryToken = null;
 let lastView = '';
@@ -56,6 +67,17 @@ function render(key, html) {
   app.innerHTML = html;
 }
 
+// Shown on the join, waiting and "not open yet" screens, before the game starts.
+const HOW_TO_PLAY = `<div class="howto"><h2>How to play</h2><ol>
+  <li><span>${GAME === 'clue' ? '🔎' : '🖼️'}</span><div>${GAME === 'clue'
+    ? 'Clues appear on the stage screen one by one. Each new clue makes it easier to guess the answer.'
+    : 'Pictures appear on the stage screen one by one. They are all connected to one answer.'}</div></li>
+  <li><span>✋</span><div>Know the answer? Tap <b>I want to answer</b> on your phone. The fastest tap goes first.</div></li>
+  <li><span>🎤</span><div>When your phone says <b>It's your turn</b> and your name is on the stage screen, say your answer out loud.</div></li>
+  <li><span>🔁</span><div>Wrong answer? The next person in line gets a chance. You get one try per question.</div></li>
+  <li><span>🏆</span><div>Each correct answer is 1 point. The highest score wins!</div></li>
+</ol></div>`;
+
 function showJoin(status) {
   const open = status === 'LOBBY' || status === 'PLAYING';
   document.getElementById('progress').textContent = 'Skåne Tamil Sangam';
@@ -63,17 +85,17 @@ function showJoin(status) {
   if (!open) {
     render('closed' + status, status === 'ENDED'
       ? `<div class="emoji">🎉</div><p class="big">The game has finished</p><p class="sub">Thank you for playing!</p>`
-      : `<div class="emoji">⏳</div><p class="big">The game hasn't opened yet</p><p class="sub">This page will open by itself when it starts. Please keep it open.</p>`);
+      : `<div class="emoji">⏳</div><p class="big">The game hasn't opened yet</p><p class="sub">This page will open by itself when it starts. Please keep it open.</p>${HOW_TO_PLAY}`);
     return;
   }
   if (lastView === 'join') return;
   render('join', `<form class="join" id="joinForm">
       <h1>Join the game</h1><p>Type the name to show on stage.</p>
       <input id="name" maxlength="30" autocomplete="name" placeholder="Your name" required>
-      <button type="submit">Join</button><div class="err" id="err"></div></form>`);
+      <button type="submit">Join</button><div class="err" id="err"></div></form>${HOW_TO_PLAY}`);
   document.getElementById('joinForm').onsubmit = async e => {
     e.preventDefault();
-    const r = await fetch(`${API}/connection/join`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: document.getElementById('name').value }) });
+    const r = await fetch(`${API}/${GAME}/join`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: document.getElementById('name').value }) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { document.getElementById('err').textContent = d.error || 'Could not join. Please try again.'; return; }
     store.set(d.token);
@@ -88,7 +110,7 @@ function showPlayer(me) {
   if (me.turn === 'ANSWERING' && lastTurn !== 'ANSWERING' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
   lastTurn = me.turn;
   if (me.status === 'LOBBY') {
-    return render('lobby', `<div class="emoji">✅</div><p class="big">You're in!</p><p class="sub">Look at the stage screen. The game starts soon.</p>`);
+    return render('lobby', `<div class="emoji">✅</div><p class="big">You're in!</p><p class="sub">Look at the stage screen. The game starts soon.</p>${HOW_TO_PLAY}`);
   }
   if (me.status === 'ENDED') {
     return render('ended' + me.score, `<div class="emoji">🎉</div><p class="big">Thanks for playing!</p><p class="sub">Your score: <b>${me.score}</b></p>`);
@@ -110,7 +132,7 @@ function showPlayer(me) {
   }
   if (me.canBuzz) {
     if (lastView !== 'buzz' + me.questionNumber) {
-      render('buzz' + me.questionNumber, `<button class="buzz" id="buzz">I want<br>to answer</button><p class="sub">Tap if you know the connection. You get one try per question.</p>`);
+      render('buzz' + me.questionNumber, `<button class="buzz" id="buzz">I want<br>to answer</button><p class="sub">Tap if you know the ${GAME === 'clue' ? 'answer' : 'connection'}. You get one try per question.</p>`);
       document.getElementById('buzz').onclick = buzz;
     }
   }
@@ -120,7 +142,7 @@ async function buzz() {
   const btn = document.getElementById('buzz');
   if (btn) btn.disabled = true;
   try {
-    const r = await fetch(`${API}/connection/buzz`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: store.get() }) });
+    const r = await fetch(`${API}/${GAME}/buzz`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: store.get() }) });
     const me = await r.json();
     if (r.ok) showPlayer(me); else lastView = '';
   } catch (e) { lastView = ''; }
@@ -129,7 +151,7 @@ async function buzz() {
 async function tick() {
   try {
     const token = store.get();
-    const r = await fetch(`${API}/connection/me?token=${encodeURIComponent(token || '')}`, { cache: 'no-store' });
+    const r = await fetch(`${API}/${GAME}/me?token=${encodeURIComponent(token || '')}`, { cache: 'no-store' });
     const me = await r.json();
     if (me.needJoin) { store.set(null); showJoin(me.status); } else showPlayer(me);
   } catch (e) { /* network blip: keep what's on screen and retry */ }

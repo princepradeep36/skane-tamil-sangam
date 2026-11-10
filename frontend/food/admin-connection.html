@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Connection Game</title>
+<title>Stage Game</title>
 <style>
 body{font-family:Arial,Helvetica,sans-serif;background:#f4f7f9;margin:0;padding:20px;color:#222}
 .wrap{max-width:1100px;margin:auto}
@@ -42,6 +42,17 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .thumb button{position:absolute;right:3px;top:3px;padding:1px 7px;font-size:13px;background:#dc2626;color:#fff;border-radius:6px;min-height:0}
 .add{width:110px;height:82px;border:2px dashed #cbd5e1;border-radius:8px;display:flex;align-items:center;justify-content:center;text-align:center;color:#475569;font-size:13px;font-weight:bold;cursor:pointer}
 .add input{display:none}
+.clue-list{margin:12px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.clue-list li{display:flex;gap:8px;align-items:center}
+.clue-list .n{flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#e0e7ff;color:#3730a3;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px}
+.clue-list input{flex:1;min-width:0;padding:9px 10px;border:1px solid #d0d5dd;border-radius:8px;font-size:14px}
+.add-clue{display:flex;gap:8px;margin-top:10px}
+.add-clue input{flex:1;min-width:0;padding:9px 10px;border:1.5px dashed #cbd5e1;border-radius:8px;font-size:14px}
+.clue-preview{background:#0f172a;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;min-height:200px}
+.clue-preview div{background:#1e293b;color:#cbd5e1;border-radius:10px;padding:10px 12px;font-size:15px}
+.clue-preview div.shown{background:#334155;color:#fff}
+.clue-preview div.current{background:#fff;color:#003d80;font-weight:bold}
+.clue-preview div small{display:block;font-size:11px;font-weight:bold;opacity:.7;text-transform:uppercase;letter-spacing:.04em}
 .newq{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
 .newq input{flex:1;min-width:220px;padding:11px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:15px}
 [hidden]{display:none!important}
@@ -52,15 +63,15 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <body>
 <div class="wrap">
   <div class="top">
-    <div><h1>🎯 Connection Game</h1><p>Players join by QR code and tap "I want to answer". Answers are given on stage.</p></div>
-    <div class="row"><a class="btn go" href="../connection-screen.html" target="_blank" rel="noopener">🖥️ Open stage screen</a><a class="btn back" href="admin.html?admin=true">Admin Home</a></div>
+    <div><h1 id="pageTitle">🎯 Connection Game</h1><p>Players join by QR code and tap "I want to answer". Answers are given on stage.</p></div>
+    <div class="row"><a class="btn go" id="stageLink" href="../connection-screen.html" target="_blank" rel="noopener">🖥️ Open stage screen</a><a class="btn back" href="admin.html?admin=true">Admin Home</a></div>
   </div>
 
   <div class="card" id="control">Loading…</div>
 
   <div class="card">
     <h2>Questions</h2>
-    <p class="hint" style="margin:0">Each question has several images, shown one at a time, and one answer. Add the answer, then its images in the order to show them.</p>
+    <p class="hint" style="margin:0" id="questionsHint">Each question has several images, shown one at a time, and one answer. Add the answer, then its images in the order to show them.</p>
     <div class="newq"><input id="newAnswer" maxlength="300" placeholder="Answer for a new question, e.g. Pongal"><button class="primary" id="addQ">+ Add question</button></div>
     <div id="questions"></div>
   </div>
@@ -70,7 +81,17 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <script>
 checkAuth('admin');
 const API = '/food-api';
+// ?game=clue manages the Clue game (text clues); otherwise the Connection game (images).
+const GAME = new URLSearchParams(location.search).get('game') === 'clue' ? 'clue' : 'connection';
+const CLUES = GAME === 'clue';
+const ITEM = CLUES ? 'clue' : 'image';
 const $ = id => document.getElementById(id);
+if (CLUES) {
+  document.title = 'Clue Game';
+  $('pageTitle').textContent = '🔎 Clue Game';
+  $('stageLink').href = '../connection-screen.html?game=clue';
+  $('questionsHint').textContent = 'Each question has several text clues, shown one at a time, and one answer. Add the answer, then its clues in the order to show them (easiest clue last).';
+}
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const json = { 'Content-Type': 'application/json' };
 
@@ -79,7 +100,7 @@ let lastState = '';
 
 async function act(action, confirmText) {
   if (confirmText && !confirm(confirmText)) return;
-  const r = await authFetch(`${API}/admin/connection/action`, { method: 'POST', headers: json, body: JSON.stringify({ action }) });
+  const r = await authFetch(`${API}/admin/${GAME}/action`, { method: 'POST', headers: json, body: JSON.stringify({ action }) });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) return alert(d.error || 'That did not work.');
   renderControl(d);
@@ -105,11 +126,13 @@ function renderControl(s) {
     el.innerHTML = `<h2>Question ${s.questionNumber} of ${s.questionTotal} <span class="status">${s.playerCount} players</span></h2>
       <div class="game">
         <div>
-          <div class="preview"><img src="${API}/connection/image/${s.imageId}" alt="Current image"></div>
+          ${CLUES
+            ? `<div class="clue-preview">${s.allClues.map((c, i) => `<div class="${i + 1 === s.imageNumber ? 'current' : i < s.imageNumber ? 'shown' : ''}"><small>Clue ${i + 1} · ${i + 1 === s.imageNumber ? 'on screen now' : i < s.imageNumber ? 'shown' : 'not shown yet'}</small>${esc(c)}</div>`).join('')}</div>`
+            : `<div class="preview"><img src="${API}/${GAME}/image/${s.imageId}" alt="Current image"></div>`}
           <div class="row" style="margin-top:10px;justify-content:space-between">
             <button class="ghost" onclick="act('prev-image')" ${first ? 'disabled' : ''}>← Previous</button>
-            <b>Image ${s.imageNumber} of ${s.imageCount}</b>
-            <button class="primary" onclick="act('next-image')" ${last ? 'disabled' : ''}>Next image →</button>
+            <b>${CLUES ? 'Clue' : 'Image'} ${s.imageNumber} of ${s.imageCount}</b>
+            <button class="primary" onclick="act('next-image')" ${last ? 'disabled' : ''}>Next ${ITEM} →</button>
           </div>
         </div>
         <div>
@@ -137,7 +160,7 @@ function renderControl(s) {
 
 async function poll() {
   try {
-    const r = await authFetch(`${API}/admin/connection/state`, { cache: 'no-store' });
+    const r = await authFetch(`${API}/admin/${GAME}/state`, { cache: 'no-store' });
     if (r.ok) renderControl(await r.json());
   } catch (e) { /* retry on the next tick */ }
 }
@@ -147,14 +170,14 @@ const thumbUrls = new Map();
 
 async function thumb(id) {
   if (!thumbUrls.has(id)) {
-    const r = await authFetch(`${API}/admin/connection/images/${id}`);
+    const r = await authFetch(`${API}/admin/${GAME}/images/${id}`);
     thumbUrls.set(id, URL.createObjectURL(await r.blob()));
   }
   return thumbUrls.get(id);
 }
 
 async function loadQuestions() {
-  const r = await authFetch(`${API}/admin/connection/questions`, { cache: 'no-store' });
+  const r = await authFetch(`${API}/admin/${GAME}/questions`, { cache: 'no-store' });
   const list = await r.json();
   $('questions').innerHTML = list.map((q, i) => `
     <div class="q" data-id="${q.id}">
@@ -165,11 +188,20 @@ async function loadQuestions() {
         <button class="ghost small" onclick="moveQ(${q.id},1)" ${i === list.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>
         <button class="bad small" onclick="deleteQ(${q.id})">Delete</button>
       </div>
+      ${CLUES ? `
+      <ol class="clue-list">
+        ${q.clues.map((c, n) => `<li><span class="n">${n + 1}</span><input type="text" maxlength="500" value="${esc(c.text)}" aria-label="Clue ${n + 1}" onchange="saveClue(${c.id}, this.value)">
+          <button class="ghost small" onclick="moveClue(${c.id},-1)" ${n === 0 ? 'disabled' : ''} aria-label="Move clue up">↑</button>
+          <button class="ghost small" onclick="moveClue(${c.id},1)" ${n === q.clues.length - 1 ? 'disabled' : ''} aria-label="Move clue down">↓</button>
+          <button class="bad small" onclick="deleteClue(${c.id})" aria-label="Remove clue">✕</button></li>`).join('')}
+      </ol>
+      <form class="add-clue" onsubmit="addClue(event, ${q.id})"><input maxlength="500" placeholder="Type clue ${q.clues.length + 1} and press Enter"><button class="primary small" type="submit">+ Add clue</button></form>
+      ${q.clues.length ? '' : '<p class="hint" style="margin:8px 0 0">No clues yet: this question is skipped until it has at least one.</p>'}` : `
       <div class="thumbs">
         ${q.image_ids.map((id, n) => `<div class="thumb"><img data-img="${id}" alt="Image ${n + 1}"><span>${n + 1}</span><button onclick="deleteImage(${id})" aria-label="Remove image">✕</button></div>`).join('')}
         <label class="add">+ Add images<input type="file" accept="image/*" multiple onchange="addImages(${q.id}, this)"></label>
       </div>
-      ${q.image_ids.length ? '' : '<p class="hint" style="margin:8px 0 0">No images yet: this question is skipped until it has at least one.</p>'}
+      ${q.image_ids.length ? '' : '<p class="hint" style="margin:8px 0 0">No images yet: this question is skipped until it has at least one.</p>'}`}
     </div>`).join('') || '<p class="hint">No questions yet. Add the first one above.</p>';
   document.querySelectorAll('img[data-img]').forEach(async img => { img.src = await thumb(Number(img.dataset.img)); });
 }
@@ -177,28 +209,54 @@ async function loadQuestions() {
 $('addQ').onclick = async () => {
   const answer = $('newAnswer').value.trim();
   if (!answer) return alert('Please type the answer first.');
-  const r = await authFetch(`${API}/admin/connection/questions`, { method: 'POST', headers: json, body: JSON.stringify({ answer }) });
+  const r = await authFetch(`${API}/admin/${GAME}/questions`, { method: 'POST', headers: json, body: JSON.stringify({ answer }) });
   if (!r.ok) return alert((await r.json().catch(() => ({}))).error || 'Could not add the question.');
   $('newAnswer').value = '';
   loadQuestions();
 };
 
 async function saveAnswer(id, answer) {
-  const r = await authFetch(`${API}/admin/connection/questions/${id}`, { method: 'PUT', headers: json, body: JSON.stringify({ answer }) });
+  const r = await authFetch(`${API}/admin/${GAME}/questions/${id}`, { method: 'PUT', headers: json, body: JSON.stringify({ answer }) });
   if (!r.ok) { alert((await r.json().catch(() => ({}))).error || 'Could not save the answer.'); loadQuestions(); }
 }
 async function moveQ(id, direction) {
-  await authFetch(`${API}/admin/connection/questions/${id}/move`, { method: 'POST', headers: json, body: JSON.stringify({ direction }) });
+  await authFetch(`${API}/admin/${GAME}/questions/${id}/move`, { method: 'POST', headers: json, body: JSON.stringify({ direction }) });
   loadQuestions();
 }
 async function deleteQ(id) {
-  if (!confirm('Delete this question and its images?')) return;
-  await authFetch(`${API}/admin/connection/questions/${id}`, { method: 'DELETE' });
+  if (!confirm(`Delete this question and its ${ITEM}s?`)) return;
+  await authFetch(`${API}/admin/${GAME}/questions/${id}`, { method: 'DELETE' });
   loadQuestions();
 }
 async function deleteImage(id) {
   if (!confirm('Remove this image?')) return;
-  await authFetch(`${API}/admin/connection/images/${id}`, { method: 'DELETE' });
+  await authFetch(`${API}/admin/${GAME}/images/${id}`, { method: 'DELETE' });
+  loadQuestions();
+}
+
+/* ---------- Clue game: text clues ---------- */
+async function addClue(e, id) {
+  e.preventDefault();
+  const input = e.target.querySelector('input');
+  const text = input.value.trim();
+  if (!text) return;
+  const r = await authFetch(`${API}/admin/${GAME}/questions/${id}/clues`, { method: 'POST', headers: json, body: JSON.stringify({ text }) });
+  if (!r.ok) return alert((await r.json().catch(() => ({}))).error || 'Could not add the clue.');
+  await loadQuestions();
+  // Keep typing the next clue of the same question.
+  document.querySelector(`.q[data-id="${id}"] .add-clue input`)?.focus();
+}
+async function saveClue(id, text) {
+  const r = await authFetch(`${API}/admin/${GAME}/clues/${id}`, { method: 'PUT', headers: json, body: JSON.stringify({ text }) });
+  if (!r.ok) { alert((await r.json().catch(() => ({}))).error || 'Could not save the clue.'); loadQuestions(); }
+}
+async function moveClue(id, direction) {
+  await authFetch(`${API}/admin/${GAME}/clues/${id}/move`, { method: 'POST', headers: json, body: JSON.stringify({ direction }) });
+  loadQuestions();
+}
+async function deleteClue(id) {
+  if (!confirm('Remove this clue?')) return;
+  await authFetch(`${API}/admin/${GAME}/clues/${id}`, { method: 'DELETE' });
   loadQuestions();
 }
 
@@ -231,7 +289,7 @@ async function addImages(id, input) {
   for (const [i, file] of files.entries()) {
     label.firstChild.textContent = `Uploading ${i + 1}/${files.length}…`;
     try {
-      const r = await authFetch(`${API}/admin/connection/questions/${id}/images`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: await shrink(file) });
+      const r = await authFetch(`${API}/admin/${GAME}/questions/${id}/images`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: await shrink(file) });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Could not upload ${file.name}.`);
     } catch (e) { alert(e.message); }
   }

@@ -1274,12 +1274,14 @@ app.put("/admin/order/:id/payment", requireAdmin, async (req, res) => {
 // app.get("/order/:id/details") is already available and public
 
 const ensureConnectionTables = registerConnectionGame(app, { pool, requireAdmin, imageContentType });
+const ensureClueTables = registerConnectionGame(app, { pool, requireAdmin, imageContentType, kind: "clue" });
 const ensureSweetsTable = registerSweets(app, { pool, requireAdmin, wa });
 
 initializeDatabase()
   .then(() => ensureEventRegistrationLifecycle())
   .then(() => mailer.ensureEmailLog())
   .then(() => ensureConnectionTables())
+  .then(() => ensureClueTables())
   .then(() => ensureSweetsTable())
   .then(() => ensureSiteSettings())
   .then(() => app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`)))

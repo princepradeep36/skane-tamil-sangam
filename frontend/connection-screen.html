@@ -23,11 +23,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-s
 .players h2{margin:0 0 2vh;font-size:4.5vh}
 .names{display:flex;flex-wrap:wrap;gap:1vh;overflow:hidden;align-content:flex-start;max-height:62vh}
 .names span{background:rgba(255,255,255,.16);padding:.8vh 1.6vh;border-radius:999px;font-size:2.6vh;font-weight:700}
+.howto{display:flex;gap:2vw;justify-content:center;margin-top:2vh}
+.howto div{background:rgba(255,255,255,.12);border-radius:14px;padding:1.4vh 1.8vw;font-size:2.4vh;font-weight:700;display:flex;gap:1vw;align-items:center}
+.howto b{background:#ffc107;color:#3d2c06;border-radius:50%;width:3.6vh;height:3.6vh;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
 /* Game */
 .bar{display:flex;justify-content:space-between;align-items:center;font-size:3vh;font-weight:800;margin-bottom:1.5vh}
 .bar .q{color:#ffd76a}
 .stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.25);border-radius:20px;overflow:hidden}
 .stage img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+/* Clue game: the clues shown so far, newest highlighted */
+.clues{width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;gap:1.6vh;padding:3vh 4vw;overflow:hidden}
+.clue{display:flex;gap:2vw;align-items:center;background:rgba(255,255,255,.1);border-radius:16px;padding:1.6vh 2vw;font-size:4vh;font-weight:700;line-height:1.25;opacity:.75}
+.clue b{flex:0 0 auto;width:6vh;height:6vh;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:3vh}
+.clue.new{background:#fff;color:#003d80;opacity:1;font-size:5.4vh;box-shadow:0 1vh 3vh rgba(0,0,0,.3)}
+.clue.new b{background:#ffc107;color:#3d2c06}
 .status{margin-top:1.5vh;min-height:13vh;display:flex;align-items:center;justify-content:center;gap:2vw;text-align:center;border-radius:18px;padding:1vh 2vw;font-weight:900}
 .status.answering{background:#16a34a;font-size:6vh}
 .status.answer{background:#ffc107;color:#3d2c06;font-size:7vh}
@@ -43,19 +52,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-s
 </style>
 </head>
 <body>
-<div class="view" id="idle"><p class="title">🪔 Connection Game<small>Skåne Tamil Sangam</small></p><div class="wait">The game will start soon</div></div>
+<div class="view" id="idle"><p class="title"><span class="gt">🪔 Connection Game</span><small>Skåne Tamil Sangam</small></p><div class="wait">The game will start soon</div></div>
 
 <div class="view" id="lobby" hidden>
-  <p class="title">🪔 Connection Game<small>Scan to join!</small></p>
+  <p class="title"><span class="gt">🪔 Connection Game</span><small>Scan to join!</small></p>
   <div class="lobby-body">
     <div class="qr-card"><div id="qr"></div><div class="join-url" id="joinUrl"></div></div>
-    <div class="players"><h2><span id="count">0</span> players joined</h2><div class="names" id="names"></div></div>
+    <div class="players"><h2><span id="count">0</span> <span id="countWord">players</span> joined</h2><div class="names" id="names"></div></div>
   </div>
+  <div class="howto"><div><b>1</b><span>Scan &amp; type your name</span></div><div><b>2</b><span>Know it? Tap <u>I want to answer</u></span></div><div><b>3</b><span>Your name shows: say your answer</span></div><div><b>4</b><span>1 point per correct answer</span></div></div>
 </div>
 
 <div class="view" id="playing" hidden>
   <div class="bar"><span class="q" id="qNum"></span><span id="imgNum"></span></div>
-  <div class="stage"><img id="img" alt="Question image"></div>
+  <div class="stage"><img id="img" alt="Question image"><div class="clues" id="clues" hidden></div></div>
   <div class="status idle" id="status"></div>
 </div>
 
@@ -65,9 +75,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-s
 
 <script>
 const API = '/food-api';
+// ?game=clue runs the Clue game (text clues); otherwise the Connection game (images).
+const GAME = new URLSearchParams(location.search).get('game') === 'clue' ? 'clue' : 'connection';
+const GAME_TITLE = GAME === 'clue' ? '🔎 Clue Game' : '🪔 Connection Game';
+document.querySelectorAll('.gt').forEach(el => { el.textContent = GAME_TITLE; });
+document.title = `${GAME_TITLE.slice(3)} · Stage Screen`;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const $ = id => document.getElementById(id);
-const joinUrl = `${location.origin}/connection.html`;
+const joinUrl = `${location.origin}/connection.html${GAME === 'clue' ? '?game=clue' : ''}`;
 $('joinUrl').textContent = joinUrl.replace(/^https?:\/\//, '');
 if (typeof QRCode !== 'undefined') new QRCode($('qr'), { text: joinUrl, width: 512, height: 512, correctLevel: QRCode.CorrectLevel.M });
 else $('qr').textContent = 'Open the address below to join';
@@ -79,14 +94,19 @@ function render(s) {
   ['idle', 'lobby', 'playing', 'ended'].forEach(v => { $(v).hidden = v !== s.status.toLowerCase(); });
   if (s.status === 'LOBBY') {
     $('count').textContent = s.playerCount;
+    $('countWord').textContent = s.playerCount === 1 ? 'player' : 'players';
     setHtml($('names'), s.playerNames.map(n => `<span>${esc(n)}</span>`).join(''));
   }
   if (s.status === 'PLAYING') {
     $('qNum').textContent = `Question ${s.questionNumber} of ${s.questionTotal}`;
-    $('imgNum').textContent = `Image ${s.imageNumber} of ${s.imageCount}`;
-    if (shownImage !== s.imageId) {
+    $('imgNum').textContent = `${GAME === 'clue' ? 'Clue' : 'Image'} ${s.imageNumber} of ${s.imageCount}`;
+    $('img').hidden = GAME === 'clue';
+    $('clues').hidden = GAME !== 'clue';
+    if (GAME === 'clue') {
+      setHtml($('clues'), s.clues.map((c, i) => `<div class="clue${i === s.clues.length - 1 ? ' new' : ''}"><b>${i + 1}</b><span>${esc(c)}</span></div>`).join(''));
+    } else if (shownImage !== s.imageId) {
       shownImage = s.imageId;
-      $('img').src = `${API}/connection/image/${s.imageId}`;
+      $('img').src = `${API}/${GAME}/image/${s.imageId}`;
     }
     const st = $('status');
     if (s.revealed) {
@@ -97,7 +117,7 @@ function render(s) {
       setHtml(st, `<div>🎤 ${esc(s.answering)}${s.waiting.length ? `<small>Next: ${s.waiting.slice(0, 3).map(esc).join(', ')}${s.waiting.length > 3 ? ` +${s.waiting.length - 3}` : ''}</small>` : ''}</div>`);
     } else {
       st.className = 'status idle';
-      setHtml(st, `<div>Know the connection? Tap <b>I want to answer</b> on your phone!${s.wrong.length ? `<small>Not this time: ${s.wrong.map(esc).join(', ')}</small>` : ''}</div>`);
+      setHtml(st, `<div>Know the ${GAME === 'clue' ? 'answer' : 'connection'}? Tap <b>I want to answer</b> on your phone!${s.wrong.length ? `<small>Not this time: ${s.wrong.map(esc).join(', ')}</small>` : ''}</div>`);
     }
   }
   if (s.status === 'ENDED') {
@@ -107,7 +127,7 @@ function render(s) {
 
 async function tick() {
   try {
-    const r = await fetch(`${API}/connection/screen`, { cache: 'no-store' });
+    const r = await fetch(`${API}/${GAME}/screen`, { cache: 'no-store' });
     if (r.ok) render(await r.json());
   } catch (e) { /* keep showing the last state and retry */ }
 }
