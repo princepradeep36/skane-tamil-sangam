@@ -105,7 +105,7 @@ th{background:#f8fafc}
         <select id="waKind">
           <option value="PAYMENT_REMINDER">Payment reminder</option>
           <option value="PAYMENT_OPEN">Payment is now open</option>
-          <option value="SWEETS_PASS">Welcome + sweet box QR code</option>
+          <option value="SWEETS_PASS">Welcome + Diwali QR code (check-in &amp; sweets)</option>
           <option value="CUSTOM">My own message</option>
         </select>
       </div>
@@ -192,7 +192,7 @@ th{background:#f8fafc}
 checkAuth('admin');
 const API = '/food-api';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const KIND_NAMES = { REGISTRATION: 'Registration confirmed', PAYMENT_RECEIVED: 'Payment received', PAYMENT_OPEN: 'Payment is open', PAYMENT_REMINDER: 'Payment reminder', SWEETS_PASS: 'Welcome + sweet box QR', CUSTOM: 'Own message' };
+const KIND_NAMES = { REGISTRATION: 'Registration confirmed', PAYMENT_RECEIVED: 'Payment received', PAYMENT_OPEN: 'Payment is open', PAYMENT_REMINDER: 'Payment reminder', SWEETS_PASS: 'Welcome + Diwali QR code', CUSTOM: 'Own message' };
 const $ = id => document.getElementById(id);
 let emailReady = false;
 

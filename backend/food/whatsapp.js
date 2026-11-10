@@ -43,9 +43,10 @@ const ALREADY_PAID_NOTE = "💡 *Already paid?* Please open the link above, uplo
 const MESSAGES = {
   PAYMENT_OPEN: r => message(r, "Payment for Diwali 2026 is now open."),
   PAYMENT_REMINDER: r => message(r, "Just a gentle reminder that your registration payment is still pending.", ALREADY_PAID_NOTE),
-  // Welcome message with the family's personal QR code for collecting the Diwali sweet boxes.
+  // Welcome message with the family's personal QR code, used at the entrance (check-in) and at the
+  // sweets counter (one box per adult).
   SWEETS_PASS: r => {
-    const boxes = Number(r.adults_count) || 0;
+    const adults = Number(r.adults_count) || 0, kids612 = Number(r.kids_6_12_count) || 0, kidsUnder6 = Number(r.kids_below_6_count) || 0;
     const payment = paymentBlock(r);
     const start = sweetsStartText();
     return `${HEADER}
@@ -53,12 +54,20 @@ const MESSAGES = {
 Vanakkam ${r.first_name} 🙏
 Thank you for registering for our *Diwali celebration*! 🎉 We are happy to welcome you.
 
-🎁 *Your Diwali sweet boxes*
-Here is your QR code for collecting *${boxes} sweet box${boxes === 1 ? "" : "es"}* (one for each adult):
+🎟️ *Your Diwali QR code*
 ${sweetsPassUrl(r)}
 
-👉 Open the link and *show the QR code at the sweets counter* to collect your sweet boxes. Each QR code can be used once.
-🕒 *Sweet box distribution starts at ${start.time}* on ${start.day}. Until then the QR code won't work.${payment ? `
+👨‍👩‍👧 *Your registration #${r.id}*
+Adults: ${adults}
+Kids 6–12: ${kids612}
+Kids under 6: ${kidsUnder6}
+Total: ${adults + kids612 + kidsUnder6} people
+
+Please use this *one QR code* twice:
+1️⃣ *At the entrance:* show it to check in your registration.
+2️⃣ *At the sweets counter:* show it again to collect *${adults} sweet box${adults === 1 ? "" : "es"}* (one for each adult). Please check in at the entrance first.
+
+🕒 *Sweet box distribution starts at ${start.time}* on ${start.day}. Until then the QR code won't work for sweets.${payment ? `
 
 ${payment}` : ""}
 

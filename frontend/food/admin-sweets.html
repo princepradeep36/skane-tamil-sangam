@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sweet Box Counter</title>
+<title>Diwali QR Scanner</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <style>
 *{box-sizing:border-box}
@@ -13,6 +13,10 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ari
 .top h1{margin:0;font-size:1.4rem}
 .btn{display:inline-block;border:0;border-radius:10px;padding:10px 14px;font-weight:700;text-decoration:none;cursor:pointer;font-size:.95rem}
 .back{background:#476cff;color:#fff}
+.modes{display:flex;gap:6px;background:#e9eef5;padding:5px;border-radius:14px;margin-top:14px}
+.modes button{flex:1;border:0;background:transparent;padding:12px 8px;border-radius:10px;font-size:1rem;font-weight:800;color:#555;cursor:pointer}
+.modes button.active{background:#fff;color:#0056b3;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.modes button.active.sweets{color:#c2410c}
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
 .stat{background:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 2px 10px #0001}
 .stat b{display:block;font-size:1.5rem}
@@ -33,9 +37,20 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ari
 .result .who{font-size:1.15rem;font-weight:700}
 .result .sub{margin-top:6px;font-weight:600;opacity:.9}
 .result .btn{margin-top:14px;width:100%;font-size:1.05rem;padding:14px}
+.result ul{text-align:left;margin:10px 0 0;padding-left:20px;font-weight:600}
+.people{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px}
+.people div{background:rgba(255,255,255,.92);color:#1c1c1e;border-radius:10px;padding:8px 4px}
+.people b{display:block;font-size:1.7rem;line-height:1.1}
+.people span{font-size:.72rem;font-weight:700;color:#475569}
+.people div.total{background:#1c1c1e;color:#fff}
+.people div.total span{color:#cbd5e1}
+.chip{display:inline-block;margin-top:10px;border-radius:999px;padding:4px 12px;font-weight:800;font-size:.9rem;background:rgba(255,255,255,.9);color:#166534}
+.chip.due{color:#b42318}
 .give{background:#16a34a;color:#fff}
+.info{background:#0284c7;color:#fff}
 .used{background:#dc2626;color:#fff}
 .warn{background:#fff7ed;color:#9a3412;border:2px solid #fdba74}
+.warn .people div{background:#fff;border:1px solid #fed7aa}
 .bad{background:#fee2e2;color:#991b1b}
 .next{background:#fff;color:#111}
 .warn .next,.bad .next{background:#0f172a;color:#fff}
@@ -43,16 +58,22 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ari
 .closed-note{background:#fff7ed;border:1px solid #fdba74;color:#9a3412;border-radius:12px;padding:10px 12px;font-weight:600;margin-bottom:14px}
 .unuse{background:transparent;color:inherit;text-decoration:underline;font-weight:600;padding:8px}
 [hidden]{display:none!important}
+@media(max-width:380px){.people{grid-template-columns:repeat(2,1fr)}}
 </style>
 <link rel="stylesheet" href="../responsive.css?v=20261015">
 </head>
 <body>
 <div class="wrap">
-  <div class="top"><h1>🎁 Sweet Box Counter</h1><a class="btn back" href="admin.html?admin=true">Admin Home</a></div>
+  <div class="top"><h1>🎟️ Diwali QR Scanner</h1><a class="btn back" href="admin.html?admin=true">Admin Home</a></div>
+
+  <div class="modes" role="tablist">
+    <button type="button" data-mode="checkin" role="tab">🎟️ Entrance check-in</button>
+    <button type="button" data-mode="sweets" class="sweets" role="tab">🎁 Sweet boxes</button>
+  </div>
 
   <div class="stats">
-    <div class="stat"><b id="sBoxes">–</b><span>boxes given</span></div>
-    <div class="stat"><b id="sFamilies">–</b><span>families collected</span></div>
+    <div class="stat"><b id="sA">–</b><span id="sAl"></span></div>
+    <div class="stat"><b id="sB">–</b><span id="sBl"></span></div>
   </div>
 
   <div class="closed-note" id="closedNote" hidden></div>
@@ -66,12 +87,12 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ari
       <button class="btn start" id="startBtn">📷 Start scanning</button>
       <button class="btn stop" id="stopBtn" hidden>Stop camera</button>
     </div>
-    <p class="hint">Point the camera at the family's QR code. Each code gives one box per adult, once.</p>
+    <p class="hint" id="modeHint"></p>
   </div>
 
   <div class="card">
     <form class="manual" id="manualForm">
-      <input id="manualCode" placeholder="Or type the code under the QR, e.g. 12-AbC…" autocomplete="off" autocapitalize="off">
+      <input id="manualCode" placeholder="Or type the code, e.g. 12-AbC…" autocomplete="off" autocapitalize="off">
       <button class="btn" type="submit">Check</button>
     </form>
   </div>
@@ -88,19 +109,43 @@ const when = d => new Date(d).toLocaleString('en-GB', { dateStyle: 'medium', tim
 const plural = n => `${n} box${n === 1 ? '' : 'es'}`;
 const openText = d => new Date(d).toLocaleString('en-GB', { timeZone: 'Europe/Stockholm', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
+// The same family QR code is scanned twice: at the entrance (check-in) and at the sweets counter.
+// Each scanning phone stays in the mode it was last set to.
+let mode = new URLSearchParams(location.search).get('mode');
+if (!['checkin', 'sweets'].includes(mode)) { try { mode = localStorage.getItem('qrScannerMode'); } catch (e) {} }
+if (!['checkin', 'sweets'].includes(mode)) mode = 'checkin';
+
 let scanner = null;
 let busy = false; // a result is on screen: ignore the camera until "Scan next"
 let lastCode = '';
 let cameraWanted = false; // the admin started the camera: reopen it after each result
 
+function setMode(m) {
+  mode = m;
+  try { localStorage.setItem('qrScannerMode', m); } catch (e) {}
+  document.querySelectorAll('.modes button').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+  $('modeHint').textContent = m === 'checkin'
+    ? 'Entrance: scan the family’s QR code to check in their registration and see how many adults and kids are registered.'
+    : 'Sweets counter: scan the same QR code to give one sweet box per adult, once. Families should check in at the entrance first.';
+  if (!$('result').hidden) scanNext();
+  loadSummary();
+}
+document.querySelectorAll('.modes button').forEach(b => { b.onclick = () => setMode(b.dataset.mode); });
+
 async function loadSummary() {
   try {
     const r = await authFetch(`${API}/admin/sweets/summary`, { cache: 'no-store' });
     const s = await r.json();
-    $('sBoxes').textContent = `${s.collected_boxes} / ${s.boxes}`;
-    $('sFamilies').textContent = `${s.collected_families} / ${s.families}`;
-    $('closedNote').hidden = s.open;
-    if (!s.open) $('closedNote').textContent = `🕒 Sweet boxes open on ${openText(s.opensAt)}. Before that, every scan asks you to confirm "Give anyway".`;
+    if (mode === 'checkin') {
+      $('sA').textContent = `${s.checked_in_families} / ${s.registrations}`; $('sAl').textContent = 'families checked in';
+      $('sB').textContent = `${s.checked_in_people} / ${s.people}`; $('sBl').textContent = 'people checked in';
+      $('closedNote').hidden = true;
+    } else {
+      $('sA').textContent = `${s.collected_boxes} / ${s.boxes}`; $('sAl').textContent = 'boxes given';
+      $('sB').textContent = `${s.collected_families} / ${s.families}`; $('sBl').textContent = 'families collected';
+      $('closedNote').hidden = s.open;
+      if (!s.open) $('closedNote').textContent = `🕒 Sweet boxes open on ${openText(s.opensAt)}. Before that, every scan asks you to confirm "Give anyway".`;
+    }
   } catch (e) {}
 }
 
@@ -126,51 +171,95 @@ function scanNext() {
   if (cameraWanted) startCamera();
 }
 
+const nextBtn = '<button class="btn next">Scan next ›</button>';
+const whoLine = d => (d.name ? `<div class="who">${esc(d.name)} · #${d.id}</div>` : '');
+const peopleGrid = d => `<div class="people">
+    <div><b>${d.adults}</b><span>Adults</span></div>
+    <div><b>${d.kids612}</b><span>Kids 6–12</span></div>
+    <div><b>${d.kidsUnder6}</b><span>Kids under 6</span></div>
+    <div class="total"><b>${d.people}</b><span>Total</span></div>
+  </div>`;
+const payChip = d => (d.paid ? '<span class="chip">✓ Paid</span>' : `<span class="chip due">⚠ Not paid${d.amountDue ? ` · ${d.amountDue} kr due` : ''}</span>`);
+
 async function check(code, force) {
   busy = true;
   lastCode = code;
   try {
-    const r = await authFetch(`${API}/admin/sweets/scan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, force: !!force }) });
+    const url = mode === 'checkin' ? `${API}/admin/checkin/scan` : `${API}/admin/sweets/scan`;
+    const r = await authFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, force: !!force }) });
     const d = await r.json().catch(() => ({}));
-    const who = d.name ? `<div class="who">${esc(d.name)} · #${d.id}</div>` : '';
-    const nextBtn = '<button class="btn next">Scan next ›</button>';
-    if (d.result === 'GIVE') {
-      if (navigator.vibrate) navigator.vibrate(200);
-      showResult('give', `✅ Give<div class="big">${plural(d.boxes)}</div>${who}<div class="sub">Marked as collected.</div>${nextBtn}`);
-      loadSummary();
-    } else if (d.result === 'ALREADY_USED') {
-      if (navigator.vibrate) navigator.vibrate([150, 80, 150, 80, 150]);
-      showResult('used', `⛔ Already collected<div class="big">Don't give</div>${who}
-        <div class="sub">${plural(d.collected.boxes)} collected on ${esc(when(d.collected.at))}${d.collected.by ? ` by ${esc(d.collected.by)}` : ''}</div>
-        ${nextBtn}<button class="btn unuse" onclick="markUnused(${d.id})">Mark this QR code as unused again</button>`);
-    } else if (d.result === 'NOT_OPEN') {
-      showResult('warn', `🕒 Not open yet<div class="big">${plural(d.boxes)}</div>${who}
-        <div class="sub">Sweet boxes open on ${esc(openText(d.opensAt))}.${d.paid ? '' : ` This registration is also not paid${d.amountDue ? ` (${d.amountDue} kr due)` : ''}.`} Give them now only if you have decided to.</div>
-        <button class="btn force" id="forceBtn">Give ${plural(d.boxes)} anyway</button>${nextBtn}`);
-      $('forceBtn').onclick = () => check(code, true);
-    } else if (d.result === 'NOT_PAID') {
-      showResult('warn', `⚠️ Registration not paid<div class="big">${plural(d.boxes)}</div>${who}
-        <div class="sub">${d.amountDue ? `${d.amountDue} kr is still due. ` : ''}Ask them to pay first, or give the boxes anyway.</div>
-        <button class="btn force" id="forceBtn">Give ${plural(d.boxes)} anyway</button>${nextBtn}`);
-      $('forceBtn').onclick = () => check(code, true);
-    } else if (d.result === 'NO_ADULTS') {
-      showResult('bad', `No sweet boxes<div class="big">0 adults</div>${who}<div class="sub">This registration has no adults, so there are no boxes to give.</div>${nextBtn}`);
-    } else if (d.result === 'CANCELLED') {
-      showResult('bad', `⛔ Registration cancelled<div class="big">Don't give</div>${who}${nextBtn}`);
-    } else {
-      showResult('bad', `❓ Not recognised<div class="sub">${esc(d.error || 'This is not a sweets QR code from the Sangam.')}</div>${nextBtn}`);
-    }
+    if (mode === 'checkin') showCheckin(d); else showSweets(d, code);
   } catch (e) {
     showResult('bad', `Could not check the code<div class="sub">Check the internet connection and try again.</div><button class="btn next">Try again ›</button>`);
   }
 }
 
+function showCheckin(d) {
+  if (d.result === 'CHECKED_IN') {
+    if (navigator.vibrate) navigator.vibrate(200);
+    showResult('give', `✅ Checked in${whoLine(d)}${peopleGrid(d)}${payChip(d)}
+      <div class="sub">Sweet boxes: ${plural(d.boxes)} at the sweets counter.</div>${nextBtn}`);
+    loadSummary();
+  } else if (d.result === 'ALREADY_CHECKED_IN') {
+    if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
+    showResult('info', `ℹ️ Already checked in${whoLine(d)}
+      <div class="sub">Checked in on ${esc(when(d.checkedIn.at))}${d.checkedIn.by ? ` by ${esc(d.checkedIn.by)}` : ''}</div>
+      ${peopleGrid(d)}${payChip(d)}${nextBtn}<button class="btn unuse" onclick="undoCheckin(${d.id})">Undo this check-in</button>`);
+  } else if (d.result === 'CANCELLED') {
+    showResult('bad', `⛔ Registration cancelled${whoLine(d)}<div class="sub">This registration was cancelled.</div>${nextBtn}`);
+  } else {
+    showResult('bad', `❓ Not recognised<div class="sub">${esc(d.error || 'This is not a Diwali QR code from the Sangam.')}</div>${nextBtn}`);
+  }
+}
+
+// Reasons to stop before giving sweet boxes; the admin can still give them with "Give anyway".
+const WARNINGS = {
+  NOT_OPEN: d => `Sweet boxes open on ${esc(openText(d.opensAt))}.`,
+  NOT_CHECKED_IN: () => 'Not checked in at the entrance yet.',
+  NOT_PAID: d => `Registration not paid${d.amountDue ? ` (${d.amountDue} kr due)` : ''}.`
+};
+const WARNING_TITLES = { NOT_OPEN: '🕒 Not open yet', NOT_CHECKED_IN: '🎟️ Not checked in yet', NOT_PAID: '⚠️ Registration not paid' };
+
+function showSweets(d, code) {
+  if (d.result === 'GIVE') {
+    if (navigator.vibrate) navigator.vibrate(200);
+    showResult('give', `✅ Give<div class="big">${plural(d.boxes)}</div>${whoLine(d)}<div class="sub">Marked as collected.</div>${nextBtn}`);
+    loadSummary();
+  } else if (d.result === 'ALREADY_USED') {
+    if (navigator.vibrate) navigator.vibrate([150, 80, 150, 80, 150]);
+    showResult('used', `⛔ Already collected<div class="big">Don't give</div>${whoLine(d)}
+      <div class="sub">${plural(d.collected.boxes)} collected on ${esc(when(d.collected.at))}${d.collected.by ? ` by ${esc(d.collected.by)}` : ''}</div>
+      ${nextBtn}<button class="btn unuse" onclick="markUnused(${d.id})">Mark the sweet boxes as not collected</button>`);
+  } else if (WARNINGS[d.result]) {
+    showResult('warn', `${WARNING_TITLES[d.result]}<div class="big">${plural(d.boxes)}</div>${whoLine(d)}
+      <ul>${(d.warnings || [d.result]).map(w => `<li>${WARNINGS[w](d)}</li>`).join('')}</ul>
+      <div class="sub">Give the boxes now only if you have decided to.</div>
+      <button class="btn force" id="forceBtn">Give ${plural(d.boxes)} anyway</button>${nextBtn}`);
+    $('forceBtn').onclick = () => check(code, true);
+  } else if (d.result === 'NO_ADULTS') {
+    showResult('bad', `No sweet boxes<div class="big">0 adults</div>${whoLine(d)}<div class="sub">This registration has no adults, so there are no boxes to give.</div>${nextBtn}`);
+  } else if (d.result === 'CANCELLED') {
+    showResult('bad', `⛔ Registration cancelled<div class="big">Don't give</div>${whoLine(d)}${nextBtn}`);
+  } else {
+    showResult('bad', `❓ Not recognised<div class="sub">${esc(d.error || 'This is not a Diwali QR code from the Sangam.')}</div>${nextBtn}`);
+  }
+}
+
+async function undoCheckin(id) {
+  if (!confirm(`Undo the check-in for registration #${id}? It will show as not checked in.`)) return;
+  const r = await authFetch(`${API}/admin/checkin/${id}`, { method: 'DELETE' });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) return alert(d.error || 'Could not change it.');
+  showResult('give', `↩️ Check-in undone<div class="who" style="margin-top:6px">Registration #${id} is not checked in now.</div>${nextBtn}`);
+  loadSummary();
+}
+
 async function markUnused(id) {
-  if (!confirm(`Mark the QR code for registration #${id} as unused? The family can then collect their boxes again.`)) return;
+  if (!confirm(`Mark the sweet boxes for registration #${id} as not collected? The family can then collect their boxes again.`)) return;
   const r = await authFetch(`${API}/admin/sweets/${id}`, { method: 'DELETE' });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) return alert(d.error || 'Could not change it.');
-  showResult('give', `↩️ Marked as unused<div class="who" style="margin-top:6px">Registration #${id} can collect again.</div><button class="btn next">Scan next ›</button>`);
+  showResult('give', `↩️ Marked as not collected<div class="who" style="margin-top:6px">Registration #${id} can collect again.</div>${nextBtn}`);
   loadSummary();
 }
 
@@ -208,7 +297,7 @@ $('manualForm').onsubmit = e => {
   if (code) { busy = false; check(code); }
 };
 
-loadSummary();
+setMode(mode);
 </script>
 </body>
 </html>

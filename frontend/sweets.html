@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Diwali Sweet Boxes | Skåne Tamil Sangam</title>
+<title>Diwali QR Code | Skåne Tamil Sangam</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 *{box-sizing:border-box}
@@ -24,6 +24,16 @@ header span{color:#ffd76a;font-weight:600}
 .state.bad{background:#fee2e2;color:#991b1b}
 .state.warn{background:#fff7ed;color:#9a3412;font-weight:600}
 .used #qr{opacity:.25}
+.people{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0 0 16px}
+.people div{background:#f1f5f9;border-radius:10px;padding:8px 2px}
+.people b{display:block;font-size:1.4rem;color:#003d80;line-height:1.1}
+.people span{font-size:.7rem;font-weight:700;color:#475569}
+.steps{list-style:none;margin:16px 0 0;padding:0;text-align:left;display:flex;flex-direction:column;gap:8px}
+.steps li{display:flex;gap:10px;align-items:flex-start;background:#f8fafc;border-radius:12px;padding:10px 12px;line-height:1.4}
+.steps li>b{flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#ffc107;color:#3d2c06;display:flex;align-items:center;justify-content:center}
+.steps li.done{background:#dcfce7}
+.steps li.done>b{background:#16a34a;color:#fff}
+.steps small{display:block;color:#166534;font-weight:700}
 footer{margin-top:18px;text-align:center;opacity:.9;font-size:.9rem;line-height:1.5}
 footer a{color:#ffd76a}
 </style>
@@ -43,19 +53,29 @@ const code = new URLSearchParams(location.search).get('pass') || '';
     const p = await r.json().catch(() => ({}));
     if (!r.ok) { box.innerHTML = `<div class="state bad">${esc(p.error || 'This QR code could not be found.')}</div>`; return; }
     const boxes = `${p.boxes} sweet box${p.boxes === 1 ? '' : 'es'}`;
+    const at = d => esc(new Date(d).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }));
+    const startTime = esc(new Date(p.startsAt).toLocaleString('en-GB', { timeZone: 'Europe/Stockholm', hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase());
+    const startDay = esc(new Date(p.startsAt).toLocaleString('en-GB', { timeZone: 'Europe/Stockholm', weekday: 'long', day: 'numeric', month: 'short' }));
+    const unpaid = p.paid ? '' : `Your registration payment is still pending${p.amountDue ? ` (${p.amountDue} kr)` : ''}. Please pay before the event.`;
     let state = '';
     if (p.cancelled) state = '<div class="state bad">This registration was cancelled, so this QR code can\'t be used.</div>';
     else if (p.collected) {
       box.classList.add('used');
-      state = `<div class="state used">✓ Already collected<br><span style="font-weight:600">${p.collected.boxes} box${p.collected.boxes === 1 ? '' : 'es'} on ${esc(new Date(p.collected.at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }))}</span></div>`;
-    } else if (!p.open) state = `<div class="state warn">🕒 Sweet box distribution starts at <b>${esc(new Date(p.startsAt).toLocaleString('en-GB', { timeZone: 'Europe/Stockholm', hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase())}</b> on ${esc(new Date(p.startsAt).toLocaleString('en-GB', { timeZone: 'Europe/Stockholm', weekday: 'long', day: 'numeric', month: 'short' }))}. Until then this QR code won't work, so please keep it safe.${p.paid ? '' : `<br><br>Your registration payment is still pending${p.amountDue ? ` (${p.amountDue} kr)` : ''}. Please pay before the event.`}</div>`;
-    else if (!p.paid) state = `<div class="state warn">Your registration payment is still pending${p.amountDue ? ` (${p.amountDue} kr)` : ''}. Please pay before the event so the counter can give you your sweet boxes.</div>`;
-    box.innerHTML = `<h1>🎁 Diwali sweet boxes</h1>
+      state = `<div class="state used">✓ Sweet boxes already collected<br><span style="font-weight:600">${p.collected.boxes} box${p.collected.boxes === 1 ? '' : 'es'} on ${at(p.collected.at)}</span></div>`;
+    } else if (!p.open) state = `<div class="state warn">🕒 Sweet box distribution starts at <b>${startTime}</b> on ${startDay}. Until then this QR code won't work for sweets, so please keep it safe.${unpaid ? `<br><br>${unpaid}` : ''}</div>`;
+    else if (unpaid) state = `<div class="state warn">${unpaid}</div>`;
+    box.innerHTML = `<h1>🎟️ Your Diwali QR code</h1>
       <p class="who">${esc(p.name)} · Registration #${p.id}</p>
-      <div class="boxes">${esc(boxes)} <span style="font-weight:600">(one per adult)</span></div>
+      <div class="people">
+        <div><b>${p.adults}</b><span>Adults</span></div><div><b>${p.kids612}</b><span>Kids 6–12</span></div>
+        <div><b>${p.kidsUnder6}</b><span>Kids under 6</span></div><div><b>${p.people}</b><span>Total</span></div>
+      </div>
       <div id="qr"></div>
       <div class="code">${esc(code)}</div>
-      <p class="how">Show this QR code at the sweets counter to collect your sweet boxes. It can be used once.</p>
+      <ol class="steps">
+        <li class="${p.checkedIn ? 'done' : ''}"><b>1</b><div><strong>At the entrance:</strong> show this QR code to check in.${p.checkedIn ? `<small>✓ Checked in ${at(p.checkedIn.at)}</small>` : ''}</div></li>
+        <li class="${p.collected ? 'done' : ''}"><b>2</b><div><strong>At the sweets counter:</strong> show it again to collect <strong>${esc(boxes)}</strong> (one per adult).${p.collected ? '<small>✓ Collected</small>' : ''}</div></li>
+      </ol>
       ${state}`;
     if (typeof QRCode !== 'undefined') new QRCode(document.getElementById('qr'), { text: location.href, width: 512, height: 512, correctLevel: QRCode.CorrectLevel.M });
     else document.getElementById('qr').textContent = 'Show the code below at the counter.';
