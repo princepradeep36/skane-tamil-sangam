@@ -125,9 +125,11 @@ function renderControl(s) {
       <button class="primary big" onclick="act('open-lobby')">Open game for joining</button>`;
   } else if (s.status === 'LOBBY') {
     el.innerHTML = `<h2>Players are joining <span class="status">${s.playerCount} joined</span></h2>
-      <p class="hint">The QR code is on the stage screen. Players can also still join after the game has started.</p>
+      <p class="hint">${s.showRules ? '📜 The stage screen is showing the <b>rules</b>. Read them out, then start the game.' : 'The QR code is on the stage screen. When everyone has joined, show the rules, then start. Players can also still join after the game has started.'}</p>
       <div class="names">${s.playerNames.map(n => `<span class="pill">${esc(n)}</span>`).join('') || '<span class="hint">Nobody yet…</span>'}</div>
-      <div class="row" style="margin-top:14px"><button class="go big" onclick="act('start')">▶ Start game</button><button class="ghost" onclick="act('reset','Cancel this game?')">Cancel</button></div>`;
+      <div class="row" style="margin-top:14px">${s.showRules
+        ? `<button class="ghost" onclick="act('hide-rules')">← Back to QR code</button>`
+        : `<button class="primary big" onclick="act('show-rules')">📜 Show rules on screen</button>`}<button class="go big" onclick="act('start')">▶ Start game</button><button class="ghost" onclick="act('reset','Cancel this game?')">Cancel</button></div>`;
   } else {
     const first = s.imageNumber <= 1, last = s.imageNumber >= s.imageCount;
     el.innerHTML = `<h2>Question ${s.questionNumber} of ${s.questionTotal} <span class="status">${s.playerCount} players</span></h2>

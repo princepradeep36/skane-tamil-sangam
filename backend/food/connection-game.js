@@ -29,6 +29,7 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
   function emptyGame() {
     return {
       status: "IDLE", // IDLE → LOBBY → PLAYING → ENDED
+      showRules: false, // in the lobby, the stage shows the rules instead of the QR code
       players: new Map(), // token → { id, name, score }
       questions: [], // [{ id, answer, imageIds, clues }], loaded when the game starts
       qIndex: -1,
@@ -69,6 +70,7 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
     return {
       kind,
       status: game.status,
+      showRules: game.status === "LOBBY" && game.showRules,
       playerCount: game.players.size,
       playerNames: [...game.players.values()].slice(-60).map(p => p.name),
       questionNumber: q ? game.qIndex + 1 : 0,
@@ -306,6 +308,8 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       if (action === "open-lobby") {
         game = emptyGame();
         game.status = "LOBBY";
+      } else if ((action === "show-rules" || action === "hide-rules") && game.status === "LOBBY") {
+        game.showRules = action === "show-rules";
       } else if (action === "start") {
         if (game.status !== "LOBBY") return res.status(409).json({ error: "Open the game for joining first." });
         const rows = (await pool.query(`SELECT q.id, q.answer${DETAIL_COLUMNS}, ${itemsJson} AS items FROM ${QUESTIONS} q ORDER BY q.position, q.id`)).rows;
