@@ -4,10 +4,21 @@
 //  2. Sweet boxes: one box per adult. The pass is marked as used once the boxes are given. Before
 //     that, the family should have checked in (and paid, and the counter should be open); an admin
 //     can still give the boxes after confirming. Only an admin can mark either step as not done again.
+// Volunteers can get "scanner" logins: they may only scan (check-in and sweet boxes). Overriding a
+// warning ("Give anyway") and undoing a scan stay with admins.
 const { sweetsPassCode, readSweetsPass, SWEETS_OPEN_AT, SWEETS_START_AT, sweetsOpen } = require("./booking-link");
 
-module.exports = function registerSweets(app, { pool, requireAdmin, wa }) {
+module.exports = function registerSweets(app, { pool, requireAdmin, authenticateToken, bcrypt, wa }) {
+  function requireScanner(req, res, next) {
+    authenticateToken(req, res, () => ["scanner", "admin"].includes(req.user.role) ? next() : res.status(403).json({ error: "Scanner access required" }));
+  }
+
   async function ensureSweetsTable() {
+    // Allow the "scanner" role next to admin and vendor.
+    const checks = await pool.query(`SELECT conname FROM pg_constraint WHERE conrelid = 'users'::regclass AND contype = 'c'
+      AND pg_get_constraintdef(oid) ILIKE '%role%'`);
+    for (const { conname } of checks.rows) await pool.query(`ALTER TABLE users DROP CONSTRAINT "${conname}"`);
+    await pool.query("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin', 'vendor', 'scanner'))");
     await pool.query(`CREATE TABLE IF NOT EXISTS event_sweet_collections (
       registration_id INTEGER PRIMARY KEY REFERENCES event_registrations(id) ON DELETE CASCADE,
       boxes INTEGER NOT NULL,
@@ -61,7 +72,7 @@ module.exports = function registerSweets(app, { pool, requireAdmin, wa }) {
   });
 
   // Entrance: shows who is registered and marks the registration as checked in (once).
-  app.post("/admin/checkin/scan", requireAdmin, async (req, res) => {
+  app.post("/admin/checkin/scan", requireScanner, async (req, res) => {
     try {
       const id = readSweetsPass(req.body?.code);
       const r = id && await registrationWithCollection(id);
@@ -87,8 +98,9 @@ module.exports = function registerSweets(app, { pool, requireAdmin, wa }) {
   // Sweet boxes: gives boxes (and marks the pass used) only once per registration. If the counter is
   // not open yet, the family has not checked in, or the registration is unpaid, the details are shown
   // first and the pass is only marked when the admin confirms with force.
-  app.post("/admin/sweets/scan", requireAdmin, async (req, res) => {
+  app.post("/admin/sweets/scan", requireScanner, async (req, res) => {
     try {
+      const force = !!req.body?.force && req.user.role === "admin"; // only admins can give anyway
       const id = readSweetsPass(req.body?.code);
       const r = id && await registrationWithCollection(id);
       if (!r) return res.status(404).json({ result: "INVALID", error: "This is not a valid Diwali QR code." });
@@ -100,7 +112,7 @@ module.exports = function registerSweets(app, { pool, requireAdmin, wa }) {
       if (!sweetsOpen()) warnings.push("NOT_OPEN");
       if (!who.checkedIn) warnings.push("NOT_CHECKED_IN");
       if (!who.paid) warnings.push("NOT_PAID");
-      if (warnings.length && !req.body?.force) return res.json({ result: warnings[0], warnings, ...who, opensAt: SWEETS_OPEN_AT });
+      if (warnings.length && !force) return res.json({ result: warnings[0], warnings, ...who, opensAt: SWEETS_OPEN_AT });
       const saved = await pool.query(`INSERT INTO event_sweet_collections(registration_id, boxes, collected_by) VALUES($1,$2,$3)
         ON CONFLICT (registration_id) DO NOTHING RETURNING collected_at`, [r.id, who.boxes, adminName(req)]);
       const now = family(await registrationWithCollection(r.id));
@@ -119,7 +131,7 @@ module.exports = function registerSweets(app, { pool, requireAdmin, wa }) {
   });
 
   // Totals for the scanner page.
-  app.get("/admin/sweets/summary", requireAdmin, async (req, res) => {
+  app.get("/admin/sweets/summary", requireScanner, async (req, res) => {
     try {
       const q = await pool.query(`SELECT
           COUNT(*)::int AS registrations,
@@ -146,6 +158,46 @@ module.exports = function registerSweets(app, { pool, requireAdmin, wa }) {
       if (!q.rows.length) return res.status(404).json({ error: "Registration not found" });
       const r = q.rows[0];
       res.json({ digits: wa.whatsappDigits(r.whatsapp), whatsapp: r.whatsapp, code: sweetsPassCode(r.id), text: wa.MESSAGES.SWEETS_PASS(r) });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  /* ---------- Scanner logins (admin only) ---------- */
+
+  app.get("/admin/scanner-users", requireAdmin, async (req, res) => {
+    try {
+      const q = await pool.query("SELECT id, username FROM users WHERE role = 'scanner' ORDER BY username");
+      res.json(q.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.post("/admin/scanner-users", requireAdmin, async (req, res) => {
+    const username = String(req.body?.username || "").trim().toLowerCase();
+    const password = String(req.body?.password || "");
+    if (!/^[a-z0-9._-]{3,40}$/.test(username)) return res.status(400).json({ error: "Username: 3 to 40 letters or numbers (no spaces)." });
+    if (password.length < 8) return res.status(400).json({ error: "The password must be at least 8 characters." });
+    try {
+      const taken = await pool.query("SELECT 1 FROM users WHERE username = $1", [username]);
+      if (taken.rows.length) return res.status(409).json({ error: "That username is already taken." });
+      await pool.query("INSERT INTO users(username, password, role) VALUES($1, $2, 'scanner')", [username, await bcrypt.hash(password, 12)]);
+      res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.put("/admin/scanner-users/:id/password", requireAdmin, async (req, res) => {
+    const password = String(req.body?.password || "");
+    if (password.length < 8) return res.status(400).json({ error: "The password must be at least 8 characters." });
+    try {
+      const q = await pool.query("UPDATE users SET password = $1 WHERE id = $2 AND role = 'scanner' RETURNING id", [await bcrypt.hash(password, 12), req.params.id]);
+      if (!q.rows.length) return res.status(404).json({ error: "Scanner login not found." });
+      res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.delete("/admin/scanner-users/:id", requireAdmin, async (req, res) => {
+    try {
+      const q = await pool.query("DELETE FROM users WHERE id = $1 AND role = 'scanner' RETURNING id", [req.params.id]);
+      if (!q.rows.length) return res.status(404).json({ error: "Scanner login not found." });
+      res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 

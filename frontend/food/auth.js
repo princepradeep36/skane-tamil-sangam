@@ -9,6 +9,7 @@ function validateSession(requiredRole) {
   if (!role || !token) return logout();
   if (requiredRole === "admin" && role !== "admin") return logout();
   if (requiredRole === "vendor" && !["vendor","admin"].includes(role)) return logout();
+  if (requiredRole === "scanner" && !["scanner","admin"].includes(role)) return logout();
 }
 async function authFetch(url, options={}) {
   const token=sessionStorage.getItem("auth_token");

@@ -1277,7 +1277,7 @@ app.put("/admin/order/:id/payment", requireAdmin, async (req, res) => {
 
 const ensureConnectionTables = registerConnectionGame(app, { pool, requireAdmin, imageContentType });
 const ensureClueTables = registerConnectionGame(app, { pool, requireAdmin, imageContentType, kind: "clue" });
-const ensureSweetsTable = registerSweets(app, { pool, requireAdmin, wa });
+const ensureSweetsTable = registerSweets(app, { pool, requireAdmin, authenticateToken, bcrypt, wa });
 
 initializeDatabase()
   .then(() => ensureEventRegistrationLifecycle())

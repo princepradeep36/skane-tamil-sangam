@@ -184,6 +184,8 @@
                     window.location.href = "admin.html?admin=true";
                 } else if (data.role === 'vendor') {
                     window.location.href = `vendor.html?vendor_id=${data.vendor_id}`;
+                } else if (data.role === 'scanner') {
+                    window.location.href = "admin-sweets.html";
                 }
             } catch (err) {
                 errDiv.style.display = "block";
