@@ -86,11 +86,13 @@ const GAME = new URLSearchParams(location.search).get('game') === 'clue' ? 'clue
 const CLUES = GAME === 'clue';
 const ITEM = CLUES ? 'clue' : 'image';
 const $ = id => document.getElementById(id);
+const CLUES_PER_QUESTION = 3;
+const pointsText = n => `${n} point${n === 1 ? '' : 's'}`;
 if (CLUES) {
   document.title = 'Clue Game';
   $('pageTitle').textContent = '🔎 Clue Game';
   $('stageLink').href = '../connection-screen.html?game=clue';
-  $('questionsHint').textContent = 'Each question has several text clues, shown one at a time, and one answer. Add the answer, then its clues in the order to show them (easiest clue last).';
+  $('questionsHint').textContent = 'Each question has exactly 3 text clues, shown one at a time, and one answer. Add the answer, then its 3 clues in the order to show them (hardest first, easiest last). A correct answer after clue 1 scores 3 points, after clue 2 scores 2 points, after clue 3 scores 1 point.';
 }
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const json = { 'Content-Type': 'application/json' };
@@ -131,17 +133,17 @@ function renderControl(s) {
             : `<div class="preview"><img src="${API}/${GAME}/image/${s.imageId}" alt="Current image"></div>`}
           <div class="row" style="margin-top:10px;justify-content:space-between">
             <button class="ghost" onclick="act('prev-image')" ${first ? 'disabled' : ''}>← Previous</button>
-            <b>${CLUES ? 'Clue' : 'Image'} ${s.imageNumber} of ${s.imageCount}</b>
+            <b>${CLUES ? 'Clue' : 'Image'} ${s.imageNumber} of ${s.imageCount}${CLUES && !s.revealed ? ` · <span style="color:#b26a00">⭐ Worth ${pointsText(s.worth)} now</span>` : ''}</b>
             <button class="primary" onclick="act('next-image')" ${last ? 'disabled' : ''}>Next ${ITEM} →</button>
           </div>
         </div>
         <div>
           <div class="secret"><small>🔒 Answer (only on this screen${s.revealed ? ', now shown on stage too' : ''})</small><b>${esc(s.secretAnswer)}</b></div>
           ${s.revealed
-            ? `<div class="turn on"><b>${s.winner ? `🏆 ${esc(s.winner)} answered correctly` : 'Answer shown on stage'}</b></div>`
+            ? `<div class="turn on"><b>${s.winner ? `🏆 ${esc(s.winner)} answered correctly${CLUES ? ` (+${pointsText(s.awarded)})` : ''}` : 'Answer shown on stage'}</b></div>`
             : s.answering
               ? `<div class="turn on"><small>🎤 Now answering (first in line)</small><div class="name">${esc(s.answering)}</div>
-                  <div class="row"><button class="go" onclick="act('correct')">✓ Correct</button><button class="bad" onclick="act('wrong')">✗ Wrong, next person</button></div>
+                  <div class="row"><button class="go" onclick="act('correct')">✓ ${CLUES ? `+${pointsText(s.worth)}` : 'Correct'}</button><button class="bad" onclick="act('wrong')">✗ Wrong, next person</button></div>
                   ${s.waiting.length ? `<p class="line"><b>Next in line:</b> ${s.waiting.map(n => `<span class="pill">${esc(n)}</span>`).join('')}</p>` : ''}</div>`
               : `<div class="turn"><b>Waiting for someone to tap "I want to answer"…</b></div>`}
           ${s.wrong.length ? `<p class="line"><b>Wrong:</b> ${s.wrong.map(n => `<span class="pill x">${esc(n)}</span>`).join('')}</p>` : ''}
@@ -195,8 +197,8 @@ async function loadQuestions() {
           <button class="ghost small" onclick="moveClue(${c.id},1)" ${n === q.clues.length - 1 ? 'disabled' : ''} aria-label="Move clue down">↓</button>
           <button class="bad small" onclick="deleteClue(${c.id})" aria-label="Remove clue">✕</button></li>`).join('')}
       </ol>
-      <form class="add-clue" onsubmit="addClue(event, ${q.id})"><input maxlength="500" placeholder="Type clue ${q.clues.length + 1} and press Enter"><button class="primary small" type="submit">+ Add clue</button></form>
-      ${q.clues.length ? '' : '<p class="hint" style="margin:8px 0 0">No clues yet: this question is skipped until it has at least one.</p>'}` : `
+      ${q.clues.length < CLUES_PER_QUESTION ? `<form class="add-clue" onsubmit="addClue(event, ${q.id})"><input maxlength="500" placeholder="Type clue ${q.clues.length + 1} of ${CLUES_PER_QUESTION} and press Enter"><button class="primary small" type="submit">+ Add clue</button></form>
+      <p class="hint" style="margin:8px 0 0">Needs ${CLUES_PER_QUESTION} clues: this question is skipped until it has all ${CLUES_PER_QUESTION}.</p>` : '<p class="hint" style="margin:8px 0 0;color:#166534">✓ 3 clues: ready to play.</p>'}` : `
       <div class="thumbs">
         ${q.image_ids.map((id, n) => `<div class="thumb"><img data-img="${id}" alt="Image ${n + 1}"><span>${n + 1}</span><button onclick="deleteImage(${id})" aria-label="Remove image">✕</button></div>`).join('')}
         <label class="add">+ Add images<input type="file" accept="image/*" multiple onchange="addImages(${q.id}, this)"></label>

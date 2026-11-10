@@ -11,6 +11,9 @@ const crypto = require("crypto");
 const express = require("express");
 
 const MAX_PLAYERS = 1000;
+// Clue game: every question has exactly 3 clues. A correct answer is worth 3 points while only clue 1 is
+// showing, 2 points after clue 2 and 1 point after clue 3. The Connection game gives 1 point.
+const CLUES_PER_QUESTION = 3;
 
 module.exports = function registerConnectionGame(app, { pool, requireAdmin, imageContentType, kind = "connection" }) {
   const CLUES = kind === "clue";
@@ -29,6 +32,7 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       imageIndex: 0, // the image or clue being shown
       shownImages: new Set(), // image ids the audience has seen, the only ones served publicly
       revealed: false,
+      awarded: 0, // points given for the current question's correct answer
       queue: [] // [{ playerId, name, result: null | 'WRONG' | 'CORRECT' }], in buzz order
     };
   }
@@ -37,6 +41,7 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
 
   const currentQuestion = () => game.questions[game.qIndex] || null;
   const answeringEntry = () => (game.status === "PLAYING" && !game.revealed ? game.queue.find(e => !e.result) || null : null);
+  const worth = () => (CLUES ? Math.max(1, CLUES_PER_QUESTION - game.imageIndex) : 1);
   const leaderboard = () => [...game.players.values()].filter(p => p.score > 0).sort((a, b) => b.score - a.score).map(p => ({ name: p.name, score: p.score }));
 
   function showImage(index) {
@@ -48,6 +53,7 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
   function beginQuestion(index) {
     game.qIndex = index;
     game.revealed = false;
+    game.awarded = 0;
     game.queue = [];
     showImage(0);
   }
@@ -74,6 +80,8 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       revealed: game.revealed,
       answer: game.revealed && q ? q.answer : null,
       winner: (game.queue.find(e => e.result === "CORRECT") || {}).name || null,
+      worth: playing ? worth() : 0,
+      awarded: game.awarded,
       leaderboard: leaderboard().slice(0, 10)
     };
   }
@@ -95,7 +103,8 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
   });
 
   function playerView(player) {
-    const view = { kind, status: game.status, questionNumber: game.qIndex + 1, questionTotal: game.questions.length, revealed: game.revealed };
+    const view = { kind, status: game.status, questionNumber: game.qIndex + 1, questionTotal: game.questions.length, revealed: game.revealed,
+      worth: game.status === "PLAYING" ? worth() : 0, awarded: game.awarded };
     if (!player) return { ...view, needJoin: true };
     const entry = game.queue.find(e => e.playerId === player.id);
     const answering = answeringEntry();
@@ -202,6 +211,8 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       const text = clueText(req.body);
       if (!text) return res.status(400).json({ error: "Please type the clue." });
       try {
+        const count = (await pool.query(`SELECT COUNT(*)::int AS n FROM ${ITEMS} WHERE question_id=$1`, [req.params.id])).rows[0].n;
+        if (count >= CLUES_PER_QUESTION) return res.status(400).json({ error: `A question has exactly ${CLUES_PER_QUESTION} clues. Edit or remove one first.` });
         const q = await pool.query(`INSERT INTO ${ITEMS}(question_id, position, text)
           VALUES ($1, (SELECT COALESCE(MAX(position), 0) + 1 FROM ${ITEMS} WHERE question_id=$1), $2) RETURNING id`, [req.params.id, text]);
         res.json({ id: q.rows[0].id });
@@ -288,13 +299,12 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       } else if (action === "start") {
         if (game.status !== "LOBBY") return res.status(409).json({ error: "Open the game for joining first." });
         const rows = (await pool.query(`SELECT q.id, q.answer, ${itemsJson} AS items FROM ${QUESTIONS} q ORDER BY q.position, q.id`)).rows;
-        const questions = rows.filter(r => r.items.length).map(r => ({
-          id: r.id,
-          answer: r.answer,
-          imageIds: CLUES ? r.items.map(c => c.id) : r.items,
-          clues: CLUES ? r.items.map(c => c.text) : []
-        }));
-        if (!questions.length) return res.status(400).json({ error: `Add at least one question with ${CLUES ? "a clue" : "an image"} first.` });
+        // Clue questions are played only once they have all their clues.
+        const questions = rows.filter(r => r.items.length >= (CLUES ? CLUES_PER_QUESTION : 1)).map(r => {
+          const items = CLUES ? r.items.slice(0, CLUES_PER_QUESTION) : r.items;
+          return { id: r.id, answer: r.answer, imageIds: CLUES ? items.map(c => c.id) : items, clues: CLUES ? items.map(c => c.text) : [] };
+        });
+        if (!questions.length) return res.status(400).json({ error: CLUES ? `Add at least one question with ${CLUES_PER_QUESTION} clues first.` : "Add at least one question with an image first." });
         game.questions = questions;
         game.status = "PLAYING";
         beginQuestion(0);
@@ -305,8 +315,9 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
         else if (action === "wrong" && answering) answering.result = "WRONG";
         else if (action === "correct" && answering) {
           answering.result = "CORRECT";
+          game.awarded = worth();
           const player = [...game.players.values()].find(p => p.id === answering.playerId);
-          if (player) player.score += 1;
+          if (player) player.score += game.awarded;
           game.revealed = true;
         } else if (action === "reveal") game.revealed = true;
         else if (action === "next-question") {
