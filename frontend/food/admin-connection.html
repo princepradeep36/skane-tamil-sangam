@@ -42,6 +42,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .thumb button{position:absolute;right:3px;top:3px;padding:1px 7px;font-size:13px;background:#dc2626;color:#fff;border-radius:6px;min-height:0}
 .add{width:110px;height:82px;border:2px dashed #cbd5e1;border-radius:8px;display:flex;align-items:center;justify-content:center;text-align:center;color:#475569;font-size:13px;font-weight:bold;cursor:pointer}
 .add input{display:none}
+.details{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
+.details label{display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:bold;color:#475569}
+.details input{padding:8px 10px;border:1px solid #d0d5dd;border-radius:8px;font-size:14px;font-weight:normal}
+.details .wide{grid-column:1/-1}
+@media(max-width:700px){.details{grid-template-columns:1fr}}
 .clue-list{margin:12px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
 .clue-list li{display:flex;gap:8px;align-items:center}
 .clue-list .n{flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#e0e7ff;color:#3730a3;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px}
@@ -138,7 +143,7 @@ function renderControl(s) {
           </div>
         </div>
         <div>
-          <div class="secret"><small>🔒 Answer (only on this screen${s.revealed ? ', now shown on stage too' : ''})</small><b>${esc(s.secretAnswer)}</b></div>
+          <div class="secret"><small>🔒 Answer (only on this screen${s.revealed ? ', now shown on stage too' : ''})</small><b>${esc(s.secretAnswer)}</b>${s.secretTamil ? ` <span style="color:#a3122e;font-size:1.2rem;font-weight:bold">${esc(s.secretTamil)}</span>` : ''}</div>
           ${s.revealed
             ? `<div class="turn on"><b>${s.winner ? `🏆 ${esc(s.winner)} answered correctly${CLUES ? ` (+${pointsText(s.awarded)})` : ''}` : 'Answer shown on stage'}</b></div>`
             : s.answering
@@ -191,6 +196,12 @@ async function loadQuestions() {
         <button class="bad small" onclick="deleteQ(${q.id})">Delete</button>
       </div>
       ${CLUES ? `
+      <div class="details" onchange="saveDetails(${q.id})">
+        <label>Tamil name<input data-f="answerTamil" maxlength="300" value="${esc(q.answer_tamil)}" placeholder="e.g. ஸ்ரீவில்லிபுத்தூர்"></label>
+        <label>Tag 1 (dark)<input data-f="tag1" maxlength="100" value="${esc(q.tag1)}" placeholder="e.g. Virudhunagar district"></label>
+        <label>Tag 2 (gold)<input data-f="tag2" maxlength="100" value="${esc(q.tag2)}" placeholder="e.g. Andal's town"></label>
+        <label class="wide">Fact shown with the answer<input data-f="fact" maxlength="500" value="${esc(q.fact)}" placeholder="e.g. Andal's Thiruppavai is recited across Tamil Nadu in the month of Margazhi."></label>
+      </div>
       <ol class="clue-list">
         ${q.clues.map((c, n) => `<li><span class="n">${n + 1}</span><input type="text" maxlength="500" value="${esc(c.text)}" aria-label="Clue ${n + 1}" onchange="saveClue(${c.id}, this.value)">
           <button class="ghost small" onclick="moveClue(${c.id},-1)" ${n === 0 ? 'disabled' : ''} aria-label="Move clue up">↑</button>
@@ -237,6 +248,14 @@ async function deleteImage(id) {
 }
 
 /* ---------- Clue game: text clues ---------- */
+// Tamil name, tags and fact: shown on the stage's answer card.
+async function saveDetails(id) {
+  const box = document.querySelector(`.q[data-id="${id}"]`);
+  const body = { answer: box.querySelector('.q-head input').value };
+  box.querySelectorAll('.details input').forEach(i => { body[i.dataset.f] = i.value; });
+  const r = await authFetch(`${API}/admin/${GAME}/questions/${id}`, { method: 'PUT', headers: json, body: JSON.stringify(body) });
+  if (!r.ok) { alert((await r.json().catch(() => ({}))).error || 'Could not save.'); loadQuestions(); }
+}
 async function addClue(e, id) {
   e.preventDefault();
   const input = e.target.querySelector('input');

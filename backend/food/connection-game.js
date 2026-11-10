@@ -19,6 +19,9 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
   const CLUES = kind === "clue";
   const QUESTIONS = `${kind}_questions`;
   const ITEMS = CLUES ? "clue_items" : "connection_images";
+  // Clue questions also have a Tamil name, two short tags and a fact, shown with the answer.
+  const DETAIL_COLUMNS = CLUES ? ", q.answer_tamil, q.tag1, q.tag2, q.fact" : "";
+  const details = r => (CLUES ? { answerTamil: r.answer_tamil || "", tags: [r.tag1, r.tag2].filter(Boolean), fact: r.fact || "" } : null);
   const itemsJson = CLUES
     ? `COALESCE((SELECT json_agg(json_build_object('id', i.id, 'text', i.text) ORDER BY i.position, i.id) FROM ${ITEMS} i WHERE i.question_id = q.id), '[]')`
     : `COALESCE((SELECT json_agg(i.id ORDER BY i.position, i.id) FROM ${ITEMS} i WHERE i.question_id = q.id), '[]')`;
@@ -79,6 +82,7 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       wrong: game.queue.filter(e => e.result === "WRONG").map(e => e.name),
       revealed: game.revealed,
       answer: game.revealed && q ? q.answer : null,
+      answerDetails: game.revealed && q ? q.details : null,
       winner: (game.queue.find(e => e.result === "CORRECT") || {}).name || null,
       worth: playing ? worth() : 0,
       awarded: game.awarded,
@@ -154,7 +158,7 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
 
   app.get(`/admin/${kind}/questions`, requireAdmin, async (req, res) => {
     try {
-      const q = await pool.query(`SELECT q.id, q.position, q.answer, ${itemsJson} AS ${CLUES ? "clues" : "image_ids"}
+      const q = await pool.query(`SELECT q.id, q.position, q.answer${DETAIL_COLUMNS}, ${itemsJson} AS ${CLUES ? "clues" : "image_ids"}
         FROM ${QUESTIONS} q ORDER BY q.position, q.id`);
       res.json(q.rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -173,8 +177,13 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
   app.put(`/admin/${kind}/questions/:id`, requireAdmin, async (req, res) => {
     const answer = String(req.body?.answer || "").trim().slice(0, 300);
     if (!answer) return res.status(400).json({ error: "Please enter the answer." });
+    const text = (key, max) => (req.body?.[key] === undefined ? null : String(req.body[key] || "").replace(/\s+/g, " ").trim().slice(0, max));
     try {
-      const q = await pool.query(`UPDATE ${QUESTIONS} SET answer=$1 WHERE id=$2 RETURNING id`, [answer, req.params.id]);
+      const q = CLUES
+        ? await pool.query(`UPDATE ${QUESTIONS} SET answer=$1, answer_tamil=COALESCE($3, answer_tamil), tag1=COALESCE($4, tag1),
+            tag2=COALESCE($5, tag2), fact=COALESCE($6, fact) WHERE id=$2 RETURNING id`,
+          [answer, req.params.id, text("answerTamil", 300), text("tag1", 100), text("tag2", 100), text("fact", 500)])
+        : await pool.query(`UPDATE ${QUESTIONS} SET answer=$1 WHERE id=$2 RETURNING id`, [answer, req.params.id]);
       if (!q.rows.length) return res.status(404).json({ error: "Question not found" });
       res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -279,6 +288,7 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
     return {
       ...publicState(),
       secretAnswer: q ? q.answer : null,
+      secretTamil: q && q.details ? q.details.answerTamil : "",
       allClues: q && CLUES ? q.clues : [],
       players: [...game.players.values()].map(p => ({ name: p.name, score: p.score })).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)),
       hasMoreQuestions: game.qIndex + 1 < game.questions.length
@@ -298,11 +308,11 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
         game.status = "LOBBY";
       } else if (action === "start") {
         if (game.status !== "LOBBY") return res.status(409).json({ error: "Open the game for joining first." });
-        const rows = (await pool.query(`SELECT q.id, q.answer, ${itemsJson} AS items FROM ${QUESTIONS} q ORDER BY q.position, q.id`)).rows;
+        const rows = (await pool.query(`SELECT q.id, q.answer${DETAIL_COLUMNS}, ${itemsJson} AS items FROM ${QUESTIONS} q ORDER BY q.position, q.id`)).rows;
         // Clue questions are played only once they have all their clues.
         const questions = rows.filter(r => r.items.length >= (CLUES ? CLUES_PER_QUESTION : 1)).map(r => {
           const items = CLUES ? r.items.slice(0, CLUES_PER_QUESTION) : r.items;
-          return { id: r.id, answer: r.answer, imageIds: CLUES ? items.map(c => c.id) : items, clues: CLUES ? items.map(c => c.text) : [] };
+          return { id: r.id, answer: r.answer, details: details(r), imageIds: CLUES ? items.map(c => c.id) : items, clues: CLUES ? items.map(c => c.text) : [] };
         });
         if (!questions.length) return res.status(400).json({ error: CLUES ? `Add at least one question with ${CLUES_PER_QUESTION} clues first.` : "Add at least one question with an image first." });
         game.questions = questions;
@@ -339,6 +349,11 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       id SERIAL PRIMARY KEY,
       position INTEGER NOT NULL DEFAULT 0,
       answer VARCHAR(300) NOT NULL)`);
+    if (CLUES) {
+      for (const [column, type] of [["answer_tamil", "VARCHAR(300)"], ["tag1", "VARCHAR(100)"], ["tag2", "VARCHAR(100)"], ["fact", "VARCHAR(500)"]]) {
+        await pool.query(`ALTER TABLE ${QUESTIONS} ADD COLUMN IF NOT EXISTS ${column} ${type}`);
+      }
+    }
     await pool.query(CLUES
       ? `CREATE TABLE IF NOT EXISTS ${ITEMS} (
           id SERIAL PRIMARY KEY,

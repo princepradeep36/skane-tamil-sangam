@@ -38,6 +38,10 @@ main{flex:1;display:flex;flex-direction:column;align-items:center;justify-conten
 .points div{background:#fff;color:#003d80;border-radius:12px;padding:10px 6px;text-align:center;font-size:.82rem;font-weight:700;line-height:1.3}
 .points b{display:block;font-size:1.7rem;line-height:1.1;color:#b26a00}
 .worth{display:inline-block;background:#ffc107;color:#3d2c06;font-weight:900;border-radius:999px;padding:8px 18px;font-size:1.1rem}
+body.clue{background:linear-gradient(170deg,#3d0815,#64101f 55%,#9b1b33)}
+body.clue header span{color:#f6c343}
+body.clue .points div{color:#64101f}
+body.clue .points b{color:#a3122e}
 footer{padding:10px 16px 16px;text-align:center;font-size:.9rem;opacity:.85}
 [hidden]{display:none!important}
 </style>
@@ -52,6 +56,7 @@ const API = '/food-api';
 const GAME = new URLSearchParams(location.search).get('game') === 'clue' ? 'clue' : 'connection';
 const GAME_TITLE = GAME === 'clue' ? '🔎 Clue Game' : '🪔 Connection Game';
 document.getElementById('gameTitle').textContent = GAME_TITLE;
+if (GAME === 'clue') document.body.classList.add('clue');
 document.title = `${GAME_TITLE.slice(3)} | Skåne Tamil Sangam`;
 const TOKEN_KEY = `${GAME}Token`;
 const app = document.getElementById('app');

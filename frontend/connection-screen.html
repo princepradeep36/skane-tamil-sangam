@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Connection Game · Stage Screen</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+Thambi+2:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
@@ -35,12 +37,39 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-s
 .bar .q{color:#ffd76a}
 .stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.25);border-radius:20px;overflow:hidden}
 .stage img{max-width:100%;max-height:100%;object-fit:contain;display:block}
-/* Clue game: the clues shown so far, newest highlighted */
-.clues{width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;gap:1.6vh;padding:3vh 4vw;overflow:hidden}
-.clue{display:flex;gap:2vw;align-items:center;background:rgba(255,255,255,.1);border-radius:16px;padding:1.6vh 2vw;font-size:4vh;font-weight:700;line-height:1.25;opacity:.75}
-.clue b{flex:0 0 auto;width:6vh;height:6vh;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:3vh}
-.clue.new{background:#fff;color:#003d80;opacity:1;font-size:5.4vh;box-shadow:0 1vh 3vh rgba(0,0,0,.3)}
-.clue.new b{background:#ffc107;color:#3d2c06}
+/* Clue game: "Guess the place!" in maroon and gold, Tamil-friendly font */
+body.clue{font-family:"Baloo Thambi 2",-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:radial-gradient(1400px 800px at 25% -10%,#9b1b33,#64101f 50%,#3d0815)}
+body.clue::before,body.clue::after{content:"";position:fixed;left:0;right:0;height:1.1vh;background:linear-gradient(90deg,#f0b429,#e8892b 60%,#d9472b);z-index:5}
+body.clue::before{top:0}body.clue::after{bottom:0}
+body.clue .title small,body.clue .bar .q{color:#f6c343}
+body.clue .qr-card{color:#64101f}
+body.clue .howto .pts{color:#64101f}
+body.clue .howto b,body.clue .howto .pts b{background:#f6c343;color:#3d0815}
+.clue-mode .bar{display:none}
+.clue-mode .stage{background:none;border-radius:0;align-items:stretch}
+.clues{width:100%;height:100%;display:flex;flex-direction:column;gap:2.4vh;padding:2vh 3vw 0;overflow:hidden}
+.cp-head{display:flex;justify-content:space-between;align-items:flex-end;gap:2vw}
+.cp-kicker{color:#f6c343;font-weight:800;letter-spacing:.18em;font-size:2.6vh}
+.cp-title{font-size:8vh;font-weight:800;line-height:1.05;color:#fbf3e4}
+.cp-worth{background:#f6c343;color:#3d0815;border-radius:999px;padding:1vh 2.2vw;font-weight:800;font-size:3vh;white-space:nowrap}
+.cp-cards{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:2.6vh}
+.cp-card{display:flex;gap:2.4vw;align-items:center;background:linear-gradient(90deg,#b3203d,#9a1a34);border-left:.9vh solid #f6c343;border-radius:1.8vh;padding:2.6vh 2.6vw;font-size:4.4vh;font-weight:600;line-height:1.25;color:#fff}
+.cp-card .num{flex:0 0 auto;width:8.5vh;height:8.5vh;border-radius:50%;background:#f6c343;color:#3d0815;font-weight:800;font-size:4.6vh;display:flex;align-items:center;justify-content:center}
+.cp-card.new{box-shadow:0 0 0 .45vh #f6c343,0 1.6vh 4vh rgba(0,0,0,.35)}
+.cp-card.locked{background:rgba(255,255,255,.06);border-left-color:rgba(255,255,255,.18);color:rgba(255,255,255,.45);font-style:italic}
+.cp-card.locked .num{background:rgba(255,255,255,.12);color:rgba(255,255,255,.55)}
+.cp-foot{display:flex;justify-content:space-between;font-weight:700;font-size:2.4vh;color:#f3d9a6;opacity:.9;padding-bottom:.4vh}
+.ans{flex:1;min-height:0;background:#f4efe4;color:#2b0710;border-radius:2vh;padding:5vh 5vw;display:flex;flex-direction:column;justify-content:center;border-top:1vh solid #e8892b}
+.ans-kicker{color:#8e1b2e;font-weight:800;letter-spacing:.2em;font-size:2.8vh}
+.ans-en{font-size:13vh;font-weight:800;line-height:1.05;color:#2b0710}
+.ans-ta{font-size:9vh;font-weight:700;line-height:1.35;color:#a3122e}
+.chips{display:flex;gap:1.4vw;flex-wrap:wrap;margin-top:1vh}
+.chips span{border-radius:999px;padding:.8vh 2.4vw;font-weight:700;font-size:3.4vh}
+.chips span:nth-child(1){background:#2b0710;color:#f6c343}
+.chips span:nth-child(2){background:#f6c343;color:#2b0710}
+.ans .fact{margin:2.4vh 0 0;font-size:3.8vh;font-weight:500;line-height:1.35}
+body.clue .status.answering{background:#16a34a}
+body.clue .status.answer{background:#f6c343;color:#3d0815;font-size:5vh}
 .status{margin-top:1.5vh;min-height:13vh;display:flex;align-items:center;justify-content:center;gap:2vw;text-align:center;border-radius:18px;padding:1vh 2vw;font-weight:900}
 .status.answering{background:#16a34a;font-size:6vh}
 .status.answer{background:#ffc107;color:#3d2c06;font-size:7vh}
@@ -89,6 +118,8 @@ const $ = id => document.getElementById(id);
 const pointsText = n => `${n} point${n === 1 ? '' : 's'}`;
 // Clue game: the 4th lobby step becomes the three scoring cards.
 if (GAME === 'clue') {
+  document.body.classList.add('clue');
+  $('playing').classList.add('clue-mode');
   $('howtoPoints').remove();
   $('lobby').insertAdjacentHTML('beforeend', '<div class="howto points"><div class="pts"><b>3</b><span>points if you guess after Clue 1</span></div><div class="pts"><b>2</b><span>points after Clue 2</span></div><div class="pts"><b>1</b><span>point after Clue 3</span></div></div>');
 }
@@ -99,6 +130,27 @@ else $('qr').textContent = 'Open the address below to join';
 
 let shownImage = null;
 function setHtml(el, html) { if (el.dataset.html !== html) { el.dataset.html = html; el.innerHTML = html; } }
+
+// Clue game: heading and the 3 clue cards (later ones still locked), or the answer card once revealed.
+function cluePanel(s) {
+  const foot = `<div class="cp-foot"><span>Guess the Place · Tamil Heritage</span><span>${s.questionNumber} / ${s.questionTotal}</span></div>`;
+  if (s.revealed) {
+    const d = s.answerDetails || {};
+    return `<div class="ans">
+        <div class="ans-kicker">THE ANSWER · ${s.questionNumber} OF ${s.questionTotal}</div>
+        <div class="ans-en">${esc(s.answer)}</div>
+        ${d.answerTamil ? `<div class="ans-ta">${esc(d.answerTamil)}</div>` : ''}
+        ${(d.tags || []).length ? `<div class="chips">${d.tags.map(t => `<span>${esc(t)}</span>`).join('')}</div>` : ''}
+        ${d.fact ? `<p class="fact">${esc(d.fact)}</p>` : ''}
+      </div>${foot}`;
+  }
+  const cards = Array.from({ length: s.imageCount }, (_, i) => i < s.clues.length
+    ? `<div class="cp-card${i === s.clues.length - 1 ? ' new' : ''}"><span class="num">${i + 1}</span><span>${esc(s.clues[i])}</span></div>`
+    : `<div class="cp-card locked"><span class="num">${i + 1}</span><span>Clue ${i + 1} is coming…</span></div>`).join('');
+  return `<div class="cp-head"><div><div class="cp-kicker">PLACE ${s.questionNumber} OF ${s.questionTotal}</div><div class="cp-title">Guess the place!</div></div>
+      <span class="cp-worth">⭐ Worth ${pointsText(s.worth)} now</span></div>
+    <div class="cp-cards">${cards}</div>${foot}`;
+}
 
 function render(s) {
   ['idle', 'lobby', 'playing', 'ended'].forEach(v => { $(v).hidden = v !== s.status.toLowerCase(); });
@@ -115,7 +167,7 @@ function render(s) {
     $('img').hidden = GAME === 'clue';
     $('clues').hidden = GAME !== 'clue';
     if (GAME === 'clue') {
-      setHtml($('clues'), s.clues.map((c, i) => `<div class="clue${i === s.clues.length - 1 ? ' new' : ''}"><b>${i + 1}</b><span>${esc(c)}</span></div>`).join(''));
+      setHtml($('clues'), cluePanel(s));
     } else if (shownImage !== s.imageId) {
       shownImage = s.imageId;
       $('img').src = `${API}/${GAME}/image/${s.imageId}`;
@@ -123,7 +175,10 @@ function render(s) {
     const st = $('status');
     if (s.revealed) {
       st.className = 'status answer';
-      setHtml(st, `<div>${esc(s.answer)}${s.winner ? `<small>🏆 ${esc(s.winner)} got it right!${GAME === 'clue' ? ` +${pointsText(s.awarded)}` : ''}</small>` : ''}</div>`);
+      setHtml(st, GAME === 'clue'
+        // The answer itself is on the big answer card above.
+        ? `<div>${s.winner ? `🏆 ${esc(s.winner)} got it right! +${pointsText(s.awarded)}` : 'Nobody got it this time'}</div>`
+        : `<div>${esc(s.answer)}${s.winner ? `<small>🏆 ${esc(s.winner)} got it right!</small>` : ''}</div>`);
     } else if (s.answering) {
       st.className = 'status answering';
       setHtml(st, `<div>🎤 ${esc(s.answering)}${s.waiting.length ? `<small>Next: ${s.waiting.slice(0, 3).map(esc).join(', ')}${s.waiting.length > 3 ? ` +${s.waiting.length - 3}` : ''}</small>` : ''}</div>`);
