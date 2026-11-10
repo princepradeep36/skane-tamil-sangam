@@ -120,7 +120,7 @@ function renderControl(s) {
   const el = $('control');
   if (s.status === 'IDLE' || s.status === 'ENDED') {
     el.innerHTML = `<h2>Run the game <span class="status">${s.status === 'ENDED' ? 'Finished' : 'Not started'}</span></h2>
-      ${s.status === 'ENDED' ? `<p><b>Final scores:</b> ${s.leaderboard.map(p => `<span class="pill">${esc(p.name)}: ${p.score}</span>`).join('') || 'No points scored.'}</p>` : ''}
+      ${s.status === 'ENDED' ? `<p><b>Final scores:</b> ${s.players.filter(p => p.score).map(p => `<span class="pill">${esc(p.name)}: ${p.score}</span>`).join('') || 'No points scored.'}</p>` : ''}
       <p class="hint">1. Open the stage screen on the projector. 2. Open the game for joining: the QR code appears on the stage screen.</p>
       <button class="primary big" onclick="act('open-lobby')">Open game for joining</button>`;
   } else if (s.status === 'LOBBY') {

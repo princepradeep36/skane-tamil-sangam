@@ -86,7 +86,7 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       winner: (game.queue.find(e => e.result === "CORRECT") || {}).name || null,
       worth: playing ? worth() : 0,
       awarded: game.awarded,
-      leaderboard: leaderboard().slice(0, 10)
+      leaderboard: leaderboard().slice(0, 5) // the stage shows the top 5 winners
     };
   }
 
