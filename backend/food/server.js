@@ -449,7 +449,7 @@ async function orderProblem(cart) {
     const max = Number(r.max_quantity) || 0;
     if (max > 0 && r.sold + wanted.get(r.id) > max) {
       const left = Math.max(0, max - r.sold);
-      return left ? `Only ${left} ${r.item_name} left. Please lower the quantity.` : `${r.item_name} is sold out. Please remove it from your cart.`;
+      return left ? `We don't have enough ${r.item_name} for that quantity. Please lower it.` : `${r.item_name} is sold out. Please remove it from your cart.`;
     }
   }
   return null;
@@ -527,7 +527,7 @@ async function cannotAdd(menuItemId, extra) {
   const max = Number(item.max_quantity) || 0;
   if (max > 0 && item.sold + extra > max) {
     const left = Math.max(0, max - item.sold);
-    return left ? `Only ${left} more ${item.item_name} left.` : `${item.item_name} is sold out.`;
+    return left ? `We don't have enough ${item.item_name} for that quantity. Please lower it.` : `${item.item_name} is sold out.`;
   }
   return null;
 }

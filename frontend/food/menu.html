@@ -386,6 +386,19 @@
 
     .sheet-add:disabled { background: #a8a29e; cursor: not-allowed; }
 
+    .menu-search {
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 10px;
+      padding: 12px 14px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 14px;
+      font-size: 16px;
+      background: #fff;
+    }
+
+    .search-hint { color: #78716c; font-size: .9rem; margin: 12px 4px 0; }
+
     /* Food / Snacks tabs */
     .category-tabs {
       display: flex;
@@ -674,6 +687,9 @@
 
     <h3 style="margin-top: 30px; padding-left: 5px;">Menu</h3>
 
+    <input type="search" class="menu-search" id="menuSearch" placeholder="🔎 Search stalls or dishes" aria-label="Search stalls or dishes"
+      oninput="renderMenu()" autocomplete="off" style="display:none;">
+
     <div class="category-tabs" id="category-tabs" style="display:none;">
       <button class="category-tab active" data-category="FOOD" onclick="selectCategory('FOOD')">🍛 Food <span class="tab-count" id="count-FOOD">0</span></button>
       <button class="category-tab nudge" data-category="SNACKS" onclick="selectCategory('SNACKS')">🍿 Snacks <span class="tab-count" id="count-SNACKS">0</span></button>
@@ -757,6 +773,7 @@
           document.getElementById(`count-${c}`).innerText = vendors.reduce((n, v) => n + v.menu.filter(m => categoryOf(m) === c).length, 0);
         });
         document.getElementById("category-tabs").style.display = "flex";
+        document.getElementById("menuSearch").style.display = "";
         renderVendorBar();
         renderMenu();
       })
@@ -844,20 +861,37 @@
       document.getElementById('category-tabs').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
+    // While searching, every stall and both Food and Snacks are searched; a stall whose name matches
+    // shows all its items, other stalls only the matching dishes. The tabs and stall chips step aside.
+    function searchedVendors(query) {
+      const has = text => String(text || '').toLowerCase().includes(query);
+      return allVendors
+        .map(v => ({ ...v, menu: has(v.name) ? v.menu : v.menu.filter(m => has(m.item_name) || has(m.description) || has(m.ingredients)) }))
+        .filter(v => v.menu.length);
+    }
+
     function renderMenu() {
         const container = document.getElementById("vendors");
-        const vendors = allVendors
+        const query = (document.getElementById("menuSearch").value || '').trim().toLowerCase();
+        document.getElementById("category-tabs").style.display = query || !allVendors.length ? "none" : "flex";
+        document.getElementById("vendor-bar").style.display = query ? "none" : (allVendors.filter(v => v.menu.length).length > 1 ? "flex" : "none");
+        const vendors = query ? searchedVendors(query) : allVendors
           .filter(v => activeVendor === 'ALL' || String(v.id) === String(activeVendor))
           .map(v => ({ ...v, menu: v.menu.filter(m => categoryOf(m) === activeCategory) }))
           .filter(v => v.menu.length);
 
+        if (query && !vendors.length) {
+          container.innerHTML = `<p style="text-align: center; padding: 20px; color: #666;">No stalls or dishes match “${Validation.escapeHtml(query)}”.</p>`;
+          return;
+        }
         if (!vendors.length) {
           container.innerHTML = `<p style="text-align: center; padding: 20px; color: #666;">No ${activeCategory === 'SNACKS' ? 'snacks' : 'food'} available ${activeVendor === 'ALL' ? 'yet' : 'from this stall'}.</p>`;
           return;
         }
 
         const esc = Validation.escapeHtml;
-        container.innerHTML = vendors.map(v => `
+        const found = vendors.reduce((n, v) => n + v.menu.length, 0);
+        container.innerHTML = (query ? `<p class="search-hint">${found} dish${found === 1 ? '' : 'es'} found in ${vendors.length} stall${vendors.length === 1 ? '' : 's'} (food and snacks). Clear the search to see the full menu.</p>` : '') + vendors.map(v => `
       <div class="stall-title"><h3>${esc(v.name)}</h3><span>${v.closed ? '<b style="color:#dc2626">🔒 Closed now</b>' : `${v.menu.length} item${v.menu.length === 1 ? '' : 's'}`}</span></div>
       <div class="item-grid">
         ${v.menu.map(m => {
@@ -881,7 +915,7 @@
           </div>`;
         }).join('')}
       </div>
-    `).join('') + (activeCategory === 'FOOD' && snackCount() ? `
+    `).join('') + (!query && activeCategory === 'FOOD' && snackCount() ? `
       <div class="snack-promo">
         <div class="emoji" aria-hidden="true">🍿</div>
         <div class="txt"><b>Snacks are here too!</b><span>${snackCount()} snack item${snackCount() === 1 ? '' : 's'} from the stalls. Want to have a look?</span></div>
