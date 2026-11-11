@@ -260,6 +260,7 @@ app.get("/vendors", async (req, res) => {
       v.name, 
       v.phone, 
       v.swish,
+      v.closed,
       COALESCE(
         json_agg(
           json_build_object(
@@ -271,6 +272,7 @@ app.get("/vendors", async (req, res) => {
             'description', m.description,
             'ingredients', m.ingredients,
             'image_updated_at', m.image_updated_at,
+            'sold_out', m.sold_out,
             'sold_quantity', COALESCE(sold.qty, 0)
           ) ORDER BY m.id
         ) FILTER (WHERE m.id IS NOT NULL AND m.is_active = TRUE), 
@@ -346,6 +348,28 @@ app.delete("/vendor/menu/:id/image", requireVendor, requireVendorMenuEditing, as
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Sold out: a vendor can switch its own items, an admin any item. Always allowed, even when menu
+// editing is turned off, so a stall can stop selling straight away.
+app.put("/vendor/menu/:id/sold-out", requireVendor, async (req, res) => {
+  try {
+    const id = await findEditableMenuItem(req, res);
+    if (!id) return;
+    await pool.query("UPDATE menu_items SET sold_out=$1 WHERE id=$2", [!!req.body.soldOut, id]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Close or reopen a whole stall: its own stall for a vendor, any stall for an admin.
+app.put("/vendor/stall/:id/closed", requireVendor, async (req, res) => {
+  const vendorId = vendorScope(req, req.params.id);
+  if (!vendorId || (req.user.role !== "admin" && Number(req.params.id) !== vendorId)) return res.status(403).json({ error: "Cannot change another stall" });
+  try {
+    const q = await pool.query("UPDATE vendors SET closed=$1 WHERE id=$2 RETURNING id", [!!req.body.closed, vendorId]);
+    if (!q.rows.length) return res.status(404).json({ error: "Stall not found" });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Description and ingredients: a vendor can edit its own items, an admin any item.
 app.put("/vendor/menu/:id/details", requireVendor, async (req, res) => {
   try {
@@ -408,12 +432,39 @@ function customerPhones(value) {
   return phone ? [...new Set([phone, normalizeInternationalPhone(phone)])] : [];
 }
 
+// Checks a cart before it becomes orders: the stall must be open and every item still on sale and in stock.
+async function orderProblem(cart) {
+  const wanted = new Map();
+  for (const vendorId in cart || {}) {
+    for (const item of cart[vendorId].items || []) wanted.set(Number(item.id), (wanted.get(Number(item.id)) || 0) + Number(item.quantity || 0));
+  }
+  if (!wanted.size) return "Your cart is empty.";
+  const q = await pool.query(`SELECT m.id, m.item_name, m.is_active, m.sold_out, m.max_quantity, v.closed, v.name AS vendor,
+      (SELECT COALESCE(SUM(quantity), 0) FROM order_items WHERE menu_item_id = m.id)::int AS sold
+    FROM menu_items m JOIN vendors v ON v.id = m.vendor_id WHERE m.id = ANY($1)`, [[...wanted.keys()]]);
+  for (const id of wanted.keys()) if (!q.rows.some(r => r.id === id)) return "An item in your cart is no longer on the menu. Please refresh the page.";
+  for (const r of q.rows) {
+    if (r.closed) return `${r.vendor} is closed now, so ${r.item_name} can't be ordered. Please remove it from your cart.`;
+    if (!r.is_active || r.sold_out) return `${r.item_name} is sold out. Please remove it from your cart.`;
+    const max = Number(r.max_quantity) || 0;
+    if (max > 0 && r.sold + wanted.get(r.id) > max) {
+      const left = Math.max(0, max - r.sold);
+      return left ? `Only ${left} ${r.item_name} left. Please lower the quantity.` : `${r.item_name} is sold out. Please remove it from your cart.`;
+    }
+  }
+  return null;
+}
+
 app.post("/order", requireFoodOrderingOpen, async (req, res) => {
   const { name, cart } = req.body;
   const phone = normalizeFoodPhone(req.body.phone);
   if (!phone) return res.status(400).json({ error: "Please enter your phone number with country code, e.g. +46 70 123 45 67." });
   const eligibility = await foodOrderEligibility(phone).catch(err => ({ eligible: false, error: err.message }));
   if (!eligibility.eligible) return res.status(403).json(eligibility);
+  try {
+    const problem = await orderProblem(cart);
+    if (problem) return res.status(409).json({ error: problem });
+  } catch (err) { return res.status(500).json({ error: err.message }); }
   let customer = await pool.query("SELECT id FROM customers WHERE phone = ANY($1) ORDER BY id LIMIT 1", [customerPhones(phone)]);
   if (customer.rows.length === 0) {
     customer = await pool.query("INSERT INTO customers(name,phone) VALUES($1,$2) RETURNING id", [name, phone]);
@@ -466,11 +517,13 @@ async function findUnpaidOrder(req, res) {
 // Returns an error message when adding `extra` more of a menu item isn't possible, otherwise null.
 async function cannotAdd(menuItemId, extra) {
   if (!(await getSettings()).food_ordering_enabled) return "Food ordering is closed now, so you can only lower quantities or remove items.";
-  const q = await pool.query(`SELECT m.item_name, m.max_quantity, m.is_active,
+  const q = await pool.query(`SELECT m.item_name, m.max_quantity, m.is_active, m.sold_out, v.closed, v.name AS vendor,
     (SELECT COALESCE(SUM(quantity), 0) FROM order_items WHERE menu_item_id = m.id)::int AS sold
-    FROM menu_items m WHERE m.id = $1`, [menuItemId]);
+    FROM menu_items m JOIN vendors v ON v.id = m.vendor_id WHERE m.id = $1`, [menuItemId]);
   const item = q.rows[0];
   if (!item || !item.is_active) return "This item isn't available any more.";
+  if (item.closed) return `${item.vendor} is closed now, so you can only lower quantities or remove items.`;
+  if (item.sold_out) return `${item.item_name} is sold out.`;
   const max = Number(item.max_quantity) || 0;
   if (max > 0 && item.sold + extra > max) {
     const left = Math.max(0, max - item.sold);
@@ -685,6 +738,9 @@ async function ensureEventRegistrationLifecycle() {
   await pool.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS ingredients VARCHAR(500) NULL`);
   // Item photos live in their own table so the menu list never loads image data.
   await pool.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS image_updated_at TIMESTAMP NULL`);
+  // A vendor or admin can mark an item sold out, or close the whole stall, at any time.
+  await pool.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS sold_out BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS closed BOOLEAN NOT NULL DEFAULT FALSE`);
   await pool.query(`CREATE TABLE IF NOT EXISTS menu_item_images (
     menu_item_id INTEGER PRIMARY KEY REFERENCES menu_items(id) ON DELETE CASCADE,
     content_type VARCHAR(50) NOT NULL,

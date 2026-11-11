@@ -127,6 +127,21 @@
             cursor: pointer;
             font-weight: bold;
         }
+        /* Stall open/closed, sold-out switches and search */
+        .stall-box { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px 16px; border-radius: 12px; margin-bottom: 16px; background: #dcfce7; border: 1px solid #86efac; }
+        .stall-box.closed { background: #fee2e2; border-color: #fca5a5; }
+        .stall-box b { font-size: 1.05rem; }
+        .stall-box small { display: block; color: #555; margin-top: 2px; }
+        .switch-btn { border: 0; border-radius: 10px; padding: 10px 14px; font-weight: bold; cursor: pointer; font-size: .95rem; }
+        .switch-btn.close { background: #dc2626; color: #fff; }
+        .switch-btn.open { background: #16a34a; color: #fff; }
+        .sold-btn { border: 1px solid #f59e0b; background: #fff7ed; color: #9a3412; border-radius: 8px; padding: 6px 10px; font-weight: bold; cursor: pointer; font-size: .85rem; margin-top: 8px; }
+        .sold-btn.is-out { background: #dc2626; border-color: #dc2626; color: #fff; }
+        .menu-item.sold-out { background: #fafafa; }
+        .menu-item.sold-out strong { text-decoration: line-through; color: #888; }
+        .out-tag { background: #dc2626; color: #fff; font-size: .72rem; font-weight: bold; padding: 2px 8px; border-radius: 999px; margin-left: 6px; }
+        [hidden] { display: none !important; }
+        .search { width: 100%; box-sizing: border-box; padding: 11px 14px; border: 1px solid #d0d5dd; border-radius: 10px; font-size: 16px; margin: 4px 0 14px; }
     </style>
     <script src="validation.js"></script>
 <link rel="stylesheet" href="../responsive.css?v=20261015">
@@ -158,6 +173,10 @@
                 <button onclick="addItem()">Add</button>
             </div>
         </div>
+
+        <div class="stall-box" id="stallBox" hidden></div>
+
+        <input type="search" class="search" id="search" placeholder="🔍 Search your menu" oninput="applySearch()" autocomplete="off">
 
         <div id="list">Loading...</div>
     </div>
@@ -196,14 +215,24 @@
 
                 if (!myVendor) return list.innerHTML = "Vendor not found";
 
+                const box = document.getElementById("stallBox");
+                box.hidden = false;
+                box.className = `stall-box ${myVendor.closed ? 'closed' : ''}`;
+                box.innerHTML = myVendor.closed
+                    ? `<div><b>🔒 Your stall is closed</b><small>Customers can't order from you now.</small></div><button class="switch-btn open" onclick="setClosed(false)">Open the stall</button>`
+                    : `<div><b>✅ Your stall is open</b><small>Customers can order. Close it to stop all orders.</small></div><button class="switch-btn close" onclick="setClosed(true)">Close the stall</button>`;
+
                 myVendor.menu.forEach(item => {
                     const div = document.createElement("div");
-                    div.className = "menu-item";
+                    div.className = `menu-item ${item.sold_out ? 'sold-out' : ''}`;
+                    div.dataset.search = `${item.item_name} ${item.description || ''} ${item.ingredients || ''}`.toLowerCase();
                     div.innerHTML = `
                         <div style="flex:1; min-width:0;">
                             <strong>${Validation.escapeHtml(item.item_name)}</strong> (${item.price}kr)
                             <span style="color:#666; font-size:0.8rem; margin-left:5px;">Max: ${item.max_quantity || '∞'}</span>
                             <span class="cat-tag">${item.category === 'SNACKS' ? 'Snacks' : 'Food'}</span>
+                            ${item.sold_out ? '<span class="out-tag">SOLD OUT</span>' : ''}
+                            <div><button class="sold-btn ${item.sold_out ? 'is-out' : ''}" onclick="setSoldOut(${item.id}, ${!item.sold_out})">${item.sold_out ? '✅ Back on sale' : '⛔ Mark as sold out'}</button></div>
                             ${item.description ? `<div class="item-note">${Validation.escapeHtml(item.description)}</div>` : ''}
                             ${item.ingredients ? `<div class="item-note"><b>Ingredients:</b> ${Validation.escapeHtml(item.ingredients)}</div>` : ''}
                             <div style="margin-top:8px">${ItemPhoto.controls(item, 'loadMenu', menuEditable)}</div>
@@ -221,7 +250,26 @@
                     `;
                     list.appendChild(div);
                 });
+                applySearch();
             } catch (e) { console.error(e); }
+        }
+
+        function applySearch() {
+            const q = document.getElementById("search").value.trim().toLowerCase();
+            document.querySelectorAll("#list .menu-item").forEach(el => { el.hidden = !!q && !el.dataset.search.includes(q); });
+        }
+
+        async function setSoldOut(id, soldOut) {
+            const res = await authFetch(`${API}/vendor/menu/${id}/sold-out`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ soldOut }) });
+            if (!res.ok) alert((await res.json().catch(() => ({}))).error || "Could not change it");
+            loadMenu();
+        }
+
+        async function setClosed(closed) {
+            if (closed && !confirm("Close your stall? Customers can't order from you until you open it again.")) return;
+            const res = await authFetch(`${API}/vendor/stall/${vendorId}/closed`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ closed }) });
+            if (!res.ok) alert((await res.json().catch(() => ({}))).error || "Could not change it");
+            loadMenu();
         }
 
         async function addItem() {

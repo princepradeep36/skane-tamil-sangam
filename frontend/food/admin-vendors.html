@@ -199,6 +199,18 @@
       cursor: pointer;
       font-weight: bold;
     }
+    [hidden] { display: none !important; }
+    .search-bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: #f4f7f9; padding: 8px 0; margin-bottom: 8px; }
+    .search-bar input { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 1px solid #d0d5dd; border-radius: 12px; font-size: 16px; }
+    .search-bar small { display: block; color: #667085; margin-top: 4px; }
+    .stall-state { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; background: #dcfce7; border: 1px solid #86efac; font-weight: bold; }
+    .stall-state.closed { background: #fee2e2; border-color: #fca5a5; }
+    .stall-state button { border: 0; border-radius: 8px; padding: 8px 12px; font-weight: bold; cursor: pointer; }
+    .stall-state .close { background: #dc2626; color: #fff; }
+    .stall-state .open { background: #16a34a; color: #fff; }
+    .btn-sold { border: 1px solid #f59e0b; background: #fff7ed; color: #9a3412; border-radius: 6px; padding: 6px 8px; font-weight: bold; cursor: pointer; font-size: .8rem; white-space: nowrap; }
+    .btn-sold.is-out { background: #dc2626; border-color: #dc2626; color: #fff; }
+    .menu-row.sold-out input[id^="name_"] { text-decoration: line-through; color: #888; }
   </style>
   <script src="validation.js"></script>
 <link rel="stylesheet" href="../responsive.css?v=20261015">
@@ -244,6 +256,11 @@
       </div>
     </div>
 
+    <div class="search-bar">
+      <input type="search" id="search" placeholder="🔍 Search stalls or menu items" oninput="applySearch()" autocomplete="off">
+      <small id="searchCount"></small>
+    </div>
+
     <div id="vendors"></div>
   </div>
 
@@ -264,9 +281,10 @@
         data.forEach(v => {
           const card = document.createElement("div");
           card.className = "admin-card";
+          card.dataset.stall = v.name.toLowerCase();
 
           let menuHtml = v.menu.map(m => `
-        <div class="menu-row">
+        <div class="menu-row ${m.sold_out ? 'sold-out' : ''}" data-item="${Validation.escapeHtml(`${m.item_name} ${m.description || ''}`.toLowerCase())}">
           <input id="name_${m.id}" value="${Validation.escapeHtml(m.item_name)}">
           <input id="price_${m.id}" value="${m.price}" type="number" placeholder="Price">
           <input id="max_${m.id}" value="${m.max_quantity}" type="number" placeholder="Max Qty">
@@ -276,6 +294,7 @@
           </select>
           <button class="btn-update" onclick="updateMenu(${m.id})">Save</button>
           <button class="btn-delete" onclick="deleteMenu(${m.id})">✖</button>
+          <div class="menu-text"><button class="btn-sold ${m.sold_out ? 'is-out' : ''}" onclick="setSoldOut(${m.id}, ${!m.sold_out})">${m.sold_out ? '⛔ Sold out · put back on sale' : 'Mark as sold out'}</button></div>
           <input class="menu-text" id="desc_${m.id}" value="${Validation.escapeHtml(m.description || '')}" placeholder="Description (optional)" maxlength="500">
           <input class="menu-text" id="ingr_${m.id}" value="${Validation.escapeHtml(m.ingredients || '')}" placeholder="Ingredients (optional)" maxlength="500">
           <div class="menu-text">${ItemPhoto.controls(m, 'loadVendors')}</div>
@@ -287,6 +306,11 @@
         <div class="card-title">
           <span>${v.name} <small style="font-weight:normal; color:#888; font-size:0.8rem;">(${v.swish})</small></span>
           <button class="btn-delete-vendor" onclick="deleteVendor(${v.id})">Delete Stall</button>
+        </div>
+
+        <div class="stall-state ${v.closed ? 'closed' : ''}">
+          <span>${v.closed ? '🔒 Stall closed: customers can’t order' : '✅ Stall open'}</span>
+          ${v.closed ? `<button class="open" onclick="setClosed(${v.id}, false)">Open the stall</button>` : `<button class="close" onclick="setClosed(${v.id}, true)">Close the stall</button>`}
         </div>
 
         <div class="login-box">
@@ -318,6 +342,7 @@
       `;
           vendorsDiv.appendChild(card);
         });
+        applySearch();
       } catch (err) {
         console.error("Load Failed:", err);
       }
@@ -421,6 +446,38 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ item_name, price, max_quantity, category, description, ingredients })
       }).then(res => res.ok ? alert("Updated") : alert("Failed"));
+    }
+
+    // Shows stalls whose name matches; for other stalls, only the menu items that match.
+    function applySearch() {
+      const q = document.getElementById("search").value.trim().toLowerCase();
+      let stalls = 0, items = 0;
+      document.querySelectorAll("#vendors .admin-card").forEach(card => {
+        const stallMatch = !q || card.dataset.stall.includes(q);
+        let itemMatches = 0;
+        card.querySelectorAll(".menu-row").forEach(row => {
+          const hit = stallMatch || row.dataset.item.includes(q);
+          row.hidden = !hit;
+          if (hit && q) itemMatches++;
+        });
+        card.hidden = !stallMatch && !itemMatches;
+        if (!card.hidden) stalls++;
+        items += itemMatches;
+      });
+      document.getElementById("searchCount").textContent = q ? `${stalls} stall${stalls === 1 ? '' : 's'} · ${items} item${items === 1 ? '' : 's'} found` : '';
+    }
+
+    async function setSoldOut(id, soldOut) {
+      const res = await authFetch(`${API}/vendor/menu/${id}/sold-out`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ soldOut }) });
+      if (!res.ok) alert((await res.json().catch(() => ({}))).error || "Could not change it");
+      loadVendors();
+    }
+
+    async function setClosed(id, closed) {
+      if (closed && !confirm("Close this stall? Customers can't order from it until it is opened again.")) return;
+      const res = await authFetch(`${API}/vendor/stall/${id}/closed`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ closed }) });
+      if (!res.ok) alert((await res.json().catch(() => ({}))).error || "Could not change it");
+      loadVendors();
     }
 
     function deleteMenu(id) {

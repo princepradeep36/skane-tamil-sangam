@@ -751,7 +751,8 @@
       })
       .then(vendors => {
         document.getElementById("sleep-message").style.display = "none";
-        allVendors = vendors;
+        // Items of a closed stall can't be ordered: treat them like sold-out items.
+        allVendors = vendors.map(v => ({ ...v, menu: v.menu.map(m => ({ ...m, stall_closed: !!v.closed })) }));
         ['FOOD', 'SNACKS'].forEach(c => {
           document.getElementById(`count-${c}`).innerText = vendors.reduce((n, v) => n + v.menu.filter(m => categoryOf(m) === c).length, 0);
         });
@@ -814,7 +815,8 @@
     function itemStock(m) {
       const sold = Number(m.sold_quantity) || 0;
       const max = Number(m.max_quantity) || 0;
-      return { max, isSoldOut: max > 0 && sold >= max, available: max > 0 ? max - sold : 1000 };
+      const isSoldOut = !!m.sold_out || !!m.stall_closed || (max > 0 && sold >= max);
+      return { max, isSoldOut, available: isSoldOut ? 0 : max > 0 ? max - sold : 1000 };
     }
 
     function findItem(vendorId, itemId) {
@@ -856,11 +858,12 @@
 
         const esc = Validation.escapeHtml;
         container.innerHTML = vendors.map(v => `
-      <div class="stall-title"><h3>${esc(v.name)}</h3><span>${v.menu.length} item${v.menu.length === 1 ? '' : 's'}</span></div>
+      <div class="stall-title"><h3>${esc(v.name)}</h3><span>${v.closed ? '<b style="color:#dc2626">🔒 Closed now</b>' : `${v.menu.length} item${v.menu.length === 1 ? '' : 's'}`}</span></div>
       <div class="item-grid">
         ${v.menu.map(m => {
           const { max, isSoldOut, available } = itemStock(m);
-          const badge = isSoldOut ? '<span class="item-badge out">SOLD OUT</span>'
+          const badge = m.stall_closed ? '<span class="item-badge out">STALL CLOSED</span>'
+            : isSoldOut ? '<span class="item-badge out">SOLD OUT</span>'
             : '';
           return `
           <div class="item-card ${isSoldOut ? 'sold-out' : ''}" onclick="openItem(${v.id}, ${m.id})" role="button" tabindex="0"
@@ -902,7 +905,7 @@
       document.getElementById('sheet-kicker').textContent = `${v.name} · ${categoryOf(m) === 'SNACKS' ? 'Snacks' : 'Food'}`;
       document.getElementById('sheet-name').textContent = m.item_name;
       document.getElementById('sheet-price').textContent = `${m.price} kr`;
-      document.getElementById('sheet-stock').textContent = isSoldOut ? 'Sold out' : '';
+      document.getElementById('sheet-stock').textContent = m.stall_closed ? 'This stall is closed now' : isSoldOut ? 'Sold out' : '';
       document.getElementById('sheet-desc').textContent = m.description || '';
       document.getElementById('sheet-desc-wrap').style.display = m.description ? '' : 'none';
       document.getElementById('sheet-ingr').textContent = m.ingredients || '';
