@@ -1,7 +1,11 @@
-// Stage games for the event: the Connection game (a question's images are shown one by one) and the Clue
-// game (a question's text clues are shown one by one). Players on their phones only have an "I want to
-// answer" button and answer out loud on stage. Buzzes queue in the order the server receives them, each
-// player can buzz once per question, and a wrong answer passes to the next in line.
+// Stage games for the event.
+//  - Connection game: a question's images are shown one by one. Players tap "I want to answer"; buzzes
+//    queue in the order the server receives them, each player can buzz once per question, and a wrong
+//    answer passes to the next in line.
+//  - Clue game: a place's 3 clues are shown one by one and EVERYONE may answer: each player types one
+//    answer per place on the phone. It is worth 3 points if sent while clue 1 is showing, 2 after clue 2
+//    and 1 after clue 3. The server suggests which answers match (allowing for typos) and the admin ticks
+//    the correct ones. The answer and the points are shown after clue 3.
 //
 // Each game is registered separately (kind "connection" or "clue") with its own routes, questions and
 // players, so both can be prepared side by side. Questions are stored in the database. The running game is
@@ -14,6 +18,36 @@ const MAX_PLAYERS = 1000;
 // Clue game: every question has exactly 3 clues. A correct answer is worth 3 points while only clue 1 is
 // showing, 2 points after clue 2 and 1 point after clue 3. The Connection game gives 1 point.
 const CLUES_PER_QUESTION = 3;
+
+// Typed answers: compare letters only, ignoring case, accents, spaces and punctuation, and allow a few
+// typos (one wrong letter, or about one in four for long names). The answer may list alternatives separated by "/".
+const normalize = s => String(s || "").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\u0b80-\u0bff]+/g, "");
+function editDistance(a, b) {
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
+}
+function looksRight(text, question) {
+  const typed = normalize(text);
+  if (!typed) return false;
+  const targets = [...String(question.answer || "").split("/"), question.details ? question.details.answerTamil : ""].map(normalize).filter(Boolean);
+  return targets.some(t => {
+    if (typed === t) return true;
+    if (t.length <= 4) return editDistance(typed, t) <= 1;
+    const allowed = Math.max(1, Math.floor(t.length / 4));
+    if (editDistance(typed, t) <= allowed) return true;
+    if (typed.length >= 5 && (t.includes(typed) || typed.includes(t))) return true; // "villiputhur", "srivilliputhur temple"
+    // Extra words around a misspelt answer ("sri villiputtur temple"): compare each stretch of the answer's length.
+    for (let len = t.length - 1; len <= t.length + 1; len++) {
+      for (let i = 0; i + len <= typed.length && typed.length > t.length; i++) if (editDistance(typed.slice(i, i + len), t) <= Math.max(1, allowed - 1)) return true;
+    }
+    return false;
+  });
+}
 
 module.exports = function registerConnectionGame(app, { pool, requireAdmin, imageContentType, kind = "connection" }) {
   const CLUES = kind === "clue";
@@ -38,7 +72,12 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       shownImages: new Set(), // image ids the audience has seen, the only ones served publicly
       revealed: false,
       awarded: 0, // points given for the current question's correct answer
-      queue: [] // [{ playerId, name, result: null | 'WRONG' | 'CORRECT' }], in buzz order
+      queue: [], // [{ playerId, name, result: null | 'WRONG' | 'CORRECT' }], in buzz order
+      // Clue game: this place's typed answers (playerId → { name, text, clue, at, suggested, correct }),
+      // the points given per place (qIndex → Map playerId → { points, at }) and the scores screen.
+      answers: new Map(),
+      awards: new Map(),
+      showScores: false
     };
   }
   let game = emptyGame();
@@ -47,6 +86,24 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
   const currentQuestion = () => game.questions[game.qIndex] || null;
   const answeringEntry = () => (game.status === "PLAYING" && !game.revealed ? game.queue.find(e => !e.result) || null : null);
   const worth = () => (CLUES ? Math.max(1, CLUES_PER_QUESTION - game.imageIndex) : 1);
+  const pointsForClue = clue => Math.max(1, CLUES_PER_QUESTION - clue + 1);
+  const playerById = id => [...game.players.values()].find(p => p.id === id);
+
+  // Clue game: points for the current place come from the ticked answers; every player's score is the
+  // sum of their places, and reachedAt is when they sent the answer that brought them to that score.
+  function scoreCurrentPlace() {
+    const awards = new Map();
+    for (const [playerId, a] of game.answers) if (a.correct) awards.set(playerId, { points: pointsForClue(a.clue), at: a.at });
+    game.awards.set(game.qIndex, awards);
+    for (const player of game.players.values()) {
+      player.score = 0; player.reachedAt = 0;
+      for (const place of game.awards.values()) {
+        const won = place.get(player.id);
+        if (won) { player.score += won.points; player.reachedAt = Math.max(player.reachedAt, won.at); }
+      }
+    }
+  }
+  const placeAwards = () => game.awards.get(game.qIndex) || new Map();
   // Highest score first; on equal scores, whoever reached that score first ranks higher.
   const byRank = (a, b) => b.score - a.score || a.reachedAt - b.reachedAt;
   const ranked = () => [...game.players.values()].filter(p => p.score > 0).sort(byRank);
@@ -63,6 +120,8 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
     game.revealed = false;
     game.awarded = 0;
     game.queue = [];
+    game.answers = new Map();
+    game.showScores = false;
     showImage(0);
   }
 
@@ -93,7 +152,27 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       winner: (game.queue.find(e => e.result === "CORRECT") || {}).name || null,
       worth: playing ? worth() : 0,
       awarded: game.awarded,
-      leaderboard: leaderboard().slice(0, 5) // the stage shows the top 5 winners
+      leaderboard: leaderboard().slice(0, 5), // the stage shows the top 5 winners
+      ...(CLUES ? clueState() : {})
+    };
+  }
+
+  // Clue game extras: how many answered (not who or what, until the reveal), then who got it right.
+  function clueState() {
+    const perClue = [0, 0, 0];
+    for (const a of game.answers.values()) perClue[a.clue - 1]++;
+    const awards = placeAwards();
+    return {
+      answerCount: game.answers.size,
+      answersPerClue: perClue,
+      canReveal: game.status === "PLAYING" && game.imageIndex >= CLUES_PER_QUESTION - 1,
+      showScores: game.revealed && game.showScores,
+      correctPlayers: game.revealed
+        ? [...awards.entries()].map(([id, w]) => ({ name: (playerById(id) || {}).name || "?", points: w.points, at: w.at }))
+          .sort((a, b) => b.points - a.points || a.at - b.at).map(({ name, points }) => ({ name, points }))
+        : [],
+      // Scores after this place: top 10, with what each gained on this place.
+      roundBoard: game.revealed ? ranked().slice(0, 10).map(p => ({ name: p.name, score: p.score, gained: (awards.get(p.id) || {}).points || 0 })) : []
     };
   }
 
@@ -121,6 +200,18 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
     const entry = game.queue.find(e => e.playerId === player.id);
     const answering = answeringEntry();
     const ahead = entry && !entry.result ? game.queue.filter(e => !e.result).indexOf(entry) : 0;
+    if (CLUES) {
+      const mine = game.answers.get(player.id);
+      const won = placeAwards().get(player.id);
+      return {
+        ...view,
+        name: player.name,
+        score: player.score,
+        canAnswer: game.status === "PLAYING" && !game.revealed && !mine,
+        myAnswer: mine ? { text: mine.text, clue: mine.clue, points: pointsForClue(mine.clue) } : null,
+        result: game.revealed && mine ? { correct: !!won, points: won ? won.points : 0 } : null
+      };
+    }
     return {
       ...view,
       name: player.name,
@@ -151,6 +242,16 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
   app.post(`/${kind}/answer`, (req, res) => {
     const player = game.players.get(String(req.body?.token || ""));
     if (!player) return res.status(404).json({ error: "Please join the game again.", needJoin: true });
+    if (CLUES) {
+      // Everyone may answer, once per place, until the answer is shown.
+      if (game.status !== "PLAYING" || game.revealed) return res.status(409).json({ error: "You can't send an answer right now.", ...playerView(player) });
+      if (game.answers.has(player.id)) return res.status(409).json({ error: "You have already sent your answer for this place.", ...playerView(player) });
+      const text = String(req.body?.text || "").replace(/\s+/g, " ").trim().slice(0, 100);
+      if (!text) return res.status(400).json({ error: "Please type your answer." });
+      const suggested = looksRight(text, currentQuestion());
+      game.answers.set(player.id, { name: player.name, text, clue: game.imageIndex + 1, at: Date.now(), suggested, correct: suggested });
+      return res.json(playerView(player));
+    }
     const entry = game.status === "PLAYING" && !game.revealed ? game.queue.find(e => e.playerId === player.id && !e.result) : null;
     if (!entry) return res.status(409).json({ error: "You can't send an answer right now.", ...playerView(player) });
     if (entry.typed) return res.status(409).json({ error: "You have already sent your answer.", ...playerView(player) });
@@ -315,9 +416,20 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       allClues: q && CLUES ? q.clues : [],
       players: [...ranked(), ...[...game.players.values()].filter(p => !p.score).sort((a, b) => a.name.localeCompare(b.name))]
         .map(p => ({ name: p.name, score: p.score })),
-      hasMoreQuestions: game.qIndex + 1 < game.questions.length
+      hasMoreQuestions: game.qIndex + 1 < game.questions.length,
+      // Clue game: every typed answer, grouped by clue, with the suggestion and the admin's tick.
+      review: CLUES ? [...game.answers.entries()].map(([playerId, a]) => ({ playerId, name: a.name, text: a.text, clue: a.clue, points: pointsForClue(a.clue), suggested: a.suggested, correct: a.correct }))
+        .sort((a, b) => a.clue - b.clue || b.suggested - a.suggested || a.name.localeCompare(b.name)) : []
     };
   }
+
+  // Clue game: the admin ticks (or unticks) an answer as correct. After the reveal the points update too.
+  if (CLUES) app.post(`/admin/${kind}/review`, requireAdmin, (req, res) => {
+    const ids = Array.isArray(req.body?.playerIds) ? req.body.playerIds : [req.body?.playerId];
+    for (const id of ids) { const a = game.answers.get(Number(id)); if (a) a.correct = !!req.body?.correct; }
+    if (game.revealed) scoreCurrentPlace();
+    res.json(adminState());
+  });
 
   app.get(`/admin/${kind}/state`, requireAdmin, (req, res) => {
     res.set("Cache-Control", "no-store").json(adminState());
@@ -344,6 +456,13 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
         game.questions = questions;
         game.status = "PLAYING";
         beginQuestion(0);
+      } else if (game.status === "PLAYING" && q && CLUES && ["reveal", "show-scores", "hide-scores"].includes(action)) {
+        // Clue game: the answer only after the last clue; then the points are counted.
+        if (action === "reveal") {
+          if (game.imageIndex < CLUES_PER_QUESTION - 1) return res.status(409).json({ error: "Show all 3 clues before the answer." });
+          game.revealed = true;
+          scoreCurrentPlace();
+        } else if (game.revealed) game.showScores = action === "show-scores";
       } else if (game.status === "PLAYING" && q) {
         const answering = answeringEntry();
         if (action === "next-image") showImage(game.imageIndex + 1);

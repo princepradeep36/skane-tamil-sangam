@@ -83,7 +83,17 @@ body.clue .howto b,body.clue .howto .pts b{background:#f6c343;color:#3d0815}
 .chips span:nth-child(2){background:#f6c343;color:#2b0710}
 .ans .fact{margin:2.4vh 0 0;font-size:3.8vh;font-weight:500;line-height:1.35}
 body.clue .status.answering{background:#16a34a}
-body.clue .status.answer{background:#f6c343;color:#3d0815;font-size:5vh}
+body.clue .status.answer{background:#f6c343;color:#3d0815;font-size:4.4vh}
+body.clue .status .names-line{display:block;font-size:2.6vh;font-weight:700;margin-top:.6vh;opacity:.9}
+.board{flex:1;min-height:0;display:flex;flex-direction:column;gap:1.1vh;justify-content:center}
+.board-title{font-size:6vh;font-weight:800;color:#fbf3e4;margin:0 0 1vh}
+.board-row{display:flex;align-items:center;gap:2vw;background:rgba(255,255,255,.1);border-radius:1.4vh;padding:1vh 2vw;font-size:3.3vh;font-weight:700}
+.board-row .rank{width:5vh;text-align:center;color:#f6c343;font-weight:800}
+.board-row .who{flex:1;min-width:0}
+.board-row .gain{color:#7ee2a0;font-weight:800;min-width:9vh;text-align:right}
+.board-row .pts{min-width:13vh;text-align:right}
+.board-row.top{background:#f6c343;color:#3d0815}
+.board-row.top .rank,.board-row.top .gain{color:#3d0815}
 .status{margin-top:1.5vh;min-height:13vh;display:flex;align-items:center;justify-content:center;gap:2vw;text-align:center;border-radius:18px;padding:1vh 2vw;font-weight:900}
 .status.answering{background:#16a34a;font-size:6vh}
 .status.answer{background:#ffc107;color:#3d2c06;font-size:7vh}
@@ -158,6 +168,13 @@ function setHtml(el, html) { if (el.dataset.html !== html) { el.dataset.html = h
 // Clue game: heading and the 3 clue cards (later ones still locked), or the answer card once revealed.
 function cluePanel(s) {
   const foot = `<div class="cp-foot"><span>Guess the Place · Tamil Heritage</span><span>${s.questionNumber} / ${s.questionTotal}</span></div>`;
+  if (s.showScores) {
+    const medals = ['🥇', '🥈', '🥉'];
+    return `<div class="board"><div class="board-title">🏆 Scores after place ${s.questionNumber}</div>
+      ${s.roundBoard.map((p, i) => `<div class="board-row${i === 0 ? ' top' : ''}"><span class="rank">${medals[i] || i + 1}</span><span class="who">${esc(p.name)}</span>
+        <span class="gain">${p.gained ? `+${p.gained}` : ''}</span><span class="pts">${pointsText(p.score)}</span></div>`).join('')
+        || '<div class="board-row"><span class="who">No points yet</span></div>'}</div>${foot}`;
+  }
   if (s.revealed) {
     const d = s.answerDetails || {};
     return `<div class="ans">
@@ -179,12 +196,20 @@ function cluePanel(s) {
 // The rules slide the admin shows in the lobby before starting.
 const RULES = [
   GAME === 'clue' ? 'Each place has <b>3 clues</b>, shown one at a time on this screen.' : 'Each question has <b>several pictures</b>, shown one at a time. They are all connected to one answer.',
-  'Know the answer? Tap <b>I want to answer</b> on your phone. The fastest tap goes first.',
-  'Then <b>type your answer</b> on your phone and send it. Spelling mistakes are fine: the quiz master decides if it is right.',
-  'When it is your turn, your answer appears here on the screen.',
-  'Wrong answer? The next person in line gets a chance. <b>One try per question</b> for each player.',
-  GAME === 'clue' ? 'The sooner you guess, the more points you get (see below).' : 'Each correct answer is <b>1 point</b>. The highest score wins!',
-  'Same points? Whoever reached that score <b>first</b> ranks higher.',
+  ...(GAME === 'clue' ? [
+    '<b>Everyone can answer!</b> Tap <b>I want to answer</b> and type your answer on your phone.',
+    'You can send <b>one answer per place</b>. Answer early for more points (see below), or wait for more clues.',
+    'Spelling mistakes are fine: the quiz master checks every answer.',
+    'The answer and the scores are shown after clue 3.',
+    'Same points? Whoever answered <b>first</b> ranks higher.'
+  ] : [
+    'Know the answer? Tap <b>I want to answer</b> on your phone. The fastest tap goes first.',
+    'Then <b>type your answer</b> on your phone and send it. Spelling mistakes are fine: the quiz master decides if it is right.',
+    'When it is your turn, your answer appears here on the screen.',
+    'Wrong answer? The next person in line gets a chance. <b>One try per question</b> for each player.',
+    'Each correct answer is <b>1 point</b>. The highest score wins!',
+    'Same points? Whoever reached that score <b>first</b> ranks higher.'
+  ]),
   "The quiz master's decision is final. Have fun! 🎉"
 ];
 $('rulesList').innerHTML = RULES.map(r => `<li><span>${r}</span></li>`).join('');
@@ -215,7 +240,18 @@ function render(s) {
       $('img').src = `${API}/${GAME}/image/${s.imageId}`;
     }
     const st = $('status');
-    if (s.revealed) {
+    if (GAME === 'clue') {
+      // Everyone answers on their phone: show how many have answered, then who got it right.
+      if (s.revealed) {
+        const right = s.correctPlayers || [];
+        st.className = 'status answer';
+        setHtml(st, `<div>${right.length ? `🏆 ${right.length} player${right.length === 1 ? '' : 's'} got it right!` : 'Nobody got it this time'}${right.length
+          ? `<span class="names-line">${right.slice(0, 8).map(p => `${esc(p.name)} +${p.points}`).join(' · ')}${right.length > 8 ? ` · +${right.length - 8} more` : ''}</span>` : ''}</div>`);
+      } else {
+        st.className = 'status idle';
+        setHtml(st, `<div>Everyone can answer: tap <b>I want to answer</b> on your phone!<small>📝 ${s.answerCount} answer${s.answerCount === 1 ? '' : 's'} so far</small></div>`);
+      }
+    } else if (s.revealed) {
       st.className = 'status answer';
       setHtml(st, GAME === 'clue'
         // The answer itself is on the big answer card above.

@@ -93,19 +93,24 @@ const POINT_CARDS = `<div class="points">
 const pointsText = n => `${n} point${n === 1 ? '' : 's'}`;
 
 // Shown on the join, waiting and "not open yet" screens, before the game starts.
-const HOW_TO_PLAY = `<div class="howto"><h2>How to play</h2><ol>
-  <li><span>${GAME === 'clue' ? '🔎' : '🖼️'}</span><div>${GAME === 'clue'
-    ? 'Clues appear on the stage screen one by one. Each new clue makes it easier to guess the answer.'
-    : 'Pictures appear on the stage screen one by one. They are all connected to one answer.'}</div></li>
+const HOW_TO_PLAY = GAME === 'clue'
+  ? `<div class="howto"><h2>How to play</h2><ol>
+  <li><span>🔎</span><div>Each place has <b>3 clues</b>, shown one by one on the stage screen.</div></li>
+  <li><span>✋</span><div><b>Everyone can answer!</b> Tap <b>I want to answer</b> and type your answer on your phone.</div></li>
+  <li><span>☝️</span><div>You can send <b>one answer per place</b>. Answer early for more points, or wait for more clues.</div></li>
+  <li><span>✏️</span><div>Spelling mistakes are fine: the quiz master checks every answer.</div></li>
+  <li><span>🏆</span><div>The answer and the scores are shown after clue 3. The highest score wins!</div></li>
+  <li><span>⏱️</span><div>Same points? Whoever answered first ranks higher.</div></li>
+</ol>${POINT_CARDS}</div>`
+  : `<div class="howto"><h2>How to play</h2><ol>
+  <li><span>🖼️</span><div>Pictures appear on the stage screen one by one. They are all connected to one answer.</div></li>
   <li><span>✋</span><div>Know the answer? Tap <b>I want to answer</b> on your phone. The fastest tap goes first.</div></li>
   <li><span>⌨️</span><div>Then <b>type your answer</b> on your phone and send it. Spelling mistakes are fine: the quiz master decides if it is right.</div></li>
   <li><span>🎤</span><div>When your phone says <b>It's your turn</b>, your answer appears on the stage screen.</div></li>
   <li><span>🔁</span><div>Wrong answer? The next person in line gets a chance. You get one try per question.</div></li>
-  <li><span>🏆</span><div>${GAME === 'clue'
-    ? 'The sooner you guess, the more points you get. The highest score wins!'
-    : 'Each correct answer is 1 point. The highest score wins!'}</div></li>
+  <li><span>🏆</span><div>Each correct answer is 1 point. The highest score wins!</div></li>
   <li><span>⏱️</span><div>Same points? Whoever reached that score first ranks higher.</div></li>
-</ol>${GAME === 'clue' ? POINT_CARDS : ''}</div>`;
+</ol></div>`;
 
 function showJoin(status) {
   const open = status === 'LOBBY' || status === 'PLAYING';
@@ -148,6 +153,7 @@ function showPlayer(me) {
   if (me.status === 'ENDED') {
     return render('ended' + me.score, `<div class="emoji">🎉</div><p class="big">Thanks for playing!</p><p class="sub">Your score: <b>${me.score}</b></p>`);
   }
+  if (GAME === 'clue') return showClueRound(me);
   if (me.turn === 'CORRECT') {
     return render('correct' + me.questionNumber, `<div class="panel win"><div class="emoji">🏆</div><p class="big">Correct!</p>${GAME === 'clue' ? `<p class="big">+${pointsText(me.awarded)}</p>` : ''}<p class="sub">Well done. Next question coming up.</p></div>`);
   }
@@ -198,6 +204,40 @@ function showAnswering(me) {
   const box = document.getElementById('turnBox');
   const html = turnPanel(me);
   if (box.dataset.html !== html) { box.dataset.html = html; box.innerHTML = html; }
+}
+
+// Clue game: everyone may answer once per place. The form is drawn once per place (so typing is never
+// interrupted when the next clue comes); only the "worth" badge above it is updated.
+function showClueRound(me) {
+  const q = me.questionNumber;
+  if (me.revealed) {
+    if (me.result && me.result.correct) return render('right' + q + '-' + me.result.points, `<div class="panel win"><div class="emoji">🏆</div><p class="big">Correct!</p><p class="big">+${pointsText(me.result.points)}</p><p class="sub">Your answer: <b>${esc(me.myAnswer.text)}</b></p></div>`);
+    if (me.myAnswer) return render('miss' + q, `<div class="panel bad"><div class="emoji">🙈</div><p class="big">Not this time</p><p class="sub">Your answer: <b>${esc(me.myAnswer.text)}</b>. See the right answer on the stage screen.</p></div>`);
+    return render('shown' + q, `<div class="emoji">👀</div><p class="big">Answer revealed</p><p class="sub">See the stage screen. Next place coming up.</p>`);
+  }
+  if (me.myAnswer) {
+    return render('sent' + q, `<div class="panel wait"><div class="emoji">✅</div><p class="big">Answer sent</p>
+      <div class="sent">Your answer<b>${esc(me.myAnswer.text)}</b></div>
+      <p class="sub" style="margin-top:12px">Sent at clue ${me.myAnswer.clue}: <b>${pointsText(me.myAnswer.points)}</b> if correct. The answer is shown after clue 3.</p></div>`);
+  }
+  if (lastView !== 'ask' + q) {
+    render('ask' + q, `<span class="worth" id="worthBadge"></span>
+      <button class="buzz" id="buzz">I want<br>to answer</button>
+      <form class="answer" id="answerForm" hidden>
+        <input id="answerText" maxlength="100" autocomplete="off" autocapitalize="words" placeholder="Type your answer" aria-label="Your answer" required>
+        <button type="submit">Send answer</button>
+        <p class="note">One answer per place. Spelling mistakes are fine: the quiz master checks every answer.</p>
+      </form>
+      <p class="sub" id="askNote">Everyone can answer. Answer now for more points, or wait for the next clue.</p>`);
+    document.getElementById('buzz').onclick = () => {
+      document.getElementById('buzz').hidden = true;
+      document.getElementById('askNote').hidden = true;
+      document.getElementById('answerForm').hidden = false;
+      document.getElementById('answerText').focus();
+    };
+    document.getElementById('answerForm').onsubmit = sendAnswer;
+  }
+  document.getElementById('worthBadge').textContent = `⭐ Worth ${pointsText(me.worth)} now`;
 }
 
 async function sendAnswer(e) {

@@ -61,6 +61,18 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .clue-preview div.shown{background:#334155;color:#fff}
 .clue-preview div.current{background:#fff;color:#003d80;font-weight:bold}
 .clue-preview div small{display:block;font-size:11px;font-weight:bold;opacity:.7;text-transform:uppercase;letter-spacing:.04em}
+.review{margin-top:4px}
+.review-group{border:1px solid #e5e7eb;border-radius:12px;margin-top:10px;overflow:hidden}
+.review-head{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#f8fafc;padding:8px 12px;font-weight:bold;flex-wrap:wrap}
+.review-head .row button{padding:5px 9px;font-size:12px}
+.review-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-top:1px solid #f1f5f9;cursor:pointer}
+.review-row input{width:20px;height:20px;flex:0 0 auto}
+.review-row .who{width:30%;min-width:0;font-weight:bold;word-break:break-word}
+.review-row .txt{flex:1;min-width:0;word-break:break-word}
+.review-row.on{background:#f0fdf4}
+.chip{font-size:11px;font-weight:bold;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.chip.ok{background:#dcfce7;color:#166534}.chip.no{background:#f1f5f9;color:#64748b}
+.count-note{color:#667085;font-size:.9rem;margin:6px 0 0}
 .newq{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
 .newq input{flex:1;min-width:220px;padding:11px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:15px}
 [hidden]{display:none!important}
@@ -71,7 +83,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <body>
 <div class="wrap">
   <div class="top">
-    <div><h1 id="pageTitle">🎯 Connection Game</h1><p>Players join by QR code and tap "I want to answer". Answers are given on stage.</p></div>
+    <div><h1 id="pageTitle">🎯 Connection Game</h1><p id="pageSub">Players join by QR code and tap "I want to answer". Answers are given on stage.</p></div>
     <div class="row"><a class="btn go" id="stageLink" href="../connection-screen.html" target="_blank" rel="noopener">🖥️ Open stage screen</a><a class="btn back" href="admin.html?admin=true">Admin Home</a></div>
   </div>
 
@@ -99,8 +111,9 @@ const pointsText = n => `${n} point${n === 1 ? '' : 's'}`;
 if (CLUES) {
   document.title = 'Clue Game';
   $('pageTitle').textContent = '🔎 Clue Game';
+  $('pageSub').textContent = 'Players join by QR code. Everyone types an answer on their phone; you tick the correct ones.';
   $('stageLink').href = '../connection-screen.html?game=clue';
-  $('questionsHint').textContent = 'Each question has exactly 3 text clues, shown one at a time, and one answer. Add the answer, then its 3 clues in the order to show them (hardest first, easiest last). A correct answer after clue 1 scores 3 points, after clue 2 scores 2 points, after clue 3 scores 1 point.';
+  $('questionsHint').textContent = 'Each question has exactly 3 text clues, shown one at a time, and one answer. Add the answer, then its 3 clues in the order to show them (hardest first, easiest last). Everyone answers on their phone: an answer sent while clue 1 is showing scores 3 points, after clue 2 scores 2, after clue 3 scores 1. Typed answers are matched allowing for spelling mistakes; to accept other names too, separate them with / (e.g. Thanjavur / Tanjore).';
 }
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const json = { 'Content-Type': 'application/json' };
@@ -133,6 +146,8 @@ function renderControl(s) {
       <div class="row" style="margin-top:14px">${s.showRules
         ? `<button class="ghost" onclick="act('hide-rules')">← Back to QR code</button>`
         : `<button class="primary big" onclick="act('show-rules')">📜 Show rules on screen</button>`}<button class="go big" onclick="act('start')">▶ Start game</button><button class="ghost" onclick="act('reset','Cancel this game?')">Cancel</button></div>`;
+  } else if (CLUES) {
+    el.innerHTML = clueControl(s);
   } else {
     const first = s.imageNumber <= 1, last = s.imageNumber >= s.imageCount;
     el.innerHTML = `<h2>${CLUES ? "Place" : "Question"} ${s.questionNumber} of ${s.questionTotal} <span class="status">${s.playerCount} players</span></h2>
@@ -171,6 +186,62 @@ function renderControl(s) {
       </div>
       <p class="line" style="margin-top:14px"><b>Scores:</b> ${s.players.filter(p => p.score).map(p => `<span class="pill">${esc(p.name)}: ${p.score}</span>`).join('') || '<span class="hint">None yet</span>'}</p>`;
   }
+}
+
+// Clue game: everyone answers on their phone. The admin ticks the correct answers (the server already
+// ticked the ones that match the answer, allowing for typos), clue by clue, and reveals after clue 3.
+function clueControl(s) {
+  const first = s.imageNumber <= 1, last = s.imageNumber >= s.imageCount;
+  const groups = [1, 2, 3].map(clue => {
+    const rows = s.review.filter(a => a.clue === clue);
+    const ticked = rows.filter(a => a.correct).length;
+    return `<div class="review-group">
+      <div class="review-head"><span>Answered at clue ${clue} · ${pointsText(4 - clue)} each · ${rows.length} answer${rows.length === 1 ? '' : 's'} · ✓ ${ticked} correct</span>
+        ${rows.length ? `<span class="row"><button class="go" onclick="markClue(${clue}, true)">✓ All correct</button><button class="ghost" onclick="markClue(${clue}, false)">✗ All wrong</button></span>` : ''}</div>
+      ${rows.map(a => `<label class="review-row ${a.correct ? 'on' : ''}"><input type="checkbox" ${a.correct ? 'checked' : ''} onchange="markAnswer(${a.playerId}, this.checked)">
+        <span class="who">${esc(a.name)}</span><span class="txt">${esc(a.text)}</span>
+        <span class="chip ${a.suggested ? 'ok' : 'no'}">${a.suggested ? '🤖 matches' : 'no match'}</span></label>`).join('')}
+    </div>`;
+  }).join('');
+  return `<h2>Place ${s.questionNumber} of ${s.questionTotal} <span class="status">${s.playerCount} players</span></h2>
+    <div class="game">
+      <div>
+        <div class="clue-preview">${s.allClues.map((c, i) => `<div class="${i + 1 === s.imageNumber ? 'current' : i < s.imageNumber ? 'shown' : ''}"><small>Clue ${i + 1} · ${i + 1 === s.imageNumber ? 'on screen now' : i < s.imageNumber ? 'shown' : 'not shown yet'}</small>${esc(c)}</div>`).join('')}</div>
+        <div class="row" style="margin-top:10px;justify-content:space-between">
+          <button class="ghost" onclick="act('prev-image')" ${first || s.revealed ? 'disabled' : ''}>← Previous</button>
+          <b>Clue ${s.imageNumber} of ${s.imageCount}${s.revealed ? '' : ` · <span style="color:#b26a00">⭐ Worth ${pointsText(s.worth)} now</span>`}</b>
+          <button class="primary" onclick="act('next-image')" ${last || s.revealed ? 'disabled' : ''}>Next clue →</button>
+        </div>
+        <div class="row" style="margin-top:14px">
+          ${s.revealed
+            ? `${s.showScores
+                ? `<button class="ghost" onclick="act('hide-scores')">← Back to the answer</button>`
+                : `<button class="primary big" onclick="act('show-scores')">🏆 Show scores on stage</button>`}
+               <button class="go big" onclick="act('next-question')">${s.hasMoreQuestions ? 'Next place →' : 'Finish game 🎉'}</button>`
+            : `<button class="warn big" onclick="act('reveal')" ${s.canReveal ? '' : 'disabled'} title="${s.canReveal ? '' : 'Show all 3 clues first'}">Show answer &amp; points</button>
+               <button class="ghost" onclick="act('next-question','Skip this place without showing the answer? Nobody gets points for it.')">Skip place</button>`}
+          <button class="ghost" onclick="act('end','End the game now?')">End game</button>
+        </div>
+        ${s.revealed ? '' : `<p class="count-note">${s.canReveal ? 'All 3 clues are shown: check the answers, then show the answer and points.' : 'The answer can be shown after clue 3.'}</p>`}
+      </div>
+      <div>
+        <div class="secret"><small>🔒 Answer (only on this screen${s.revealed ? ', now shown on stage too' : ''})</small><b>${esc(s.secretAnswer)}</b>${s.secretTamil ? ` <span style="color:#a3122e;font-size:1.2rem;font-weight:bold">${esc(s.secretTamil)}</span>` : ''}</div>
+        <b>📝 Answers (${s.review.length})</b>
+        <p class="count-note">Ticked = correct. Answers that match the right answer (allowing for spelling mistakes) are ticked for you; change any tick you disagree with.${s.revealed ? ' Points update straight away.' : ''}</p>
+        <div class="review">${groups}</div>
+      </div>
+    </div>
+    <p class="line" style="margin-top:14px"><b>Scores:</b> ${s.players.filter(p => p.score).map(p => `<span class="pill">${esc(p.name)}: ${p.score}</span>`).join('') || '<span class="hint">None yet</span>'}</p>`;
+}
+
+async function review(body) {
+  const r = await authFetch(`${API}/admin/${GAME}/review`, { method: 'POST', headers: json, body: JSON.stringify(body) });
+  if (r.ok) { lastState = ''; renderControl(await r.json()); }
+}
+const markAnswer = (playerId, correct) => review({ playerId, correct });
+function markClue(clue, correct) {
+  const ids = JSON.parse(lastState || '{}').review?.filter(a => a.clue === clue).map(a => a.playerId) || [];
+  if (ids.length) review({ playerIds: ids, correct });
 }
 
 async function poll() {
