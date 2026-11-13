@@ -72,6 +72,14 @@ body.clue .howto b,body.clue .howto .pts b{background:#f6c343;color:#3d0815}
 .cp-card.new{box-shadow:0 0 0 .45vh #f6c343,0 1.6vh 4vh rgba(0,0,0,.35)}
 .cp-card.locked{background:rgba(255,255,255,.06);border-left-color:rgba(255,255,255,.18);color:rgba(255,255,255,.45);font-style:italic}
 .cp-card.locked .num{background:rgba(255,255,255,.12);color:rgba(255,255,255,.55)}
+/* Image clues: side by side, left to right */
+.cp-cards.row{flex-direction:row;align-items:stretch;gap:1.6vw}
+.cp-cards.row .cp-card{flex:1;min-width:0;flex-direction:column;align-items:stretch;justify-content:flex-start;padding:1.4vh 1vw 1.4vh 1.2vw;gap:1.2vh;font-size:3vh}
+.cp-cards.row .cp-card .num{width:6vh;height:6vh;font-size:3.4vh;align-self:flex-start}
+.cp-cards.row .cp-pic{flex:1;min-height:0;border-radius:1.2vh;overflow:hidden;background:rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center}
+.cp-cards.row .cp-pic img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.cp-cards.row .cp-text{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 .6vw;line-height:1.3}
+.cp-cards.row .locked .cp-text{font-size:2.8vh}
 .cp-foot{display:flex;justify-content:space-between;font-weight:700;font-size:2.4vh;color:#f3d9a6;opacity:.9;padding-bottom:.4vh}
 .ans{flex:1;min-height:0;background:#f4efe4;color:#2b0710;border-radius:2vh;padding:5vh 5vw;display:flex;flex-direction:column;justify-content:center;border-top:1vh solid #e8892b}
 .ans-kicker{color:#8e1b2e;font-weight:800;letter-spacing:.2em;font-size:2.8vh}
@@ -185,12 +193,17 @@ function cluePanel(s) {
         ${d.fact ? `<p class="fact">${esc(d.fact)}</p>` : ''}
       </div>${foot}`;
   }
+  // A place with image clues shows its clues side by side; text-only places stack them downwards.
+  const row = (s.clueKinds || []).includes('image');
+  const shown = c => (c.image
+    ? `<div class="cp-pic"><img src="${API}/${GAME}/image/${c.image}" alt="Image clue"></div>`
+    : row ? `<span class="cp-text">${esc(c.text)}</span>` : `<span>${esc(c.text)}</span>`);
   const cards = Array.from({ length: s.imageCount }, (_, i) => i < s.clues.length
-    ? `<div class="cp-card${i === s.clues.length - 1 ? ' new' : ''}"><span class="num">${i + 1}</span><span>${esc(s.clues[i])}</span></div>`
-    : `<div class="cp-card locked"><span class="num">${i + 1}</span><span>Clue ${i + 1} is coming…</span></div>`).join('');
+    ? `<div class="cp-card${i === s.clues.length - 1 ? ' new' : ''}"><span class="num">${i + 1}</span>${shown(s.clues[i])}</div>`
+    : `<div class="cp-card locked"><span class="num">${i + 1}</span>${row ? `<span class="cp-text">Clue ${i + 1} is coming…</span>` : `<span>Clue ${i + 1} is coming…</span>`}</div>`).join('');
   return `<div class="cp-head"><div><div class="cp-kicker">PLACE ${s.questionNumber} OF ${s.questionTotal}</div><div class="cp-title">Guess the place!</div></div>
       <span class="cp-worth">⭐ Worth ${pointsText(s.worth)} now</span></div>
-    <div class="cp-cards">${cards}</div>${foot}`;
+    <div class="cp-cards${row ? ' row' : ''}">${cards}</div>${foot}`;
 }
 
 // The rules slide the admin shows in the lobby before starting.

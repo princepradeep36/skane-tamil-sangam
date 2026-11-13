@@ -56,8 +56,9 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
   // Clue questions also have a Tamil name, two short tags and a fact, shown with the answer.
   const DETAIL_COLUMNS = CLUES ? ", q.answer_tamil, q.tag1, q.tag2, q.fact" : "";
   const details = r => (CLUES ? { answerTamil: r.answer_tamil || "", tags: [r.tag1, r.tag2].filter(Boolean), fact: r.fact || "" } : null);
+  // A clue is either text or an image (image clues are shown side by side on the stage).
   const itemsJson = CLUES
-    ? `COALESCE((SELECT json_agg(json_build_object('id', i.id, 'text', i.text) ORDER BY i.position, i.id) FROM ${ITEMS} i WHERE i.question_id = q.id), '[]')`
+    ? `COALESCE((SELECT json_agg(json_build_object('id', i.id, 'text', i.text, 'image', i.image IS NOT NULL) ORDER BY i.position, i.id) FROM ${ITEMS} i WHERE i.question_id = q.id), '[]')`
     : `COALESCE((SELECT json_agg(i.id ORDER BY i.position, i.id) FROM ${ITEMS} i WHERE i.question_id = q.id), '[]')`;
 
   function emptyGame() {
@@ -139,7 +140,8 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       questionNumber: q ? game.qIndex + 1 : 0,
       questionTotal: game.questions.length,
       imageId: playing && !CLUES ? q.imageIds[game.imageIndex] : null,
-      clues: playing && CLUES ? q.clues.slice(0, game.imageIndex + 1) : [],
+      clues: playing && CLUES ? q.clues.slice(0, game.imageIndex + 1).map(c => ({ text: c.image ? "" : c.text, image: c.image ? c.id : null })) : [],
+      clueKinds: playing && CLUES ? q.clues.map(c => (c.image ? "image" : "text")) : [],
       imageNumber: q ? game.imageIndex + 1 : 0,
       imageCount: q ? q.imageIds.length : 0,
       answering: answering ? answering.name : null,
@@ -147,7 +149,8 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       waiting: game.queue.filter(e => !e.result && e !== answering).map(e => e.name),
       wrong: game.queue.filter(e => e.result === "WRONG").map(e => e.name),
       revealed: game.revealed,
-      answer: game.revealed && q ? q.answer : null,
+      // Other accepted names after "/" are only for matching typed answers; the stage shows the first name.
+      answer: game.revealed && q ? (CLUES ? q.answer.split("/")[0].trim() : q.answer) : null,
       answerDetails: game.revealed && q ? q.details : null,
       winner: (game.queue.find(e => e.result === "CORRECT") || {}).name || null,
       worth: playing ? worth() : 0,
@@ -268,11 +271,11 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
   });
 
   // Only images the admin has already shown: players cannot peek at what comes next.
-  if (!CLUES) app.get(`/${kind}/image/:id`, async (req, res) => {
+  app.get(`/${kind}/image/:id`, async (req, res) => {
     const id = Number(req.params.id);
     if (!game.shownImages.has(id)) return res.status(404).json({ error: "Not available" });
     try {
-      const q = await pool.query(`SELECT content_type, image FROM ${ITEMS} WHERE id=$1`, [id]);
+      const q = await pool.query(`SELECT content_type, image FROM ${ITEMS} WHERE id=$1 AND image IS NOT NULL`, [id]);
       if (!q.rows.length) return res.status(404).json({ error: "Not found" });
       res.set("Content-Type", q.rows[0].content_type).set("Cache-Control", "no-store").send(Buffer.from(q.rows[0].image));
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -352,6 +355,28 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       } catch (err) { res.status(500).json({ error: err.message }); }
     });
 
+    // An image clue instead of text (counts towards the 3 clues).
+    app.post(`/admin/${kind}/questions/:id/clue-image`, requireAdmin, express.raw({ type: "image/*", limit: "5mb" }), async (req, res) => {
+      const image = Buffer.isBuffer(req.body) ? req.body : null;
+      const contentType = image && imageContentType(image);
+      if (!contentType) return res.status(400).json({ error: "Please choose a JPG, PNG or WebP image." });
+      try {
+        const count = (await pool.query(`SELECT COUNT(*)::int AS n FROM ${ITEMS} WHERE question_id=$1`, [req.params.id])).rows[0].n;
+        if (count >= CLUES_PER_QUESTION) return res.status(400).json({ error: `A question has exactly ${CLUES_PER_QUESTION} clues. Remove one first.` });
+        const q = await pool.query(`INSERT INTO ${ITEMS}(question_id, position, text, content_type, image)
+          VALUES ($1, (SELECT COALESCE(MAX(position), 0) + 1 FROM ${ITEMS} WHERE question_id=$1), '', $2, $3) RETURNING id`, [req.params.id, contentType, image]);
+        res.json({ id: q.rows[0].id });
+      } catch (err) { res.status(500).json({ error: err.message }); }
+    });
+
+    app.get(`/admin/${kind}/images/:id`, requireAdmin, async (req, res) => {
+      try {
+        const q = await pool.query(`SELECT content_type, image FROM ${ITEMS} WHERE id=$1 AND image IS NOT NULL`, [req.params.id]);
+        if (!q.rows.length) return res.status(404).json({ error: "Not found" });
+        res.set("Content-Type", q.rows[0].content_type).set("Cache-Control", "no-store").send(Buffer.from(q.rows[0].image));
+      } catch (err) { res.status(500).json({ error: err.message }); }
+    });
+
     app.put(`/admin/${kind}/clues/:id`, requireAdmin, async (req, res) => {
       const text = clueText(req.body);
       if (!text) return res.status(400).json({ error: "Please type the clue." });
@@ -413,7 +438,7 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       ...publicState(),
       secretAnswer: q ? q.answer : null,
       secretTamil: q && q.details ? q.details.answerTamil : "",
-      allClues: q && CLUES ? q.clues : [],
+      allClues: q && CLUES ? q.clues.map(c => ({ text: c.text, image: c.image ? c.id : null })) : [],
       players: [...ranked(), ...[...game.players.values()].filter(p => !p.score).sort((a, b) => a.name.localeCompare(b.name))]
         .map(p => ({ name: p.name, score: p.score })),
       hasMoreQuestions: game.qIndex + 1 < game.questions.length,
@@ -450,7 +475,7 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
         // Clue questions are played only once they have all their clues.
         const questions = rows.filter(r => r.items.length >= (CLUES ? CLUES_PER_QUESTION : 1)).map(r => {
           const items = CLUES ? r.items.slice(0, CLUES_PER_QUESTION) : r.items;
-          return { id: r.id, answer: r.answer, details: details(r), imageIds: CLUES ? items.map(c => c.id) : items, clues: CLUES ? items.map(c => c.text) : [] };
+          return { id: r.id, answer: r.answer, details: details(r), imageIds: CLUES ? items.map(c => c.id) : items, clues: CLUES ? items : [] };
         });
         if (!questions.length) return res.status(400).json({ error: CLUES ? `Add at least one question with ${CLUES_PER_QUESTION} clues first.` : "Add at least one question with an image first." });
         game.questions = questions;
@@ -511,5 +536,9 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
           position INTEGER NOT NULL DEFAULT 0,
           content_type VARCHAR(50) NOT NULL,
           image BYTEA NOT NULL)`);
+    if (CLUES) {
+      await pool.query(`ALTER TABLE ${ITEMS} ADD COLUMN IF NOT EXISTS content_type VARCHAR(50)`);
+      await pool.query(`ALTER TABLE ${ITEMS} ADD COLUMN IF NOT EXISTS image BYTEA`);
+    }
   };
 };

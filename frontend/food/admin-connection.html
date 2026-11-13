@@ -54,6 +54,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .clue-list li{display:flex;gap:8px;align-items:center}
 .clue-list .n{flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#e0e7ff;color:#3730a3;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px}
 .clue-list input{flex:1;min-width:0;padding:9px 10px;border:1px solid #d0d5dd;border-radius:8px;font-size:14px}
+.clue-img{flex:1;min-width:0;display:flex;align-items:center;gap:10px;border:1px solid #d0d5dd;border-radius:8px;padding:6px 10px;font-size:14px;color:#475569}
+.clue-img img{height:56px;width:84px;object-fit:cover;border-radius:6px;background:#e5e7eb}
+.add-img{display:inline-flex;align-items:center;gap:6px;border:1.5px dashed #cbd5e1;border-radius:8px;padding:7px 10px;font-size:13px;font-weight:bold;color:#475569;cursor:pointer;white-space:nowrap}
+.add-img input{display:none}
+.clue-preview .pic{display:block;height:70px;width:100%;object-fit:cover;border-radius:6px;margin-top:4px;background:#334155}
 .add-clue{display:flex;gap:8px;margin-top:10px}
 .add-clue input{flex:1;min-width:0;padding:9px 10px;border:1.5px dashed #cbd5e1;border-radius:8px;font-size:14px}
 .clue-preview{background:#0f172a;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;min-height:200px}
@@ -113,7 +118,7 @@ if (CLUES) {
   $('pageTitle').textContent = '🔎 Clue Game';
   $('pageSub').textContent = 'Players join by QR code. Everyone types an answer on their phone; you tick the correct ones.';
   $('stageLink').href = '../connection-screen.html?game=clue';
-  $('questionsHint').textContent = 'Each question has exactly 3 text clues, shown one at a time, and one answer. Add the answer, then its 3 clues in the order to show them (hardest first, easiest last). Everyone answers on their phone: an answer sent while clue 1 is showing scores 3 points, after clue 2 scores 2, after clue 3 scores 1. Typed answers are matched allowing for spelling mistakes; to accept other names too, separate them with / (e.g. Thanjavur / Tanjore).';
+  $('questionsHint').textContent = 'Each question has exactly 3 clues (text, or an image), shown one at a time, and one answer. Add the answer, then its 3 clues in the order to show them (hardest first, easiest last). Everyone answers on their phone: an answer sent while clue 1 is showing scores 3 points, after clue 2 scores 2, after clue 3 scores 1. Typed answers are matched allowing for spelling mistakes; to accept other names too, separate them with / (e.g. Thanjavur / Tanjore).';
 }
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const json = { 'Content-Type': 'application/json' };
@@ -148,13 +153,14 @@ function renderControl(s) {
         : `<button class="primary big" onclick="act('show-rules')">📜 Show rules on screen</button>`}<button class="go big" onclick="act('start')">▶ Start game</button><button class="ghost" onclick="act('reset','Cancel this game?')">Cancel</button></div>`;
   } else if (CLUES) {
     el.innerHTML = clueControl(s);
+    el.querySelectorAll('img[data-img]').forEach(async img => { img.src = await thumb(Number(img.dataset.img)); });
   } else {
     const first = s.imageNumber <= 1, last = s.imageNumber >= s.imageCount;
     el.innerHTML = `<h2>${CLUES ? "Place" : "Question"} ${s.questionNumber} of ${s.questionTotal} <span class="status">${s.playerCount} players</span></h2>
       <div class="game">
         <div>
           ${CLUES
-            ? `<div class="clue-preview">${s.allClues.map((c, i) => `<div class="${i + 1 === s.imageNumber ? 'current' : i < s.imageNumber ? 'shown' : ''}"><small>Clue ${i + 1} · ${i + 1 === s.imageNumber ? 'on screen now' : i < s.imageNumber ? 'shown' : 'not shown yet'}</small>${esc(c)}</div>`).join('')}</div>`
+            ? `<div class="clue-preview">${s.allClues.map((c, i) => `<div class="${i + 1 === s.imageNumber ? 'current' : i < s.imageNumber ? 'shown' : ''}"><small>Clue ${i + 1} · ${i + 1 === s.imageNumber ? 'on screen now' : i < s.imageNumber ? 'shown' : 'not shown yet'}</small>${c.image ? `<img class="pic" data-img="${c.image}" alt="Image clue ${i + 1}">` : esc(c.text)}</div>`).join('')}</div>`
             : `<div class="preview"><img src="${API}/${GAME}/image/${s.imageId}" alt="Current image"></div>`}
           <div class="row" style="margin-top:10px;justify-content:space-between">
             <button class="ghost" onclick="act('prev-image')" ${first ? 'disabled' : ''}>← Previous</button>
@@ -206,7 +212,7 @@ function clueControl(s) {
   return `<h2>Place ${s.questionNumber} of ${s.questionTotal} <span class="status">${s.playerCount} players</span></h2>
     <div class="game">
       <div>
-        <div class="clue-preview">${s.allClues.map((c, i) => `<div class="${i + 1 === s.imageNumber ? 'current' : i < s.imageNumber ? 'shown' : ''}"><small>Clue ${i + 1} · ${i + 1 === s.imageNumber ? 'on screen now' : i < s.imageNumber ? 'shown' : 'not shown yet'}</small>${esc(c)}</div>`).join('')}</div>
+        <div class="clue-preview">${s.allClues.map((c, i) => `<div class="${i + 1 === s.imageNumber ? 'current' : i < s.imageNumber ? 'shown' : ''}"><small>Clue ${i + 1} · ${i + 1 === s.imageNumber ? 'on screen now' : i < s.imageNumber ? 'shown' : 'not shown yet'}</small>${c.image ? `<img class="pic" data-img="${c.image}" alt="Image clue ${i + 1}">` : esc(c.text)}</div>`).join('')}</div>
         <div class="row" style="margin-top:10px;justify-content:space-between">
           <button class="ghost" onclick="act('prev-image')" ${first || s.revealed ? 'disabled' : ''}>← Previous</button>
           <b>Clue ${s.imageNumber} of ${s.imageCount}${s.revealed ? '' : ` · <span style="color:#b26a00">⭐ Worth ${pointsText(s.worth)} now</span>`}</b>
@@ -282,12 +288,15 @@ async function loadQuestions() {
         <label class="wide">Fact shown with the answer<input data-f="fact" maxlength="500" value="${esc(q.fact)}" placeholder="e.g. Andal's Thiruppavai is recited across Tamil Nadu in the month of Margazhi."></label>
       </div>
       <ol class="clue-list">
-        ${q.clues.map((c, n) => `<li><span class="n">${n + 1}</span><input type="text" maxlength="500" value="${esc(c.text)}" aria-label="Clue ${n + 1}" onchange="saveClue(${c.id}, this.value)">
+        ${q.clues.map((c, n) => `<li><span class="n">${n + 1}</span>${c.image
+          ? `<span class="clue-img"><img data-img="${c.id}" alt="Image clue ${n + 1}">🖼️ Image clue</span>`
+          : `<input type="text" maxlength="500" value="${esc(c.text)}" aria-label="Clue ${n + 1}" onchange="saveClue(${c.id}, this.value)">`}
           <button class="ghost small" onclick="moveClue(${c.id},-1)" ${n === 0 ? 'disabled' : ''} aria-label="Move clue up">↑</button>
           <button class="ghost small" onclick="moveClue(${c.id},1)" ${n === q.clues.length - 1 ? 'disabled' : ''} aria-label="Move clue down">↓</button>
           <button class="bad small" onclick="deleteClue(${c.id})" aria-label="Remove clue">✕</button></li>`).join('')}
       </ol>
-      ${q.clues.length < CLUES_PER_QUESTION ? `<form class="add-clue" onsubmit="addClue(event, ${q.id})"><input maxlength="500" placeholder="Type clue ${q.clues.length + 1} of ${CLUES_PER_QUESTION} and press Enter"><button class="primary small" type="submit">+ Add clue</button></form>
+      ${q.clues.length < CLUES_PER_QUESTION ? `<form class="add-clue" onsubmit="addClue(event, ${q.id})"><input maxlength="500" placeholder="Type clue ${q.clues.length + 1} of ${CLUES_PER_QUESTION} and press Enter"><button class="primary small" type="submit">+ Add clue</button>
+        <label class="add-img">or 🖼️ Add image clue<input type="file" accept="image/*" multiple onchange="addClueImages(${q.id}, this, ${CLUES_PER_QUESTION - q.clues.length})"></label></form>
       <p class="hint" style="margin:8px 0 0">Needs ${CLUES_PER_QUESTION} clues: this question is skipped until it has all ${CLUES_PER_QUESTION}.</p>` : '<p class="hint" style="margin:8px 0 0;color:#166534">✓ 3 clues: ready to play.</p>'}` : `
       <div class="thumbs">
         ${q.image_ids.map((id, n) => `<div class="thumb"><img data-img="${id}" alt="Image ${n + 1}"><span>${n + 1}</span><button onclick="deleteImage(${id})" aria-label="Remove image">✕</button></div>`).join('')}
@@ -380,6 +389,19 @@ function shrink(file) {
     img.onerror = () => { URL.revokeObjectURL(src); reject(new Error(`${file.name} could not be opened as an image.`)); };
     img.src = src;
   });
+}
+
+// Clue game: image clues, in file-name order, up to the clues still missing.
+async function addClueImages(id, input, room) {
+  const files = [...input.files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  if (files.length > room) alert(`Only ${room} more clue${room === 1 ? '' : 's'} fit in this question; the first ${room} image${room === 1 ? ' is' : 's are'} added.`);
+  for (const file of files.slice(0, room)) {
+    try {
+      const r = await authFetch(`${API}/admin/${GAME}/questions/${id}/clue-image`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: await shrink(file) });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Could not upload ${file.name}.`);
+    } catch (e) { alert(e.message); }
+  }
+  loadQuestions();
 }
 
 async function addImages(id, input) {
