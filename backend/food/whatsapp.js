@@ -72,6 +72,10 @@ Please use this *one QR code* twice:
 
 ${payment}` : ""}
 
+📞 *If you have any queries, please contact:*
+Ajish: 0722199316
+Pradeep: 0725283137
+
 ${FOOTER}`;
   },
   // Admin-written text. {first_name}, {amount_due} and {registration_id} are filled in per family.
