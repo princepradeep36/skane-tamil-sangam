@@ -52,25 +52,38 @@ async function refreshAccess(done) {
 }
 function logout(){ sessionStorage.clear(); window.location.replace("login.html"); }
 
-// WhatsApp links. "app" opens the WhatsApp app on this computer/phone straight away (whatsapp://);
-// "web" goes through the api.whatsapp.com page in a new browser tab. The choice is remembered here.
-function waMode(){ try { return localStorage.getItem("wa_open") === "web" ? "web" : "app"; } catch (e) { return "app"; } }
+// WhatsApp links.
+// Phones: wa.me (opens the WhatsApp app). Computers: whatsapp://send, which opens WhatsApp Desktop
+// straight away in the same tab, with no extra browser window. On a computer without the app,
+// "Browser tab (WhatsApp Web)" can be picked instead; the choice is remembered on that computer.
+function waIsPhone(){
+  const ua = navigator.userAgent || "";
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+}
+function waMode(){
+  if (waIsPhone()) return "phone";
+  try { return localStorage.getItem("wa_open") === "web" ? "web" : "app"; } catch (e) { return "app"; }
+}
 function setWaMode(m){ try { localStorage.setItem("wa_open", m === "web" ? "web" : "app"); } catch (e) {} }
 function waUrl(digits, text){
-  const q = `${digits ? `phone=${digits}&` : ""}text=${encodeURIComponent(text)}`;
-  return waMode() === "app" ? `whatsapp://send?${q}` : `https://api.whatsapp.com/send?${q}`;
+  const t = `text=${encodeURIComponent(text)}`;
+  const mode = waMode();
+  if (mode === "phone") return `https://wa.me/${digits || ""}?${t}`;
+  const q = `${digits ? `phone=${digits}&` : ""}${t}`;
+  return mode === "app" ? `whatsapp://send?${q}` : `https://api.whatsapp.com/send?${q}`;
 }
-// target attribute for an <a href="waUrl(...)">: the app link must not open an empty tab.
-function waTarget(){ return waMode() === "app" ? "" : ' target="_blank" rel="noopener"'; }
+// target attribute for an <a href="waUrl(...)">: only the browser-tab choice opens a new tab.
+function waTarget(){ return waMode() === "web" ? ' target="_blank" rel="noopener"' : ""; }
 function openWa(digits, text){
   const u = waUrl(digits, text);
-  if (waMode() === "app") location.href = u; else window.open(u, "_blank", "noopener");
+  if (waMode() === "web") window.open(u, "_blank", "noopener"); else location.href = u;
 }
-// A small "Open WhatsApp in: app / browser" picker; onChange re-renders links.
+// "Open WhatsApp in: app / browser" picker for computers (phones always use the app); onChange re-renders links.
 function waModePicker(onChange){
   const l = document.createElement("label");
+  if (waIsPhone()) { l.style.display = "none"; return l; }
   l.className = "check"; l.style.cssText = "display:inline-flex;gap:6px;align-items:center;margin:6px 0";
-  l.innerHTML = 'Open WhatsApp in: <select><option value="app">WhatsApp app (direct)</option><option value="web">Browser tab (WhatsApp Web)</option></select>';
+  l.innerHTML = 'Open WhatsApp in: <select><option value="app">WhatsApp Desktop app (direct)</option><option value="web">Browser tab (WhatsApp Web)</option></select>';
   const sel = l.querySelector("select"); sel.value = waMode();
   sel.addEventListener("change", () => { setWaMode(sel.value); if (onChange) onChange(); });
   return l;

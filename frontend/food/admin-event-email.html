@@ -373,7 +373,7 @@ With warm wishes,
 *Skåne Tamil Sangam* 🙏`;
 function updateGroupLink() {
   $('groupOpen').href = waLink('', $('groupMsg').value);
-  if (waMode() === 'app') $('groupOpen').removeAttribute('target'); else $('groupOpen').target = '_blank';
+  if (waMode() !== 'web') $('groupOpen').removeAttribute('target'); else $('groupOpen').target = '_blank';
 }
 // "Open WhatsApp in" pickers next to the group message and the family list
 const waPickerChanged = () => { updateGroupLink(); if ($('waArea').style.display !== 'none') renderWa(); document.querySelectorAll('.wa-mode select').forEach(s => { s.value = waMode(); }); };
