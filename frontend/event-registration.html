@@ -61,7 +61,7 @@
             </div>
 
             <div id="registration-closed" class="alert alert-info hidden" style="text-align:center;font-size:1.1rem;">
-                <strong>Registration is closed.</strong><br>Please contact Skåne Tamil Sangam if you have questions about your registration.
+                <strong>New registrations are closed.</strong><br>Already registered? Find your booking below with your phone number to see it and <b>pay</b>. For other questions, please contact Skåne Tamil Sangam.
             </div>
 
             <!-- Lookup Section -->
@@ -75,6 +75,10 @@
                     <button type="button" class="btn btn-primary" style="padding: 0 2rem;"
                         onclick="lookupRegistration()">Find Booking</button>
                 </div>
+            </div>
+
+            <div id="closed-booking-note" class="alert alert-info hidden" style="margin-bottom:1.5rem;">
+                🔒 Registration changes are closed, so your booking details can't be changed any more. You can still <b>pay</b> below.
             </div>
 
             <div id="modify-alert" class="alert alert-success hidden"
@@ -247,6 +251,17 @@
     <script>
         const API_BASE_URL = '/food-api';
         let currentRegistrationId = null;
+        // When registration is closed, new registrations and changes are off, but a family can still
+        // find their booking and pay for it.
+        let registrationClosed = false;
+        function lockBookingForClosed() {
+            registrationForm.classList.remove('hidden');
+            document.getElementById('closed-booking-note').classList.remove('hidden');
+            document.getElementById('submit-btn').classList.add('hidden');
+            registrationForm.querySelectorAll('input, select, textarea').forEach(el => {
+                if (!el.closest('#payment-panel')) el.disabled = true;
+            });
+        }
         const PRICE_ADULT = 100;
         const PRICE_CHILD = 60;
         const registrationForm = document.getElementById('reg-form');
@@ -272,9 +287,11 @@
             .then(response => response.ok ? response.json() : null)
             .then(settings => {
                 if (!settings || settings.event_registration_enabled !== false) return;
+                registrationClosed = true;
                 document.getElementById('registration-closed').classList.remove('hidden');
-                document.getElementById('lookup-panel').classList.add('hidden');
-                registrationForm.classList.add('hidden');
+                // A booking may already be open from a personal link: keep it, read-only, so it can be paid.
+                if (currentRegistrationId) lockBookingForClosed();
+                else registrationForm.classList.add('hidden');
             })
             .catch(() => {});
 
@@ -632,6 +649,7 @@
                     document.getElementById('submit-btn').textContent = 'Update My Registration';
                     document.getElementById('lookup-panel').classList.add('hidden');
                     statusMsg.style.display = 'none';
+                    if (registrationClosed) lockBookingForClosed();
                     // An unpaid booking goes straight to the payment steps; otherwise show the booking from the top.
                     if (paymentPending(data)) setTimeout(scrollToPayment, 250);
                     else window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -670,6 +688,11 @@
 
         function resetForm() {
             currentRegistrationId = null;
+            if (registrationClosed) {
+                // Closed: no new registrations; go back to "find your booking".
+                registrationForm.classList.add('hidden');
+                document.getElementById('closed-booking-note').classList.add('hidden');
+            }
             document.getElementById('reg-form').reset();
             document.getElementById('modify-alert').classList.add('hidden');
             document.getElementById('goPaymentBtn').classList.add('hidden');
