@@ -110,6 +110,17 @@
       color: var(--primary);
     }
 
+    .unpay-link {
+      display: block;
+      margin: 10px auto 0;
+      background: none;
+      border: 0;
+      color: #b42318;
+      text-decoration: underline;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
     .status-btn {
       width: 100%;
       margin-top: 15px;
@@ -366,6 +377,17 @@
       });
     }
 
+    // Admins (and food staff) can move a paid order back to unpaid, e.g. after a mistake.
+    async function markUnpaid(orderId) {
+      const order = allOrders.find(o => o.id === orderId);
+      if (!order || !confirm(`Mark order #${orderId} from ${order.name} (${money(order.total)}) as NOT paid? It moves back to the Unpaid tab and the customer can change it again.`)) return;
+      try {
+        const res = await authFetch(`${API}/admin/order/${orderId}/payment`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "UNPAID" }) });
+        if (!res.ok) throw new Error("Couldn't change the payment. Please try again.");
+      } catch (err) { alert(err.message); }
+      loadVendorOrders(role === 'vendor' ? myId : vendorSelect.value);
+    }
+
     async function markPaid(orderId) {
       const order = allOrders.find(o => o.id === orderId);
       if (!order || !confirm(`⚠️ Make sure you have received the payment!
@@ -492,7 +514,8 @@ Only press OK if the money is in. The order then moves to Paid and the customer 
           </div>
           ${itemsHtml(order)}
           <div class="order-total"><span>Total paid · #${order.id}</span><span>${money(order.total)}</span></div>
-          ${btnHtml}`;
+          ${btnHtml}
+          ${role !== 'vendor' ? `<button class="unpay-link" onclick="markUnpaid(${order.id})">Mark as unpaid (admin)</button>` : ''}`;
         } else {
           // Orders placed but not paid yet: shown so the stall can plan, but not to be prepared.
           card.className = "customer-card unpaid";
