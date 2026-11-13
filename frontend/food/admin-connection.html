@@ -111,14 +111,14 @@ const GAME = new URLSearchParams(location.search).get('game') === 'clue' ? 'clue
 const CLUES = GAME === 'clue';
 const ITEM = CLUES ? 'clue' : 'image';
 const $ = id => document.getElementById(id);
-const CLUES_PER_QUESTION = 3;
+const MIN_CLUES = 3, MAX_CLUES = 5; // a place has 3 to 5 clues
 const pointsText = n => `${n} point${n === 1 ? '' : 's'}`;
 if (CLUES) {
   document.title = 'Clue Game';
   $('pageTitle').textContent = '🔎 Clue Game';
   $('pageSub').textContent = 'Players join by QR code. Everyone types an answer on their phone; you tick the correct ones.';
   $('stageLink').href = '../connection-screen.html?game=clue';
-  $('questionsHint').textContent = 'Each question has exactly 3 clues (text, or an image), shown one at a time, and one answer. Add the answer, then its 3 clues in the order to show them (hardest first, easiest last). Everyone answers on their phone: an answer sent while clue 1 is showing scores 3 points, after clue 2 scores 2, after clue 3 scores 1. Typed answers are matched allowing for spelling mistakes; to accept other names too, separate them with / (e.g. Thanjavur / Tanjore).';
+  $('questionsHint').textContent = 'Each place has 3 to 5 clues (text, or an image), shown one at a time, and one answer. Add the answer, then its 3 clues in the order to show them (hardest first, easiest last). Everyone answers on their phone: an answer is worth as many points as there are clues left (with 5 clues: 5 points at clue 1, then 4, 3, 2, 1; with 3 clues: 3, 2, 1). Typed answers are matched allowing for spelling mistakes; to accept other names too, separate them with / (e.g. Thanjavur / Tanjore).';
 }
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const json = { 'Content-Type': 'application/json' };
@@ -198,11 +198,11 @@ function renderControl(s) {
 // ticked the ones that match the answer, allowing for typos), clue by clue, and reveals after clue 3.
 function clueControl(s) {
   const first = s.imageNumber <= 1, last = s.imageNumber >= s.imageCount;
-  const groups = [1, 2, 3].map(clue => {
+  const groups = Array.from({ length: s.clueTotal || 3 }, (_, i) => i + 1).map(clue => {
     const rows = s.review.filter(a => a.clue === clue);
     const ticked = rows.filter(a => a.correct).length;
     return `<div class="review-group">
-      <div class="review-head"><span>Answered at clue ${clue} · ${pointsText(4 - clue)} each · ${rows.length} answer${rows.length === 1 ? '' : 's'} · ✓ ${ticked} correct</span>
+      <div class="review-head"><span>Answered at clue ${clue} · ${pointsText((s.clueTotal || 3) - clue + 1)} each · ${rows.length} answer${rows.length === 1 ? '' : 's'} · ✓ ${ticked} correct</span>
         ${rows.length ? `<span class="row"><button class="go" onclick="markClue(${clue}, true)">✓ All correct</button><button class="ghost" onclick="markClue(${clue}, false)">✗ All wrong</button></span>` : ''}</div>
       ${rows.map(a => `<label class="review-row ${a.correct ? 'on' : ''}"><input type="checkbox" ${a.correct ? 'checked' : ''} onchange="markAnswer(${a.playerId}, this.checked)">
         <span class="who">${esc(a.name)}</span><span class="txt">${esc(a.text)}</span>
@@ -224,11 +224,11 @@ function clueControl(s) {
                 ? `<button class="ghost" onclick="act('hide-scores')">← Back to the answer</button>`
                 : `<button class="primary big" onclick="act('show-scores')">🏆 Show scores on stage</button>`}
                <button class="go big" onclick="act('next-question')">${s.hasMoreQuestions ? 'Next place →' : 'Finish game 🎉'}</button>`
-            : `<button class="warn big" onclick="act('reveal')" ${s.canReveal ? '' : 'disabled'} title="${s.canReveal ? '' : 'Show all 3 clues first'}">Show answer &amp; points</button>
+            : `<button class="warn big" onclick="act('reveal')" ${s.canReveal ? '' : 'disabled'} title="${s.canReveal ? '' : `Show all ${s.clueTotal} clues first`}">Show answer &amp; points</button>
                <button class="ghost" onclick="act('next-question','Skip this place without showing the answer? Nobody gets points for it.')">Skip place</button>`}
           <button class="ghost" onclick="act('end','End the game now?')">End game</button>
         </div>
-        ${s.revealed ? '' : `<p class="count-note">${s.canReveal ? 'All 3 clues are shown: check the answers, then show the answer and points.' : 'The answer can be shown after clue 3.'}</p>`}
+        ${s.revealed ? '' : `<p class="count-note">${s.canReveal ? `All ${s.clueTotal} clues are shown: check the answers, then show the answer and points.` : `The answer can be shown after clue ${s.clueTotal}.`}</p>`}
       </div>
       <div>
         <div class="secret"><small>🔒 Answer (only on this screen${s.revealed ? ', now shown on stage too' : ''})</small><b>${esc(s.secretAnswer)}</b>${s.secretTamil ? ` <span style="color:#a3122e;font-size:1.2rem;font-weight:bold">${esc(s.secretTamil)}</span>` : ''}</div>
@@ -295,9 +295,11 @@ async function loadQuestions() {
           <button class="ghost small" onclick="moveClue(${c.id},1)" ${n === q.clues.length - 1 ? 'disabled' : ''} aria-label="Move clue down">↓</button>
           <button class="bad small" onclick="deleteClue(${c.id})" aria-label="Remove clue">✕</button></li>`).join('')}
       </ol>
-      ${q.clues.length < CLUES_PER_QUESTION ? `<form class="add-clue" onsubmit="addClue(event, ${q.id})"><input maxlength="500" placeholder="Type clue ${q.clues.length + 1} of ${CLUES_PER_QUESTION} and press Enter"><button class="primary small" type="submit">+ Add clue</button>
-        <label class="add-img">or 🖼️ Add image clue<input type="file" accept="image/*" multiple onchange="addClueImages(${q.id}, this, ${CLUES_PER_QUESTION - q.clues.length})"></label></form>
-      <p class="hint" style="margin:8px 0 0">Needs ${CLUES_PER_QUESTION} clues: this question is skipped until it has all ${CLUES_PER_QUESTION}.</p>` : '<p class="hint" style="margin:8px 0 0;color:#166534">✓ 3 clues: ready to play.</p>'}` : `
+      ${q.clues.length < MAX_CLUES ? `<form class="add-clue" onsubmit="addClue(event, ${q.id})"><input maxlength="500" placeholder="Type clue ${q.clues.length + 1} and press Enter${q.clues.length >= MIN_CLUES ? ' (optional)' : ''}"><button class="primary small" type="submit">+ Add clue</button>
+        <label class="add-img">or 🖼️ Add image clue<input type="file" accept="image/*" multiple onchange="addClueImages(${q.id}, this, ${MAX_CLUES - q.clues.length})"></label></form>` : ''}
+      ${q.clues.length < MIN_CLUES
+        ? `<p class="hint" style="margin:8px 0 0">Needs at least ${MIN_CLUES} clues: this place is skipped until it has ${MIN_CLUES}.</p>`
+        : `<p class="hint" style="margin:8px 0 0;color:#166534">✓ ${q.clues.length} clues: ready to play · points ${Array.from({ length: q.clues.length }, (_, i) => q.clues.length - i).join(' / ')}${q.clues.length < MAX_CLUES ? ` · you can add up to ${MAX_CLUES}` : ''}</p>`}` : `
       <div class="thumbs">
         ${q.image_ids.map((id, n) => `<div class="thumb"><img data-img="${id}" alt="Image ${n + 1}"><span>${n + 1}</span><button onclick="deleteImage(${id})" aria-label="Remove image">✕</button></div>`).join('')}
         <label class="add">+ Add images<input type="file" accept="image/*" multiple onchange="addImages(${q.id}, this)"></label>

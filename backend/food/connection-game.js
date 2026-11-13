@@ -15,9 +15,11 @@ const crypto = require("crypto");
 const express = require("express");
 
 const MAX_PLAYERS = 1000;
-// Clue game: every question has exactly 3 clues. A correct answer is worth 3 points while only clue 1 is
-// showing, 2 points after clue 2 and 1 point after clue 3. The Connection game gives 1 point.
-const CLUES_PER_QUESTION = 3;
+// Clue game: a place has 3 to 5 clues. A correct answer is worth as many points as there are clues
+// left to show, counting the one on screen: with 5 clues 5/4/3/2/1, with 4 clues 4/3/2/1, with 3 clues
+// 3/2/1. The Connection game gives 1 point.
+const MIN_CLUES = 3;
+const MAX_CLUES = 5;
 
 // Typed answers: compare letters only, ignoring case, accents, spaces and punctuation, and allow a few
 // typos (one wrong letter, or about one in four for long names). The answer may list alternatives separated by "/".
@@ -102,8 +104,9 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
 
   const currentQuestion = () => game.questions[game.qIndex] || null;
   const answeringEntry = () => (game.status === "PLAYING" && !game.revealed ? game.queue.find(e => !e.result) || null : null);
-  const worth = () => (CLUES ? Math.max(1, CLUES_PER_QUESTION - game.imageIndex) : 1);
-  const pointsForClue = clue => Math.max(1, CLUES_PER_QUESTION - clue + 1);
+  const clueCount = () => (currentQuestion() ? currentQuestion().imageIds.length : MIN_CLUES);
+  const worth = () => (CLUES ? Math.max(1, clueCount() - game.imageIndex) : 1);
+  const pointsForClue = clue => Math.max(1, clueCount() - clue + 1);
   const playerById = id => [...game.players.values()].find(p => p.id === id);
 
   // Clue game: points for the current place come from the ticked answers; every player's score is the
@@ -178,13 +181,14 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
 
   // Clue game extras: how many answered (not who or what, until the reveal), then who got it right.
   function clueState() {
-    const perClue = [0, 0, 0];
+    const perClue = Array(clueCount()).fill(0);
     for (const a of game.answers.values()) perClue[a.clue - 1]++;
     const awards = placeAwards();
     return {
       answerCount: game.answers.size,
       answersPerClue: perClue,
-      canReveal: game.status === "PLAYING" && game.imageIndex >= CLUES_PER_QUESTION - 1,
+      canReveal: game.status === "PLAYING" && game.imageIndex >= clueCount() - 1,
+      clueTotal: clueCount(),
       showScores: game.revealed && game.showScores,
       correctPlayers: game.revealed
         ? [...awards.entries()].map(([id, w]) => ({ name: (playerById(id) || {}).name || "?", points: w.points, at: w.at }))
@@ -364,7 +368,7 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       if (!text) return res.status(400).json({ error: "Please type the clue." });
       try {
         const count = (await pool.query(`SELECT COUNT(*)::int AS n FROM ${ITEMS} WHERE question_id=$1`, [req.params.id])).rows[0].n;
-        if (count >= CLUES_PER_QUESTION) return res.status(400).json({ error: `A question has exactly ${CLUES_PER_QUESTION} clues. Edit or remove one first.` });
+        if (count >= MAX_CLUES) return res.status(400).json({ error: `A place can have at most ${MAX_CLUES} clues. Edit or remove one first.` });
         const q = await pool.query(`INSERT INTO ${ITEMS}(question_id, position, text)
           VALUES ($1, (SELECT COALESCE(MAX(position), 0) + 1 FROM ${ITEMS} WHERE question_id=$1), $2) RETURNING id`, [req.params.id, text]);
         res.json({ id: q.rows[0].id });
@@ -378,7 +382,7 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       if (!contentType) return res.status(400).json({ error: "Please choose a JPG, PNG or WebP image." });
       try {
         const count = (await pool.query(`SELECT COUNT(*)::int AS n FROM ${ITEMS} WHERE question_id=$1`, [req.params.id])).rows[0].n;
-        if (count >= CLUES_PER_QUESTION) return res.status(400).json({ error: `A question has exactly ${CLUES_PER_QUESTION} clues. Remove one first.` });
+        if (count >= MAX_CLUES) return res.status(400).json({ error: `A place can have at most ${MAX_CLUES} clues. Remove one first.` });
         const q = await pool.query(`INSERT INTO ${ITEMS}(question_id, position, text, content_type, image)
           VALUES ($1, (SELECT COALESCE(MAX(position), 0) + 1 FROM ${ITEMS} WHERE question_id=$1), '', $2, $3) RETURNING id`, [req.params.id, contentType, image]);
         res.json({ id: q.rows[0].id });
@@ -489,18 +493,18 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
         if (game.status !== "LOBBY") return res.status(409).json({ error: "Open the game for joining first." });
         const rows = (await pool.query(`SELECT q.id, q.answer${DETAIL_COLUMNS}, ${itemsJson} AS items FROM ${QUESTIONS} q ORDER BY q.position, q.id`)).rows;
         // Clue questions are played only once they have all their clues.
-        const questions = rows.filter(r => r.items.length >= (CLUES ? CLUES_PER_QUESTION : 1)).map(r => {
-          const items = CLUES ? r.items.slice(0, CLUES_PER_QUESTION) : r.items;
+        const questions = rows.filter(r => r.items.length >= (CLUES ? MIN_CLUES : 1)).map(r => {
+          const items = CLUES ? r.items.slice(0, MAX_CLUES) : r.items;
           return { id: r.id, answer: r.answer, details: details(r), imageIds: CLUES ? items.map(c => c.id) : items, clues: CLUES ? items : [] };
         });
-        if (!questions.length) return res.status(400).json({ error: CLUES ? `Add at least one question with ${CLUES_PER_QUESTION} clues first.` : "Add at least one question with an image first." });
+        if (!questions.length) return res.status(400).json({ error: CLUES ? `Add at least one place with ${MIN_CLUES} or more clues first.` : "Add at least one question with an image first." });
         game.questions = questions;
         game.status = "PLAYING";
         beginQuestion(0);
       } else if (game.status === "PLAYING" && q && CLUES && ["reveal", "show-scores", "hide-scores"].includes(action)) {
         // Clue game: the answer only after the last clue; then the points are counted.
         if (action === "reveal") {
-          if (game.imageIndex < CLUES_PER_QUESTION - 1) return res.status(409).json({ error: "Show all 3 clues before the answer." });
+          if (game.imageIndex < clueCount() - 1) return res.status(409).json({ error: `Show all ${clueCount()} clues before the answer.` });
           game.revealed = true;
           scoreCurrentPlace();
         } else if (game.revealed) game.showScores = action === "show-scores";

@@ -84,22 +84,22 @@ function render(key, html) {
   app.innerHTML = html;
 }
 
-// Clue game scoring: 3 points after clue 1, 2 after clue 2, 1 after clue 3.
+// Clue game scoring: as many points as clues left (5/4/3/2/1 with 5 clues, 3/2/1 with 3).
 const POINT_CARDS = `<div class="points">
-  <div><b>3</b>points if you guess after Clue 1</div>
-  <div><b>2</b>points after Clue 2</div>
-  <div><b>1</b>point after Clue 3</div>
+  <div><b>Most</b>points if you guess after Clue 1</div>
+  <div><b>−1</b>point with every new clue</div>
+  <div><b>1</b>point after the last clue</div>
 </div>`;
 const pointsText = n => `${n} point${n === 1 ? '' : 's'}`;
 
 // Shown on the join, waiting and "not open yet" screens, before the game starts.
 const HOW_TO_PLAY = GAME === 'clue'
   ? `<div class="howto"><h2>How to play</h2><ol>
-  <li><span>🔎</span><div>Each place has <b>3 clues</b>, shown one by one on the stage screen.</div></li>
+  <li><span>🔎</span><div>Each place has <b>3 to 5 clues</b>, shown one by one on the stage screen.</div></li>
   <li><span>✋</span><div><b>Everyone can answer!</b> Tap <b>I want to answer</b> and type your answer on your phone.</div></li>
   <li><span>☝️</span><div>You can send <b>one answer per place</b>. Answer early for more points, or wait for more clues.</div></li>
   <li><span>✏️</span><div>Spelling mistakes are fine: the quiz master checks every answer.</div></li>
-  <li><span>🏆</span><div>The answer and the scores are shown after clue 3. The highest score wins!</div></li>
+  <li><span>🏆</span><div>The answer and the scores are shown after the last clue. The highest score wins!</div></li>
   <li><span>⏱️</span><div>Same points? Whoever answered first ranks higher.</div></li>
 </ol>${POINT_CARDS}</div>`
   : `<div class="howto"><h2>How to play</h2><ol>
@@ -218,7 +218,7 @@ function showClueRound(me) {
   if (me.myAnswer) {
     return render('sent' + q, `<div class="panel wait"><div class="emoji">✅</div><p class="big">Answer sent</p>
       <div class="sent">Your answer<b>${esc(me.myAnswer.text)}</b></div>
-      <p class="sub" style="margin-top:12px">Sent at clue ${me.myAnswer.clue}: <b>${pointsText(me.myAnswer.points)}</b> if correct. The answer is shown after clue 3.</p></div>`);
+      <p class="sub" style="margin-top:12px">Sent at clue ${me.myAnswer.clue}: <b>${pointsText(me.myAnswer.points)}</b> if correct. The answer is shown after the last clue.</p></div>`);
   }
   if (lastView !== 'ask' + q) {
     render('ask' + q, `<span class="worth" id="worthBadge"></span>

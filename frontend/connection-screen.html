@@ -80,6 +80,12 @@ body.clue .howto b,body.clue .howto .pts b{background:#f6c343;color:#3d0815}
 .cp-cards.row .cp-pic img{max-width:100%;max-height:100%;object-fit:contain;display:block}
 .cp-cards.row .cp-text{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 .6vw;line-height:1.3}
 .cp-cards.row .locked .cp-text{font-size:2.8vh}
+/* 4 or 5 clues: smaller cards so they all fit */
+.cp-cards.many{gap:1.4vh}
+.cp-cards.many:not(.row) .cp-card{padding:1.3vh 2.2vw;font-size:3.4vh}
+.cp-cards.many:not(.row) .cp-card .num{width:6vh;height:6vh;font-size:3.2vh}
+.cp-cards.many.row{gap:1vw}
+.cp-cards.many.row .cp-card{font-size:2.5vh;padding:1.2vh .8vw}
 .cp-foot{display:flex;justify-content:space-between;font-weight:700;font-size:2.4vh;color:#f3d9a6;opacity:.9;padding-bottom:.4vh}
 .ans{flex:1;min-height:0;background:#f4efe4;color:#2b0710;border-radius:2vh;padding:5vh 5vw;display:flex;flex-direction:column;justify-content:center;border-top:1vh solid #e8892b}
 .ans-kicker{color:#8e1b2e;font-weight:800;letter-spacing:.2em;font-size:2.8vh}
@@ -163,7 +169,7 @@ if (GAME === 'clue') {
   document.body.classList.add('clue');
   $('playing').classList.add('clue-mode');
   $('howtoPoints').remove();
-  $('lobby').insertAdjacentHTML('beforeend', '<div class="howto points"><div class="pts"><b>3</b><span>points if you guess after Clue 1</span></div><div class="pts"><b>2</b><span>points after Clue 2</span></div><div class="pts"><b>1</b><span>point after Clue 3</span></div></div>');
+  $('lobby').insertAdjacentHTML('beforeend', '<div class="howto points"><div class="pts"><b>5</b><span>points after Clue 1 with 5 clues (4 with 4, 3 with 3)</span></div><div class="pts"><b>−1</b><span>point with every new clue</span></div><div class="pts"><b>1</b><span>point after the last clue</span></div></div>');
 }
 const joinUrl = `${location.origin}/connection.html${GAME === 'clue' ? '?game=clue' : ''}`;
 $('joinUrl').textContent = joinUrl.replace(/^https?:\/\//, '');
@@ -203,17 +209,17 @@ function cluePanel(s) {
     : `<div class="cp-card locked"><span class="num">${i + 1}</span>${row ? `<span class="cp-text">Clue ${i + 1} is coming…</span>` : `<span>Clue ${i + 1} is coming…</span>`}</div>`).join('');
   return `<div class="cp-head"><div><div class="cp-kicker">PLACE ${s.questionNumber} OF ${s.questionTotal}</div><div class="cp-title">Guess the place!</div></div>
       <span class="cp-worth">⭐ Worth ${pointsText(s.worth)} now</span></div>
-    <div class="cp-cards${row ? ' row' : ''}">${cards}</div>${foot}`;
+    <div class="cp-cards${row ? ' row' : ''}${s.imageCount > 3 ? ' many' : ''}">${cards}</div>${foot}`;
 }
 
 // The rules slide the admin shows in the lobby before starting.
 const RULES = [
-  GAME === 'clue' ? 'Each place has <b>3 clues</b>, shown one at a time on this screen.' : 'Each question has <b>several pictures</b>, shown one at a time. They are all connected to one answer.',
+  GAME === 'clue' ? 'Each place has <b>3 to 5 clues</b>, shown one at a time on this screen.' : 'Each question has <b>several pictures</b>, shown one at a time. They are all connected to one answer.',
   ...(GAME === 'clue' ? [
     '<b>Everyone can answer!</b> Tap <b>I want to answer</b> and type your answer on your phone.',
     'You can send <b>one answer per place</b>. Answer early for more points (see below), or wait for more clues.',
     'Spelling mistakes are fine: the quiz master checks every answer.',
-    'The answer and the scores are shown after clue 3.',
+    'The answer and the scores are shown after the last clue.',
     'Same points? Whoever answered <b>first</b> ranks higher.'
   ] : [
     'Know the answer? Tap <b>I want to answer</b> on your phone. The fastest tap goes first.',
@@ -228,7 +234,7 @@ const RULES = [
 $('rulesList').innerHTML = RULES.map(r => `<li><span>${r}</span></li>`).join('');
 if (GAME === 'clue') {
   $('rulesPoints').hidden = false;
-  $('rulesPoints').innerHTML = '<div class="pts"><b>3</b><span>points if you guess after Clue 1</span></div><div class="pts"><b>2</b><span>points after Clue 2</span></div><div class="pts"><b>1</b><span>point after Clue 3</span></div>';
+  $('rulesPoints').innerHTML = '<div class="pts"><b>5</b><span>points after Clue 1 with 5 clues (4 with 4, 3 with 3)</span></div><div class="pts"><b>−1</b><span>point with every new clue</span></div><div class="pts"><b>1</b><span>point after the last clue</span></div>';
 }
 
 function render(s) {
