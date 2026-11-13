@@ -31,12 +31,28 @@ function editDistance(a, b) {
   }
   return prev[b.length];
 }
+// Tamil names are written many ways in English: th/t, dh/d, zh/l, sh/s, w/v, doubled letters and
+// long vowels (oo/u, ee/i, aa/a). soundKey folds those together; skeleton keeps only the consonants,
+// so "tanjur", "thanjore" and "tanjore" sound alike.
+function soundKey(s) {
+  return s.replace(/zh/g, "l").replace(/([tdskpbgc])h/g, "$1").replace(/w/g, "v").replace(/ee/g, "i").replace(/oo/g, "u")
+    .replace(/(.)+/g, "$1");
+}
+const skeleton = s => soundKey(s).replace(/[aeiouy]/g, "").replace(/(.)+/g, "$1");
+
 function looksRight(text, question) {
   const typed = normalize(text);
   if (!typed) return false;
   const targets = [...String(question.answer || "").split("/"), question.details ? question.details.answerTamil : ""].map(normalize).filter(Boolean);
   return targets.some(t => {
     if (typed === t) return true;
+    if (/^[a-z0-9]+$/.test(t)) {
+      // Sounds alike (English spellings only; Tamil script is compared as typed).
+      const a = soundKey(typed), b = soundKey(t);
+      if (a === b || (b.length >= 5 && editDistance(a, b) <= Math.max(1, Math.floor(b.length / 4)))) return true;
+      const sa = skeleton(typed), sb = skeleton(t);
+      if (sb.length >= 3 && sa === sb) return true;
+    }
     if (t.length <= 4) return editDistance(typed, t) <= 1;
     const allowed = Math.max(1, Math.floor(t.length / 4));
     if (editDistance(typed, t) <= allowed) return true;
