@@ -65,7 +65,8 @@ Total: ${adults + kids612 + kidsUnder6} people
 
 Please use this *one QR code* twice:
 1️⃣ *At the entrance:* show it to check in your registration.
-2️⃣ *At the sweets counter:* show it again to collect *${adults} sweet box${adults === 1 ? "" : "es"}* (one for each adult). Please check in at the entrance first.
+2️⃣ *At the sweets counter:* show it again to collect *${adults} sweet box${adults === 1 ? "" : "es"}* (one for each adult).
+⚠️ Entrance check-in is mandatory. If you skip it, your QR code will not work at the sweets counter.
 
 🕒 *Sweet box distribution starts at ${start.time}* on ${start.day}. Until then the QR code won't work for sweets.${payment ? `
 
