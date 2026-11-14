@@ -2,7 +2,7 @@
 //  - Connection game: a question's images are shown one by one. Players tap "I want to answer"; buzzes
 //    queue in the order the server receives them, each player can buzz once per question, and a wrong
 //    answer passes to the next in line.
-//  - Clue game: a place's 3 clues are shown one by one and EVERYONE may answer: each player types one
+//  - Clue game: a place's 2 to 5 clues are shown one by one and EVERYONE may answer: each player types one
 //    answer per place on the phone. It is worth 3 points if sent while clue 1 is showing, 2 after clue 2
 //    and 1 after clue 3. The server suggests which answers match (allowing for typos) and the admin ticks
 //    the correct ones. The answer and the points are shown after clue 3.
@@ -15,10 +15,10 @@ const crypto = require("crypto");
 const express = require("express");
 
 const MAX_PLAYERS = 1000;
-// Clue game: a place has 3 to 5 clues. A correct answer is worth as many points as there are clues
+// Clue game: a place has 2 to 5 clues. A correct answer is worth as many points as there are clues
 // left to show, counting the one on screen: with 5 clues 5/4/3/2/1, with 4 clues 4/3/2/1, with 3 clues
-// 3/2/1. The Connection game gives 1 point.
-const MIN_CLUES = 3;
+// 3/2/1, with 2 clues 2/1. The Connection game gives 1 point.
+const MIN_CLUES = 2;
 const MAX_CLUES = 5;
 
 // Typed answers: compare letters only, ignoring case, accents, spaces and punctuation, and allow a few
@@ -375,7 +375,7 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
       } catch (err) { res.status(500).json({ error: err.message }); }
     });
 
-    // An image clue instead of text (counts towards the 3 clues).
+    // An image clue instead of text (counts towards the place's clues).
     app.post(`/admin/${kind}/questions/:id/clue-image`, requireAdmin, express.raw({ type: "image/*", limit: "5mb" }), async (req, res) => {
       const image = Buffer.isBuffer(req.body) ? req.body : null;
       const contentType = image && imageContentType(image);

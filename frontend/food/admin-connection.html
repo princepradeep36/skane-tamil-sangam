@@ -111,14 +111,14 @@ const GAME = new URLSearchParams(location.search).get('game') === 'clue' ? 'clue
 const CLUES = GAME === 'clue';
 const ITEM = CLUES ? 'clue' : 'image';
 const $ = id => document.getElementById(id);
-const MIN_CLUES = 3, MAX_CLUES = 5; // a place has 3 to 5 clues
+const MIN_CLUES = 2, MAX_CLUES = 5; // a place has 2 to 5 clues
 const pointsText = n => `${n} point${n === 1 ? '' : 's'}`;
 if (CLUES) {
   document.title = 'Clue Game';
   $('pageTitle').textContent = '🔎 Clue Game';
   $('pageSub').textContent = 'Players join by QR code. Everyone types an answer on their phone; you tick the correct ones.';
   $('stageLink').href = '../connection-screen.html?game=clue';
-  $('questionsHint').textContent = 'Each place has 3 to 5 clues (text, or an image), shown one at a time, and one answer. Add the answer, then its 3 clues in the order to show them (hardest first, easiest last). Everyone answers on their phone: an answer is worth as many points as there are clues left (with 5 clues: 5 points at clue 1, then 4, 3, 2, 1; with 3 clues: 3, 2, 1). Typed answers are matched allowing for spelling mistakes; to accept other names too, separate them with / (e.g. Thanjavur / Tanjore).';
+  $('questionsHint').textContent = 'Each place has 2 to 5 clues (text, or an image), shown one at a time, and one answer. Add the answer, then its clues in the order to show them (hardest first, easiest last). Everyone answers on their phone: an answer is worth as many points as there are clues left (with 5 clues: 5 points at clue 1, then 4, 3, 2, 1; with 2 clues: 2, 1). Typed answers are matched allowing for spelling mistakes; to accept other names too, separate them with / (e.g. Thanjavur / Tanjore).';
 }
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const json = { 'Content-Type': 'application/json' };

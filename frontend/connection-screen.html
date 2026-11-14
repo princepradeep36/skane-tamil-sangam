@@ -169,7 +169,7 @@ if (GAME === 'clue') {
   document.body.classList.add('clue');
   $('playing').classList.add('clue-mode');
   $('howtoPoints').remove();
-  $('lobby').insertAdjacentHTML('beforeend', '<div class="howto points"><div class="pts"><b>5</b><span>points after Clue 1 with 5 clues (4 with 4, 3 with 3)</span></div><div class="pts"><b>−1</b><span>point with every new clue</span></div><div class="pts"><b>1</b><span>point after the last clue</span></div></div>');
+  $('lobby').insertAdjacentHTML('beforeend', '<div class="howto points"><div class="pts"><b>5</b><span>points after Clue 1 with 5 clues (4 with 4, 3 with 3, 2 with 2)</span></div><div class="pts"><b>−1</b><span>point with every new clue</span></div><div class="pts"><b>1</b><span>point after the last clue</span></div></div>');
 }
 const joinUrl = `${location.origin}/connection.html${GAME === 'clue' ? '?game=clue' : ''}`;
 $('joinUrl').textContent = joinUrl.replace(/^https?:\/\//, '');
@@ -214,7 +214,7 @@ function cluePanel(s) {
 
 // The rules slide the admin shows in the lobby before starting.
 const RULES = [
-  GAME === 'clue' ? 'Each place has <b>3 to 5 clues</b>, shown one at a time on this screen.' : 'Each question has <b>several pictures</b>, shown one at a time. They are all connected to one answer.',
+  GAME === 'clue' ? 'Each place has <b>2 to 5 clues</b>, shown one at a time on this screen.' : 'Each question has <b>several pictures</b>, shown one at a time. They are all connected to one answer.',
   ...(GAME === 'clue' ? [
     '<b>Everyone can answer!</b> Tap <b>I want to answer</b> and type your answer on your phone.',
     'You can send <b>one answer per place</b>. Answer early for more points (see below), or wait for more clues.',
@@ -234,7 +234,7 @@ const RULES = [
 $('rulesList').innerHTML = RULES.map(r => `<li><span>${r}</span></li>`).join('');
 if (GAME === 'clue') {
   $('rulesPoints').hidden = false;
-  $('rulesPoints').innerHTML = '<div class="pts"><b>5</b><span>points after Clue 1 with 5 clues (4 with 4, 3 with 3)</span></div><div class="pts"><b>−1</b><span>point with every new clue</span></div><div class="pts"><b>1</b><span>point after the last clue</span></div>';
+  $('rulesPoints').innerHTML = '<div class="pts"><b>5</b><span>points after Clue 1 with 5 clues (4 with 4, 3 with 3, 2 with 2)</span></div><div class="pts"><b>−1</b><span>point with every new clue</span></div><div class="pts"><b>1</b><span>point after the last clue</span></div>';
 }
 
 function render(s) {

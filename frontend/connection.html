@@ -84,7 +84,7 @@ function render(key, html) {
   app.innerHTML = html;
 }
 
-// Clue game scoring: as many points as clues left (5/4/3/2/1 with 5 clues, 3/2/1 with 3).
+// Clue game scoring: as many points as clues left (5/4/3/2/1 with 5 clues, 3/2/1 with 3, 2/1 with 2).
 const POINT_CARDS = `<div class="points">
   <div><b>Most</b>points if you guess after Clue 1</div>
   <div><b>−1</b>point with every new clue</div>
@@ -95,7 +95,7 @@ const pointsText = n => `${n} point${n === 1 ? '' : 's'}`;
 // Shown on the join, waiting and "not open yet" screens, before the game starts.
 const HOW_TO_PLAY = GAME === 'clue'
   ? `<div class="howto"><h2>How to play</h2><ol>
-  <li><span>🔎</span><div>Each place has <b>3 to 5 clues</b>, shown one by one on the stage screen.</div></li>
+  <li><span>🔎</span><div>Each place has <b>2 to 5 clues</b>, shown one by one on the stage screen.</div></li>
   <li><span>✋</span><div><b>Everyone can answer!</b> Tap <b>I want to answer</b> and type your answer on your phone.</div></li>
   <li><span>☝️</span><div>You can send <b>one answer per place</b>. Answer early for more points, or wait for more clues.</div></li>
   <li><span>✏️</span><div>Spelling mistakes are fine: the quiz master checks every answer.</div></li>
