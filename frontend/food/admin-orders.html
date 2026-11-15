@@ -251,10 +251,14 @@
 
                 <div id="items-${order.id}" class="item-list">Loading items...</div>
 
+                <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0;">
+                    <span style="font-size:.85rem; color:#666;">Delivery:</span>${partsHtml(order)}
+                    <span style="font-size:.85rem; color:#666;">Order: <b>${order.delivery_status || 'Pending'}</b></span>
+                </div>
                 <div class="order-footer">
                     <button class="btn-delete-order" onclick="deleteOrder(${order.id})">Delete Order</button>
                     <div style="display: flex; gap: 10px; align-items: center;">
-                        <select onchange="updateDeliveryStatus(${order.id}, this.value)" style="padding: 5px; border-radius: 4px;">
+                        <select onchange="updateDeliveryStatus(${order.id}, this.value)" style="padding: 5px; border-radius: 4px;" title="Whole order">
                              <option value="Pending" ${order.delivery_status === 'Pending' ? 'selected' : ''}>Pending</option>
                              <option value="Accepted" ${order.delivery_status === 'Accepted' ? 'selected' : ''}>Accepted</option>
                              <option value="Delivered" ${order.delivery_status === 'Delivered' ? 'selected' : ''}>Delivered</option>
@@ -323,15 +327,26 @@
             loadOrders(); // Reload to see price update
         }
 
-        async function updateDeliveryStatus(orderId, status) {
+        // Food and Snacks are delivered separately; the order is Delivered when every part it has is.
+        function partsHtml(order) {
+            const parts = [['FOOD', '🍛 Food', order.has_food, order.food_delivery], ['SNACKS', '🍿 Snacks', order.has_snacks, order.snacks_delivery]].filter(p => p[2]);
+            return parts.map(([cat, label, , st]) => {
+                const done = st === 'Delivered';
+                return `<button onclick="updateDeliveryStatus(${order.id}, '${done ? 'Pending' : 'Delivered'}', '${cat}')" title="${done ? 'Tap to undo' : 'Mark as delivered'}"
+                    style="border:none; padding:6px 10px; border-radius:4px; cursor:pointer; font-weight:600; background:${done ? '#e8f5e9' : '#fff3e0'}; color:${done ? '#2e7d32' : '#9a3412'};">
+                    ${label}: ${done ? '✓ Delivered' : 'Not delivered'}</button>`;
+            }).join('');
+        }
+
+        async function updateDeliveryStatus(orderId, status, part) {
             try {
-                await authFetch(`${API}/order/${orderId}/delivery`, {
+                const r = await authFetch(`${API}/order/${orderId}/delivery`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status })
+                    body: JSON.stringify(part ? { status, part } : { status })
                 });
-                // Optional: show toast or tiny notification instead of full reload
-                // loadOrders(); 
+                if (!r.ok) throw new Error();
+                loadOrders();
             } catch (err) { console.error(err); alert("Failed to update status"); }
         }
 

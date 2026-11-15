@@ -286,6 +286,12 @@
       font-weight: bold;
       z-index: 100;
     }
+      .part-status { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 2px; }
+    .part-chip { font-size:.8rem; font-weight:700; padding:3px 8px; border-radius:999px; background:#fff3e0; color:#9a3412; }
+    .part-chip.done { background:#e8f5e9; color:#2e7d32; }
+    .part-btns { display:flex; gap:8px; flex-wrap:wrap; }
+    .part-btns .status-btn { flex:1 1 140px; }
+    .cat-tag { font-size:.8em; }
   </style>
 <link rel="stylesheet" href="../responsive.css?v=20261015">
 </head>
@@ -403,12 +409,27 @@ Only press OK if the money is in. The order then moves to Paid and the customer 
       loadVendorOrders(role === 'vendor' ? myId : vendorSelect.value);
     }
 
-    function updateStatus(orderId, newStatus) {
+    function updateStatus(orderId, newStatus, part) {
       authFetch(`${API}/order/${orderId}/delivery`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify(part ? { status: newStatus, part } : { status: newStatus })
       }).then(() => loadVendorOrders(role === 'vendor' ? myId : vendorSelect.value));
+    }
+
+    // Food and Snacks are delivered separately; an order only has the parts it has items for.
+    const PARTS = [['FOOD', '🍛 Food', 'food'], ['SNACKS', '🍿 Snacks', 'snacks']];
+    function orderParts(order) {
+      return PARTS.filter(([cat]) => order.items.some(i => (i.category === 'SNACKS' ? 'SNACKS' : 'FOOD') === cat))
+        .map(([cat, label, key]) => ({ cat, label, done: order[key] === 'Delivered' }));
+    }
+    function partStatusHtml(order) {
+      return `<div class="part-status">${orderParts(order).map(p => `<span class="part-chip ${p.done ? 'done' : ''}">${p.label}: ${p.done ? '✓ Delivered' : 'Not delivered'}</span>`).join('')}</div>`;
+    }
+    function partButtonsHtml(order) {
+      return `<div class="part-btns">${orderParts(order).map(p => p.done
+        ? `<button onclick="updateStatus('${order.id}', 'Pending', '${p.cat}')" class="status-btn" style="background:var(--success); color:white;">✓ ${p.label} delivered (Undo)</button>`
+        : `<button onclick="updateStatus('${order.id}', 'Delivered', '${p.cat}')" class="status-btn" style="background:var(--primary); color:white;">${p.label} delivered</button>`).join('')}</div>`;
     }
 
     const money = n => `${Number(n) % 1 ? Number(n).toFixed(2) : Number(n)}kr`;
@@ -441,6 +462,8 @@ Only press OK if the money is in. The order then moves to Paid and the customer 
                 name: row.customer_name,
                 phone: row.customer_phone,
                 status: row.delivery_status || 'Pending',
+                food: row.food_delivery || 'Pending',
+                snacks: row.snacks_delivery || 'Pending',
                 paid: row.paid,
                 total: Number(row.total),
                 items: []
@@ -465,7 +488,7 @@ Only press OK if the money is in. The order then moves to Paid and the customer 
       return `<div class="item-list">
             ${order.items.map(i => `
               <div class="item-row">
-                <span class="item-name">${esc(i.item_name)}</span>
+                <span class="item-name">${esc(i.item_name)} <span class="cat-tag">${i.category === 'SNACKS' ? '🍿' : '🍛'}</span></span>
                 <span class="item-qty">x${i.quantity}</span>
                 <span class="item-price">${money(i.price * i.quantity)}</span>
               </div>
@@ -500,10 +523,8 @@ Only press OK if the money is in. The order then moves to Paid and the customer 
           // Status Flow: Pending -> Accepted -> Delivered
           if (status === 'Pending') {
             btnHtml = `<button onclick="updateStatus('${order.id}', 'Accepted')" class="status-btn" style="background:var(--warning); color:black;">Accept Order</button>`;
-          } else if (status === 'Accepted') {
-            btnHtml = `<button onclick="updateStatus('${order.id}', 'Delivered')" class="status-btn" style="background:var(--primary); color:white;">Mark as Delivered</button>`;
-          } else if (status === 'Delivered') {
-            btnHtml = `<button onclick="updateStatus('${order.id}', 'Accepted')" class="status-btn" style="background:var(--success); color:white;">✓ Delivered (Undo)</button>`;
+          } else {
+            btnHtml = partButtonsHtml(order);
           }
 
           card.className = "customer-card";
@@ -512,6 +533,7 @@ Only press OK if the money is in. The order then moves to Paid and the customer 
             <span class="customer-name">${esc(order.name)} <span style="font-weight:normal; font-size:0.8em; margin-left:10px; padding:2px 6px; border-radius:4px; background:#eee;">${esc(status)}</span></span>
             <span class="customer-phone">${esc(order.phone)}</span>
           </div>
+          ${partStatusHtml(order)}
           ${itemsHtml(order)}
           <div class="order-total"><span>Total paid · #${order.id}</span><span>${money(order.total)}</span></div>
           ${btnHtml}

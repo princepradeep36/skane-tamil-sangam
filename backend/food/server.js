@@ -491,7 +491,10 @@ app.post("/order", requireFoodOrderingOpen, async (req, res) => {
 
 app.get("/orders/:phone", async (req, res) => {
   const data = await pool.query(`
-    SELECT o.id, o.total, o.payment_status, o.delivery_status, v.name AS vendor 
+    SELECT o.id, o.total, o.payment_status, o.delivery_status, v.name AS vendor,
+      o.food_delivery, o.snacks_delivery,
+      EXISTS (SELECT 1 FROM order_items pi JOIN menu_items pm ON pm.id = pi.menu_item_id WHERE pi.order_id = o.id AND pm.category <> 'SNACKS') AS has_food,
+      EXISTS (SELECT 1 FROM order_items pi JOIN menu_items pm ON pm.id = pi.menu_item_id WHERE pi.order_id = o.id AND pm.category = 'SNACKS') AS has_snacks
     FROM orders o JOIN vendors v ON o.vendor_id = v.id
     JOIN customers c ON o.customer_id = c.id WHERE c.phone = ANY($1) ORDER BY o.id`, [customerPhones(req.params.phone)]);
   res.json(data.rows);
@@ -499,7 +502,7 @@ app.get("/orders/:phone", async (req, res) => {
 
 app.get("/order/:id/details", async (req, res) => {
   const data = await pool.query(`
-    SELECT oi.id, m.item_name, oi.quantity, m.price FROM order_items oi 
+    SELECT oi.id, m.item_name, oi.quantity, m.price, m.category FROM order_items oi
     JOIN menu_items m ON oi.menu_item_id = m.id WHERE oi.order_id=$1 ORDER BY oi.id`, [req.params.id]);
   res.json(data.rows);
 });
@@ -617,7 +620,7 @@ app.get("/vendor-orders/:vendorId", requireVendor, async (req, res) => {
   const vendorId = vendorScope(req, req.params.vendorId);
   if (req.user.role !== "admin" && Number(req.params.vendorId) !== vendorId) return res.status(403).json({ error: "Cannot access another vendor" });
   const data = await pool.query(`
-    SELECT o.id AS order_id, o.delivery_status, o.total, c.name AS customer_name, c.phone AS customer_phone, m.item_name, m.price, oi.quantity
+    SELECT o.id AS order_id, o.delivery_status, o.food_delivery, o.snacks_delivery, o.total, c.name AS customer_name, c.phone AS customer_phone, m.item_name, m.price, m.category, oi.quantity
     FROM orders o JOIN customers c ON o.customer_id = c.id
     JOIN order_items oi ON o.id = oi.order_id
     JOIN menu_items m ON oi.menu_item_id = m.id
@@ -631,7 +634,7 @@ app.get("/vendor-unpaid-orders/:vendorId", requireVendor, async (req, res) => {
   if (req.user.role !== "admin" && Number(req.params.vendorId) !== vendorId) return res.status(403).json({ error: "Cannot access another vendor" });
   try {
     const data = await pool.query(`
-      SELECT o.id AS order_id, o.total, c.name AS customer_name, c.phone AS customer_phone, m.item_name, m.price, oi.quantity
+      SELECT o.id AS order_id, o.total, c.name AS customer_name, c.phone AS customer_phone, m.item_name, m.price, m.category, oi.quantity
       FROM orders o JOIN customers c ON o.customer_id = c.id
       JOIN order_items oi ON o.id = oi.order_id
       JOIN menu_items m ON oi.menu_item_id = m.id
@@ -668,21 +671,47 @@ app.put("/vendor/order/:id/mark-paid", requireVendor, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Delivery has two parts, Food and Snacks (from each item's menu category). An order is fully
+// "Delivered" when every part it has is delivered. Body: { part: "FOOD" | "SNACKS", status } for one part,
+// or { status } for the whole order ("Delivered" marks every part delivered, anything else resets them).
+const DELIVERY_STATUSES = ["Pending", "Accepted", "Delivered"];
+async function refreshDeliveryStatus(orderId) {
+  const r = await pool.query(`SELECT o.delivery_status, o.food_delivery, o.snacks_delivery,
+      EXISTS (SELECT 1 FROM order_items pi JOIN menu_items pm ON pm.id = pi.menu_item_id WHERE pi.order_id = o.id AND pm.category <> 'SNACKS') AS has_food,
+      EXISTS (SELECT 1 FROM order_items pi JOIN menu_items pm ON pm.id = pi.menu_item_id WHERE pi.order_id = o.id AND pm.category = 'SNACKS') AS has_snacks
+    FROM orders o WHERE o.id = $1`, [orderId]);
+  const o = r.rows[0];
+  if (!o || (!o.has_food && !o.has_snacks)) return;
+  const allDone = (!o.has_food || o.food_delivery === "Delivered") && (!o.has_snacks || o.snacks_delivery === "Delivered");
+  const anyDone = (o.has_food && o.food_delivery === "Delivered") || (o.has_snacks && o.snacks_delivery === "Delivered");
+  let next = o.delivery_status;
+  if (allDone) next = "Delivered";
+  else if (o.delivery_status === "Delivered" || (anyDone && o.delivery_status === "Pending")) next = "Accepted";
+  if (next !== o.delivery_status) await pool.query("UPDATE orders SET delivery_status = $1 WHERE id = $2", [next, orderId]);
+}
+
 app.put("/order/:id/delivery", requireVendor, async (req, res) => {
-  const { status } = req.body;
-  // If status is provided, use it. Otherwise toggle for backward compatibility if needed (though we will use explicit status now)
-  if (status) {
-    const params = [status, req.params.id];
-    let query = "UPDATE orders SET delivery_status = $1 WHERE id = $2";
-    if (req.user.role !== "admin") { query += " AND vendor_id = $3"; params.push(req.user.vendorId); }
+  const { status, part } = req.body;
+  if (!DELIVERY_STATUSES.includes(status)) return res.status(400).json({ error: "Status is required" });
+  if (part !== undefined && !["FOOD", "SNACKS"].includes(part)) return res.status(400).json({ error: "Part must be FOOD or SNACKS" });
+  try {
+    const params = [req.params.id];
+    let query;
+    if (part) {
+      const col = part === "FOOD" ? "food_delivery" : "snacks_delivery";
+      params.push(status === "Delivered" ? "Delivered" : "Pending");
+      query = `UPDATE orders SET ${col} = $2 WHERE id = $1`;
+    } else {
+      params.push(status, status === "Delivered" ? "Delivered" : "Pending");
+      query = "UPDATE orders SET delivery_status = $2, food_delivery = $3, snacks_delivery = $3 WHERE id = $1";
+    }
+    if (req.user.role !== "admin") { params.push(req.user.vendorId); query += ` AND vendor_id = $${params.length}`; }
     const result = await pool.query(query + " RETURNING id", params);
     if (!result.rows.length) return res.status(404).json({ error: "Order not found" });
-  } else {
-    // Fallback toggle logic (Pending <-> Delivered) - strictly speaking we might not need this if frontend sends status
-    // But for safety let's just error or require status.
-    return res.status(400).json({ error: "Status is required" });
-  }
-  res.json({ success: true });
+    await refreshDeliveryStatus(req.params.id);
+    const o = await pool.query("SELECT delivery_status, food_delivery, snacks_delivery FROM orders WHERE id = $1", [req.params.id]);
+    res.json({ success: true, ...o.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put("/change-password", authenticateToken, async (req, res) => {
@@ -741,6 +770,11 @@ async function ensureEventRegistrationLifecycle() {
   // A vendor or admin can mark an item sold out, or close the whole stall, at any time.
   await pool.query(`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS sold_out BOOLEAN NOT NULL DEFAULT FALSE`);
   await pool.query(`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS closed BOOLEAN NOT NULL DEFAULT FALSE`);
+  // Delivery per part: Food and Snacks. Orders delivered before this existed count as fully delivered.
+  await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS food_delivery VARCHAR(20) NOT NULL DEFAULT 'Pending'`);
+  await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS snacks_delivery VARCHAR(20) NOT NULL DEFAULT 'Pending'`);
+  await pool.query(`UPDATE orders SET food_delivery='Delivered', snacks_delivery='Delivered'
+    WHERE delivery_status='Delivered' AND food_delivery='Pending' AND snacks_delivery='Pending'`);
   await pool.query(`CREATE TABLE IF NOT EXISTS menu_item_images (
     menu_item_id INTEGER PRIMARY KEY REFERENCES menu_items(id) ON DELETE CASCADE,
     content_type VARCHAR(50) NOT NULL,
@@ -1281,13 +1315,18 @@ async function recalcOrderTotal(orderId) {
 
   const newTotal = res.rows[0].new_total || 0;
   await pool.query("UPDATE orders SET total = $1 WHERE id = $2", [newTotal, orderId]);
+  // Removing items can change which parts (Food / Snacks) the order still has.
+  await refreshDeliveryStatus(orderId);
 }
 
 app.get("/admin/orders", requirePerm("food"), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT o.id, o.total, o.payment_status, o.delivery_status, o.created_at,
-             v.name AS vendor_name, c.name AS customer_name, c.phone AS customer_phone
+             v.name AS vendor_name, c.name AS customer_name, c.phone AS customer_phone,
+      o.food_delivery, o.snacks_delivery,
+      EXISTS (SELECT 1 FROM order_items pi JOIN menu_items pm ON pm.id = pi.menu_item_id WHERE pi.order_id = o.id AND pm.category <> 'SNACKS') AS has_food,
+      EXISTS (SELECT 1 FROM order_items pi JOIN menu_items pm ON pm.id = pi.menu_item_id WHERE pi.order_id = o.id AND pm.category = 'SNACKS') AS has_snacks
       FROM orders o
       JOIN vendors v ON o.vendor_id = v.id
       JOIN customers c ON o.customer_id = c.id

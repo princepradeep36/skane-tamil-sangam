@@ -202,6 +202,11 @@
             statusColor = '#4caf50'; // Green
             statusBg = '#e8f5e9';
           }
+          // Food and snacks can be handed over separately: say which part is ready.
+          if (status !== 'Delivered' && order.has_food && order.has_snacks) {
+            const f = order.food_delivery === 'Delivered', sn = order.snacks_delivery === 'Delivered';
+            if (f !== sn) statusText = f ? 'Food delivered · snacks coming' : 'Snacks delivered · food coming';
+          }
 
           const card = document.createElement("div");
           card.className = "receipt-card";
