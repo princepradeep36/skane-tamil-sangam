@@ -222,6 +222,15 @@
             cursor: pointer;
         }
 
+        .paid-note {
+            background: #e8f5e9;
+            color: #1b5e20;
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
         .btn-mark-paid {
             background: #28a745;
             color: white;
@@ -401,8 +410,7 @@
           </div>
 
           <div class="payment-actions">
-            <button class="btn-swish" onclick="payWithSwish(${order.id}, '${swishNum}')">Pay with Swish</button>
-            <button class="btn-mark-paid" id="btn-paid-${order.id}" onclick="markAsPaid(${order.id})">Mark as Paid</button>
+            <button class="btn-swish" id="btn-swish-${order.id}" onclick="payWithSwish(${order.id}, '${swishNum}')">Pay with Swish</button>
             <button class="btn-cancel-order" type="button" onclick="cancelOrder(${order.id})">Cancel this order</button>
           </div>
         `;
@@ -536,8 +544,9 @@
             const swishPayload = JSON.stringify(swishData);
             const swishUrl = `swish://payment?data=${encodeURIComponent(swishPayload)}`;
 
-            // Show "Mark as Paid" button regardless, so they can confirm after paying
-            document.getElementById(`btn-paid-${orderId}`).style.display = "block";
+            // Tapping Pay with Swish marks the order as paid straight away (no separate step).
+            // The stall checks its Swish before handing over the food.
+            markPaidNow(orderId);
 
             if (isMobile()) {
                 window.location.href = swishUrl;
@@ -591,28 +600,18 @@
             }, 100);
         }
 
-        async function markAsPaid(orderId) {
-            const btn = document.getElementById(`btn-paid-${orderId}`);
-            btn.disabled = true;
-            btn.innerText = "Updating...";
-
-            try {
-                const res = await fetch(`${API}/order/${orderId}/pay`, { method: 'PUT' });
-                if (!res.ok) throw new Error("Failed to update");
-
-                // Remove card from view
-                const card = document.getElementById(`order-card-${orderId}`);
-                card.style.opacity = '0.5';
-                setTimeout(() => {
-                    card.remove();
-                    showIfEmpty("All paid!");
-                }, 500);
-
-            } catch (err) {
-                alert("Error updating payment status. Try again.");
-                btn.disabled = false;
-                btn.innerText = "Mark as Paid";
-            }
+        // keepalive: the request still completes when the page hands over to the Swish app.
+        function markPaidNow(orderId) {
+            fetch(`${API}/order/${orderId}/pay`, { method: 'PUT', keepalive: true })
+                .then(res => { if (!res.ok) throw new Error(); })
+                .catch(() => alert("We couldn't save your payment. Please show your Swish payment to the stall."));
+            const card = document.getElementById(`order-card-${orderId}`);
+            if (!card) return;
+            card.querySelectorAll('.qty button, .remove-btn, .add-item').forEach(el => { el.disabled = true; });
+            card.querySelectorAll('.edit-hint').forEach(el => { el.hidden = true; });
+            const actions = card.querySelector('.payment-actions');
+            actions.innerHTML = `<div class="paid-note">✅ <b>Paid</b> · order #${orderId}. Show your Swish payment at the stall to collect your order.
+                <br><a href="receipts.html?phone=${encodeURIComponent(document.getElementById('phone').value)}">View receipts</a></div>`;
         }
     </script>
 
