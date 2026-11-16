@@ -60,7 +60,7 @@ th { color: #666; font-size: .8rem; }
 
   <div class="box">
     <h2>Vendor ratings</h2>
-    <p class="hint">Average stars per food stall. Each vendor sees only their own ratings and comments, without names or phone numbers.</p>
+    <p class="hint">Average stars per food stall. Each vendor sees only their own ratings and comments.</p>
     <div id="vendors"></div>
   </div>
 
@@ -95,7 +95,7 @@ function render() {
   $('list').innerHTML = data.submissions.length ? data.submissions.map(f => `<div class="sub">
       <div class="sub-head">
         <span><b>#${f.id}</b> · Success <span class="gold">${starText(f.success_rating)}</span>${f.food_rating ? ` · Food <span class="gold">${starText(f.food_rating)}</span>` : ''}</span>
-        <span class="sub-who">${esc(f.name || 'Anonymous')}${f.phone ? ' · ' + esc(f.phone) : ''} · ${esc(new Date(f.created_at).toLocaleString())} <button class="del" onclick="removeFb(${f.id})">Delete</button></span>
+        <span class="sub-who">${esc(new Date(f.created_at).toLocaleString())} <button class="del" onclick="removeFb(${f.id})">Delete</button></span>
       </div>
       ${ans('What did you enjoy the most, what worked well?', f.enjoyed)}
       ${ans('What did not work or could have been better?', f.not_worked)}
@@ -132,8 +132,7 @@ $('exportBtn').addEventListener('click', () => {
     'What would you do differently next time?': f.differently || '',
     'Food stalls & Click2Eat (1-5)': f.food_rating || '',
     'Food stalls & Click2Eat comment': f.food_comment || '',
-    'Vendor ratings': f.vendors.map(v => `${v.vendor_name}: ${v.rating}/5${v.comment ? ` (${v.comment})` : ''}`).join('; '),
-    'Name': f.name || '', 'Phone': f.phone || ''
+    'Vendor ratings': f.vendors.map(v => `${v.vendor_name}: ${v.rating}/5${v.comment ? ` (${v.comment})` : ''}`).join('; ')
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(answers), 'Answers');
   const vendorRows = data.submissions.flatMap(f => f.vendors.map(v => ({ 'Response ID': f.id, 'Vendor': v.vendor_name, 'Rating (1-5)': v.rating, 'Comment': v.comment || '' })));

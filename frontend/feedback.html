@@ -51,7 +51,7 @@ footer a{color:#ffd76a}
 <form id="form" novalidate>
   <div class="card">
     <h1>📝 Diwali 2026 Feedback</h1>
-    <p class="sub">Thank you for celebrating Diwali with us! Your feedback helps us make our next event even better. It takes about 2 minutes. Questions marked <b style="color:#c62828">*</b> are required.</p>
+    <p class="sub">Thank you for celebrating Diwali with us! Your feedback helps us make our next event even better. It takes about 2 minutes and is anonymous. Questions marked <b style="color:#c62828">*</b> are required.</p>
   </div>
 
   <div class="card">
@@ -95,17 +95,9 @@ footer a{color:#ffd76a}
   </div>
 
   <div class="card">
-    <span class="q">7. Vendor feedback<small>Pick a food stall, give it stars and a comment. Your rating and comment are shared with that stall, without your name or phone number.</small></span>
+    <span class="q">7. Vendor feedback<small>Pick a food stall, give it stars and a comment. Your rating and comment are shared with that stall.</small></span>
     <div id="vendors"></div>
     <button type="button" class="add" id="addVendor">+ Add feedback for another vendor</button>
-  </div>
-
-  <div class="card">
-    <span class="q">8. Your details (optional)</span>
-    <label class="q" for="name" style="font-weight:600;color:#475569;font-size:.9rem;margin-top:6px">Name</label>
-    <input id="name" maxlength="100" autocomplete="name">
-    <label class="q" for="phone" style="font-weight:600;color:#475569;font-size:.9rem;margin-top:10px">Phone</label>
-    <input id="phone" type="tel" placeholder="+46 70 123 45 67" autocomplete="tel">
   </div>
 
   <div id="error" class="err hidden"></div>
@@ -200,8 +192,7 @@ $('form').addEventListener('submit', async e => {
     hadProblems: problems, problemsPrepare: problems === 'yes' ? $('problemsPrepare').value : '',
     differently: $('differently').value,
     foodRating: rating.food || null, foodComment: $('foodComment').value,
-    vendors: vendorRows.filter(v => v.vendorId && v.rating),
-    name: $('name').value, phone: $('phone').value
+    vendors: vendorRows.filter(v => v.vendorId && v.rating)
   };
   $('send').disabled = true;
   try {
