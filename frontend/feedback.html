@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Feedback | Skåne Tamil Sangam</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:linear-gradient(170deg,#003d80,#0056b3 60%,#0b75d1);color:#fff;display:flex;flex-direction:column;align-items:center;padding:20px 16px 28px}
+header{text-align:center;margin-bottom:16px}
+header b{display:block;font-size:1.3rem}
+header span{color:#ffd76a;font-weight:600}
+.card{width:min(520px,100%);background:#fff;color:#1c1c1e;border-radius:22px;padding:20px 18px;box-shadow:0 18px 40px rgba(0,0,0,.25);margin-bottom:14px}
+h1{margin:0 0 4px;font-size:1.3rem;color:#003d80}
+h2{margin:0 0 6px;font-size:1.05rem;color:#003d80}
+.sub{margin:0 0 12px;color:#57534e;font-size:.92rem;line-height:1.45}
+label{display:block;font-weight:700;font-size:.85rem;color:#475569;margin:10px 0 4px}
+input,textarea{width:100%;padding:11px 12px;border:1.5px solid #d6dde6;border-radius:10px;font-size:16px;font-family:inherit}
+textarea{min-height:64px;resize:vertical;margin-top:8px}
+.stars{display:flex;gap:4px}
+.stars button{background:none;border:none;font-size:2rem;line-height:1;padding:2px;cursor:pointer;color:#d1d5db}
+.stars button.on{color:#ffc107}
+.stars-label{font-size:.85rem;color:#6b7280;margin-top:2px;min-height:1.1em}
+.stall{border:1px solid #e5e7eb;border-radius:14px;padding:12px;margin-top:10px}
+.stall.ordered{border-color:#f6c77a;background:#fffbeb}
+.stall.focus{box-shadow:0 0 0 3px #ffc107}
+.stall-name{font-weight:800;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.tag{font-size:.72rem;font-weight:700;background:#fff4dc;color:#7c2d12;border:1px solid #f6c77a;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.send{width:min(520px,100%);background:#ffc107;color:#3d2c06;border:none;border-radius:14px;padding:15px;font-size:1.05rem;font-weight:800;cursor:pointer}
+.send:disabled{opacity:.6}
+.msg{width:min(520px,100%);border-radius:14px;padding:14px;font-weight:700;line-height:1.4;margin-top:12px;text-align:center}
+.msg.ok{background:#dcfce7;color:#166534}
+.msg.bad{background:#fee2e2;color:#991b1b}
+.hidden{display:none}
+footer{margin-top:18px;text-align:center;opacity:.9;font-size:.9rem;line-height:1.5}
+footer a{color:#ffd76a}
+</style>
+</head>
+<body>
+<header><b>🪔 Diwali 2026</b><span>Skåne Tamil Sangam</span></header>
+
+<div class="card">
+  <h1>⭐ Your feedback</h1>
+  <p class="sub">Thank you for joining us! Tell us how it was. Every rating is optional: rate what you like.</p>
+  <label for="name">Your name (optional)</label>
+  <input id="name" maxlength="100" autocomplete="name">
+  <label for="phone">Phone number (optional)</label>
+  <input id="phone" type="tel" placeholder="+46 70 123 45 67" autocomplete="tel">
+  <p class="sub" style="margin:6px 0 0;font-size:.82rem">With your phone number we show the stalls you ordered from first, and you can change your ratings later.</p>
+</div>
+
+<div class="card">
+  <h2>🪔 The Diwali celebration</h2>
+  <div id="event"></div>
+</div>
+
+<div class="card">
+  <h2>🍛 Food stalls</h2>
+  <p class="sub">Your rating and comment go to the stall, so they can see what you liked.</p>
+  <div id="stalls"><p class="sub">Loading stalls…</p></div>
+</div>
+
+<button class="send" id="send">Send feedback</button>
+<div id="result" class="msg hidden"></div>
+
+<footer><a href="/">skanetamilsangam.duckdns.org</a></footer>
+
+<script>
+const API = '/food-api';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const params = new URLSearchParams(location.search);
+const focusVendor = Number(params.get('vendor')) || null;
+const WORDS = ['', 'Poor', 'Okay', 'Good', 'Very good', 'Excellent'];
+const ratings = {}; // key: 'event' or vendor id → { rating, comment }
+
+function starsHtml(key, label) {
+  return `<div class="stars" role="radiogroup" aria-label="${esc(label)}" data-key="${key}">
+      ${[1, 2, 3, 4, 5].map(n => `<button type="button" data-n="${n}" aria-label="${n} star${n > 1 ? 's' : ''}">★</button>`).join('')}
+    </div>
+    <div class="stars-label" id="lbl-${key}"></div>
+    <textarea class="hidden" id="cm-${key}" maxlength="1000" placeholder="Anything to add? (optional)"></textarea>`;
+}
+function paint(key) {
+  const r = ratings[key]?.rating || 0;
+  document.querySelectorAll(`.stars[data-key="${key}"] button`).forEach(b => b.classList.toggle('on', Number(b.dataset.n) <= r));
+  $(`lbl-${key}`).textContent = r ? `${r} / 5 · ${WORDS[r]}` : '';
+  $(`cm-${key}`).classList.toggle('hidden', !r);
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('.stars button');
+  if (!b) return;
+  const key = b.parentElement.dataset.key;
+  ratings[key] = { ...(ratings[key] || {}), rating: Number(b.dataset.n) };
+  paint(key);
+});
+
+$('event').innerHTML = starsHtml('event', 'Rate the Diwali celebration');
+
+async function loadStalls() {
+  const phone = $('phone').value.trim();
+  try {
+    const r = await fetch(`${API}/feedback/stalls${phone ? `?phone=${encodeURIComponent(phone)}` : ''}`, { cache: 'no-store' });
+    const d = await r.json();
+    const keep = {}; // keep what was already typed
+    document.querySelectorAll('textarea[id^="cm-"]').forEach(t => { keep[t.id] = t.value; });
+    $('stalls').innerHTML = d.stalls.length ? d.stalls.map(s => `
+      <div class="stall ${s.ordered ? 'ordered' : ''} ${s.id === focusVendor ? 'focus' : ''}" id="stall-${s.id}">
+        <div class="stall-name"><span>${esc(s.name)}</span>${s.ordered ? '<span class="tag">You ordered here</span>' : ''}</div>
+        ${starsHtml(s.id, `Rate ${s.name}`)}
+      </div>`).join('') : '<p class="sub">No stalls to rate.</p>';
+    for (const m of d.mine || []) {
+      const key = m.vendor_id === null ? 'event' : m.vendor_id;
+      if (!ratings[key]?.rating) ratings[key] = { rating: m.rating };
+      const t = $(`cm-${key}`);
+      if (t && !keep[`cm-${key}`] && m.comment) t.value = m.comment;
+      if (m.name && !$('name').value) $('name').value = m.name;
+    }
+    for (const [id, v] of Object.entries(keep)) if ($(id) && v) $(id).value = v;
+    Object.keys(ratings).forEach(k => { if ($(`lbl-${k}`)) paint(k); });
+    if (focusVendor && $(`stall-${focusVendor}`)) $(`stall-${focusVendor}`).scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } catch (_) { $('stalls').innerHTML = '<p class="sub">Could not load the stalls. Please try again.</p>'; }
+}
+if (params.get('phone')) $('phone').value = params.get('phone');
+$('phone').addEventListener('change', loadStalls);
+loadStalls();
+
+$('send').addEventListener('click', async () => {
+  const comment = k => ($(`cm-${k}`)?.value || '').trim();
+  const stalls = Object.keys(ratings).filter(k => k !== 'event' && ratings[k].rating)
+    .map(k => ({ vendorId: Number(k), rating: ratings[k].rating, comment: comment(k) }));
+  const body = { name: $('name').value.trim(), phone: $('phone').value.trim(), stalls };
+  if (ratings.event?.rating) body.event = { rating: ratings.event.rating, comment: comment('event') };
+  const out = $('result');
+  if (!body.event && !stalls.length) { out.className = 'msg bad'; out.textContent = 'Please tap the stars for at least one rating.'; return; }
+  $('send').disabled = true;
+  try {
+    const r = await fetch(`${API}/feedback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'Could not send your feedback. Please try again.');
+    out.className = 'msg ok';
+    out.textContent = '🙏 Nandri! Your feedback has been sent.' + (body.phone ? ' You can come back and change it with the same phone number.' : '');
+  } catch (err) { out.className = 'msg bad'; out.textContent = err.message; }
+  $('send').disabled = false;
+});
+</script>
+</body>
+</html>

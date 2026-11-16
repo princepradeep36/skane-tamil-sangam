@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ratings & Feedback - Click2Eat</title>
+<style>
+:root { --primary: #007bff; --bg: #f4f7f9; --card: #ffffff; --text: #333; }
+* { box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; }
+.container { max-width: 760px; margin: 0 auto; }
+.top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.top h1 { margin: 0; font-size: 1.5rem; color: var(--primary); }
+.top a, .top button { text-decoration: none; background: #fff; border: 1px solid #ddd; color: #333; padding: 8px 12px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: .9rem; }
+.box { background: var(--card); border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.05); padding: 16px; margin-bottom: 14px; }
+.hint { color: #666; font-size: .9rem; margin: 0 0 10px; line-height: 1.45; }
+.sum-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.sum { border: 1px solid #eee; border-radius: 10px; padding: 12px; cursor: pointer; background: #fff; text-align: left; font: inherit; color: inherit; }
+.sum.active { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(0,123,255,.2); }
+.sum b { display: block; margin-bottom: 4px; }
+.avg { font-size: 1.6rem; font-weight: 800; }
+.avg small { font-size: .85rem; color: #666; font-weight: 600; }
+.bars { margin-top: 6px; font-size: .78rem; color: #555; }
+.bar { display: flex; align-items: center; gap: 6px; }
+.bar i { flex: 1; height: 6px; background: #eee; border-radius: 4px; overflow: hidden; display: block; }
+.bar i span { display: block; height: 100%; background: #ffc107; }
+.gold { color: #f5a300; letter-spacing: 1px; }
+.fb { border-bottom: 1px solid #f0f0f0; padding: 12px 0; }
+.fb:last-child { border-bottom: none; }
+.fb-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+.fb-who { font-size: .85rem; color: #666; }
+.fb-comment { margin: 6px 0 0; white-space: pre-wrap; line-height: 1.45; }
+.del { background: none; border: none; color: #c62828; cursor: pointer; font-size: .8rem; text-decoration: underline; }
+.empty { text-align: center; color: #888; padding: 20px; }
+.share { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.share input { flex: 1 1 240px; padding: 9px; border: 1px solid #ddd; border-radius: 8px; font-size: .9rem; }
+.share button { background: var(--primary); color: #fff; border: none; padding: 9px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="top">
+    <h1>⭐ Ratings & Feedback</h1>
+    <div><a id="back" href="vendor.html">⬅ Back</a> <button onclick="logout()">Logout</button></div>
+  </div>
+  <div class="box" id="shareBox" hidden>
+    <p class="hint"><b>Feedback link for guests</b>: share it in WhatsApp, or show it as a QR code. Guests rate the event and the stalls.</p>
+    <div class="share"><input id="shareUrl" readonly><button onclick="copyShare()">Copy link</button></div>
+  </div>
+  <div class="box">
+    <p class="hint" id="intro">Star ratings and comments from guests.</p>
+    <div class="sum-grid" id="summary"></div>
+  </div>
+  <div class="box">
+    <div id="list"><div class="empty">Loading…</div></div>
+  </div>
+</div>
+<script src="auth.js"></script>
+<script>
+checkAuth('vendor');
+const API = '/food-api';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const starText = n => '★'.repeat(n) + '☆'.repeat(5 - n);
+const role = sessionStorage.getItem('user_role');
+let data = { summary: [], items: [] }, filter = 'ALL';
+
+if (role !== 'vendor') $('back').href = 'admin.html?admin=true';
+else $('back').href = `vendor.html?vendor_id=${sessionStorage.getItem('vendor_id') || ''}`;
+
+function copyShare() { navigator.clipboard?.writeText($('shareUrl').value); }
+
+function summaryCard(s, key) {
+  const max = Math.max(1, ...[1, 2, 3, 4, 5].map(n => s[`s${n}`]));
+  return `<button class="sum ${filter === key ? 'active' : ''}" data-key="${key}">
+      <b>${s.vendor_id === null ? '🪔 Diwali celebration' : '🍛 ' + esc(s.vendor_name)}</b>
+      <div class="avg"><span class="gold">★</span> ${s.average} <small>/ 5 · ${s.count} rating${s.count === 1 ? '' : 's'}</small></div>
+      <div class="bars">${[5, 4, 3, 2, 1].map(n => `<div class="bar">${n}★ <i><span style="width:${100 * s[`s${n}`] / max}%"></span></i> ${s[`s${n}`]}</div>`).join('')}</div>
+    </button>`;
+}
+
+function render() {
+  const sums = data.summary;
+  $('summary').innerHTML = sums.length
+    ? (data.admin && sums.length > 1 ? `<button class="sum ${filter === 'ALL' ? 'active' : ''}" data-key="ALL"><b>Everything</b><div class="avg">${data.items.length} <small>ratings</small></div></button>` : '')
+      + sums.map(s => summaryCard(s, s.vendor_id === null ? 'EVENT' : String(s.vendor_id))).join('')
+    : '<div class="empty">No ratings yet.</div>';
+  const items = data.items.filter(i => filter === 'ALL' || (filter === 'EVENT' ? i.vendor_id === null : String(i.vendor_id) === filter));
+  $('list').innerHTML = items.length ? items.map(i => `<div class="fb">
+      <div class="fb-head">
+        <span><span class="gold">${starText(i.rating)}</span>${data.admin ? ` · <b>${i.vendor_id === null ? 'Diwali celebration' : esc(i.vendor_name)}</b>` : ''}</span>
+        <span class="fb-who">${esc(i.name || 'Guest')}${data.admin && i.phone ? ' · ' + esc(i.phone) : ''} · ${esc(new Date(i.updated_at).toLocaleString())}
+          ${data.admin ? `<button class="del" onclick="removeFb(${i.id})">Delete</button>` : ''}</span>
+      </div>
+      ${i.comment ? `<p class="fb-comment">${esc(i.comment)}</p>` : ''}
+    </div>`).join('') : '<div class="empty">No feedback here yet.</div>';
+}
+$('summary').addEventListener('click', e => { const b = e.target.closest('.sum'); if (b) { filter = b.dataset.key; render(); } });
+
+async function load() {
+  const r = await authFetch(`${API}/vendor/feedback`, { cache: 'no-store' });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { $('list').innerHTML = `<div class="empty">${esc(d.error || 'Could not load the feedback.')}</div>`; return; }
+  data = d;
+  $('intro').textContent = d.admin
+    ? 'All feedback: the event and every stall. Tap a card to see only those ratings. Vendors see only their own stall, with first names only.'
+    : 'What guests said about your stall.';
+  if (d.admin) { $('shareBox').hidden = false; $('shareUrl').value = `${location.origin}/feedback.html`; }
+  render();
+}
+async function removeFb(id) {
+  if (!confirm('Delete this feedback?')) return;
+  await authFetch(`${API}/admin/feedback/${id}`, { method: 'DELETE' });
+  load();
+}
+load();
+setInterval(load, 30000);
+</script>
+</body>
+</html>

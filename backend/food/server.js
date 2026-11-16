@@ -12,6 +12,7 @@ const wa = require("./whatsapp");
 const { validBookingKey } = require("./booking-link");
 const registerConnectionGame = require("./connection-game"); // not "whatsapp": route bodies use that name for the phone field
 const registerSweets = require("./sweets");
+const registerFeedback = require("./feedback");
 const registerStaff = require("./staff");
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -491,7 +492,7 @@ app.post("/order", requireFoodOrderingOpen, async (req, res) => {
 
 app.get("/orders/:phone", async (req, res) => {
   const data = await pool.query(`
-    SELECT o.id, o.total, o.payment_status, o.delivery_status, v.name AS vendor,
+    SELECT o.id, o.total, o.payment_status, o.delivery_status, v.name AS vendor, o.vendor_id,
       o.food_delivery, o.snacks_delivery,
       EXISTS (SELECT 1 FROM order_items pi JOIN menu_items pm ON pm.id = pi.menu_item_id WHERE pi.order_id = o.id AND pm.category <> 'SNACKS') AS has_food,
       EXISTS (SELECT 1 FROM order_items pi JOIN menu_items pm ON pm.id = pi.menu_item_id WHERE pi.order_id = o.id AND pm.category = 'SNACKS') AS has_snacks
@@ -1385,6 +1386,7 @@ app.put("/admin/order/:id/payment", requirePerm("food"), async (req, res) => {
 const ensureConnectionTables = registerConnectionGame(app, { pool, requireAdmin: requirePerm("games"), imageContentType });
 const ensureClueTables = registerConnectionGame(app, { pool, requireAdmin: requirePerm("games"), imageContentType, kind: "clue" });
 const ensureSweetsTable = registerSweets(app, { pool, requirePerm, hasPerm, wa });
+const ensureFeedbackTable = registerFeedback(app, { pool, requireVendor, vendorScope, normalizePhone: normalizeFoodPhone, customerPhones });
 
 initializeDatabase()
   .then(() => ensureEventRegistrationLifecycle())
@@ -1393,6 +1395,7 @@ initializeDatabase()
   .then(() => ensureClueTables())
   .then(() => ensureStaffColumns())
   .then(() => ensureSweetsTable())
+  .then(() => ensureFeedbackTable())
   .then(() => ensureSiteSettings())
   .then(() => app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`)))
   .catch(err => { console.error('Failed to initialize event registration lifecycle:', err); process.exit(1); });
