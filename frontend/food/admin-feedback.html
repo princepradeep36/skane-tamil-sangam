@@ -65,6 +65,11 @@ th { color: #666; font-size: .8rem; }
   </div>
 
   <div class="box">
+    <h2>Any other comments</h2>
+    <div id="others"></div>
+  </div>
+
+  <div class="box">
     <h2>All answers</h2>
     <div id="list"><div class="empty">Loading…</div></div>
   </div>
@@ -81,18 +86,31 @@ const yesNo = v => v === true ? 'Yes' : v === false ? 'No' : '';
 let data = null;
 $('shareUrl').value = `${location.origin}/feedback.html`;
 
+// Question 6 "How was the website/app experience?": one rating per part.
+const APP_PARTS = [['reg', 'Registration'], ['pay', 'Registration payment'], ['food', 'Food ordering (Click2Eat)'], ['game', 'Clue Game']];
+
 function render() {
   const s = data.summary;
+  const app = s.app || {};
   $('stats').innerHTML = `
     <div class="stat"><span class="lbl">Responses</span><b>${s.count}</b></div>
     <div class="stat"><span class="lbl">Success of Diwali 2026</span><b><span class="gold">★</span> ${s.successAverage ?? '–'}</b> / 5</div>
-    <div class="stat"><span class="lbl">Food stalls & Click2Eat</span><b><span class="gold">★</span> ${s.foodAverage ?? '–'}</b> / 5 <small>(${s.foodCount})</small></div>
+    ${APP_PARTS.map(([k, label]) => `<div class="stat"><span class="lbl">App: ${label}</span><b><span class="gold">★</span> ${app[k]?.average ?? '–'}</b> / 5 <small>(${app[k]?.count ?? 0})</small></div>`).join('')}
+    ${s.foodCount ? `<div class="stat"><span class="lbl">Food stalls & Click2Eat (earlier question)</span><b><span class="gold">★</span> ${s.foodAverage}</b> / 5 <small>(${s.foodCount})</small></div>` : ''}
     <div class="stat"><span class="lbl">Sweet boxes</span><b><span class="gold">★</span> ${s.sweetsAverage ?? '–'}</b> / 5 <small>(${s.sweetsCount ?? 0})</small></div>
     <div class="stat"><span class="lbl">Unforeseen problems</span><b>${s.problemsYes}</b> yes · ${s.problemsNo} no</div>`;
   $('vendors').innerHTML = data.vendors.length
     ? `<table><tr><th>Vendor</th><th>Average</th><th>Ratings</th></tr>${data.vendors.map(v => `<tr><td>${esc(v.vendor_name)}</td><td><span class="gold">★</span> <b>${v.average}</b> / 5</td><td>${v.count}</td></tr>`).join('')}</table>`
     : '<div class="empty">No vendor ratings yet.</div>';
+  const others = data.submissions.filter(f => f.other_comments);
+  $('others').innerHTML = others.length
+    ? others.map(f => `<div class="ans"><b>#${f.id} · ${esc(new Date(f.created_at).toLocaleString())}</b><p>${esc(f.other_comments)}</p></div>`).join('')
+    : '<div class="empty">No other comments yet.</div>';
   const ans = (label, val) => val ? `<div class="ans"><b>${label}</b><p>${esc(val)}</p></div>` : '';
+  const appRatings = f => {
+    const parts = APP_PARTS.filter(([k]) => f[`app_${k}_rating`]);
+    return parts.length ? `<div class="ans"><b>Website/app experience</b>${parts.map(([k, label]) => `<span class="vend">${label} <span class="gold">${starText(f[`app_${k}_rating`])}</span></span>`).join('')}</div>` : '';
+  };
   $('list').innerHTML = data.submissions.length ? data.submissions.map(f => `<div class="sub">
       <div class="sub-head">
         <span><b>#${f.id}</b> · Success <span class="gold">${starText(f.success_rating)}</span>${f.food_rating ? ` · Food <span class="gold">${starText(f.food_rating)}</span>` : ''}${f.sweets_rating ? ` · Sweets <span class="gold">${starText(f.sweets_rating)}</span>` : ''}</span>
@@ -103,9 +121,12 @@ function render() {
       ${f.had_problems !== null ? `<div class="ans"><b>Unforeseen problems?</b><p>${yesNo(f.had_problems)}</p></div>` : ''}
       ${ans('How could we prepare better?', f.problems_prepare)}
       ${ans('What would you do differently next time?', f.differently)}
-      ${ans('Food stalls & Click2Eat comment', f.food_comment)}
+      ${appRatings(f)}
+      ${ans('Website/app comment', f.app_comment)}
+      ${ans('Food stalls & Click2Eat comment (earlier question)', f.food_comment)}
       ${ans('Sweet boxes comment', f.sweets_comment)}
       ${f.vendors.length ? `<div class="ans"><b>Vendor feedback</b>${f.vendors.map(v => `<span class="vend">${esc(v.vendor_name)} <span class="gold">${starText(v.rating)}</span>${v.comment ? ` · ${esc(v.comment)}` : ''}</span>`).join('')}</div>` : ''}
+      ${ans('Any other comments?', f.other_comments)}
     </div>`).join('') : '<div class="empty">No feedback yet.</div>';
 }
 
@@ -132,11 +153,14 @@ $('exportBtn').addEventListener('click', () => {
     'Unforeseen problems?': yesNo(f.had_problems),
     'How could we prepare better?': f.problems_prepare || '',
     'What would you do differently next time?': f.differently || '',
-    'Food stalls & Click2Eat (1-5)': f.food_rating || '',
-    'Food stalls & Click2Eat comment': f.food_comment || '',
+    ...Object.fromEntries(APP_PARTS.map(([k, label]) => [`App: ${label} (1-5)`, f[`app_${k}_rating`] || ''])),
+    'Website/app comment': f.app_comment || '',
+    'Food stalls & Click2Eat (1-5) – earlier question': f.food_rating || '',
+    'Food stalls & Click2Eat comment – earlier question': f.food_comment || '',
     'Sweet boxes (1-5)': f.sweets_rating || '',
     'Sweet boxes comment': f.sweets_comment || '',
-    'Vendor ratings': f.vendors.map(v => `${v.vendor_name}: ${v.rating}/5${v.comment ? ` (${v.comment})` : ''}`).join('; ')
+    'Vendor ratings': f.vendors.map(v => `${v.vendor_name}: ${v.rating}/5${v.comment ? ` (${v.comment})` : ''}`).join('; '),
+    'Any other comments?': f.other_comments || ''
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(answers), 'Answers');
   const vendorRows = data.submissions.flatMap(f => f.vendors.map(v => ({ 'Response ID': f.id, 'Vendor': v.vendor_name, 'Rating (1-5)': v.rating, 'Comment': v.comment || '' })));
@@ -145,7 +169,8 @@ $('exportBtn').addEventListener('click', () => {
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([
     { 'Item': 'Responses', 'Value': s.count },
     { 'Item': 'Success of Diwali 2026 – average', 'Value': s.successAverage ?? '' },
-    { 'Item': 'Food stalls & Click2Eat – average', 'Value': s.foodAverage ?? '' },
+    ...APP_PARTS.map(([k, label]) => ({ 'Item': `App: ${label} – average (${s.app?.[k]?.count ?? 0} ratings)`, 'Value': s.app?.[k]?.average ?? '' })),
+    { 'Item': 'Food stalls & Click2Eat – average (earlier question)', 'Value': s.foodAverage ?? '' },
     { 'Item': 'Sweet boxes – average', 'Value': s.sweetsAverage ?? '' },
     { 'Item': 'Unforeseen problems – yes', 'Value': s.problemsYes },
     { 'Item': 'Unforeseen problems – no', 'Value': s.problemsNo },

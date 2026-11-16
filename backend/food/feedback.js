@@ -34,6 +34,12 @@ module.exports = function registerFeedback(app, { pool, requireVendor, requirePe
     // Rating for the Diwali sweet boxes handed out at the event.
     await pool.query(`ALTER TABLE event_feedback ADD COLUMN IF NOT EXISTS sweets_rating SMALLINT NULL`);
     await pool.query(`ALTER TABLE event_feedback ADD COLUMN IF NOT EXISTS sweets_comment TEXT NULL`);
+    // "How was the website/app experience?": one optional rating per part, one comment, plus "Any other comments?".
+    // (These replaced the single food stalls / Click2Eat rating; older answers keep food_rating/food_comment.)
+    for (const col of ["app_reg_rating", "app_pay_rating", "app_food_rating", "app_game_rating"])
+      await pool.query(`ALTER TABLE event_feedback ADD COLUMN IF NOT EXISTS ${col} SMALLINT NULL`);
+    await pool.query(`ALTER TABLE event_feedback ADD COLUMN IF NOT EXISTS app_comment TEXT NULL`);
+    await pool.query(`ALTER TABLE event_feedback ADD COLUMN IF NOT EXISTS other_comments TEXT NULL`);
     // Vendor ratings belong to one form submission.
     await pool.query(`ALTER TABLE feedback ADD COLUMN IF NOT EXISTS event_feedback_id INTEGER NULL REFERENCES event_feedback(id) ON DELETE CASCADE`);
     await pool.query(`CREATE INDEX IF NOT EXISTS feedback_vendor_idx ON feedback(vendor_id)`);
@@ -62,10 +68,12 @@ module.exports = function registerFeedback(app, { pool, requireVendor, requirePe
     try {
       const known = new Set((await pool.query("SELECT id FROM vendors")).rows.map(r => r.id));
       const name = text(b.name, 100);
-      const ins = await pool.query(`INSERT INTO event_feedback(success_rating, enjoyed, not_worked, had_problems, problems_prepare, differently, food_rating, food_comment, sweets_rating, sweets_comment, name, phone)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
+      const ins = await pool.query(`INSERT INTO event_feedback(success_rating, enjoyed, not_worked, had_problems, problems_prepare, differently, food_rating, food_comment, sweets_rating, sweets_comment, name, phone,
+          app_reg_rating, app_pay_rating, app_food_rating, app_game_rating, app_comment, other_comments)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id`,
         [success, text(b.enjoyed), text(b.notWorked), hadProblems, hadProblems ? text(b.problemsPrepare) : null, text(b.differently),
-         stars(b.foodRating), text(b.foodComment), stars(b.sweetsRating), text(b.sweetsComment), name, phone]);
+         stars(b.foodRating), text(b.foodComment), stars(b.sweetsRating), text(b.sweetsComment), name, phone,
+         stars(b.appRegRating), stars(b.appPayRating), stars(b.appFoodRating), stars(b.appGameRating), text(b.appComment), text(b.otherComments)]);
       for (const v of vendorRatings.filter(v => known.has(v.id))) {
         await pool.query("INSERT INTO feedback(vendor_id, rating, comment, name, phone, event_feedback_id) VALUES($1,$2,$3,$4,$5,$6)",
           [v.id, v.rating, v.comment, name, phone, ins.rows[0].id]);
@@ -93,6 +101,10 @@ module.exports = function registerFeedback(app, { pool, requireVendor, requirePe
           successAverage: avg(subs.map(s => s.success_rating)),
           foodAverage: avg(food), foodCount: food.length,
           sweetsAverage: avg(sweets), sweetsCount: sweets.length,
+          app: Object.fromEntries(["reg", "pay", "food", "game"].map(k => {
+            const list = subs.map(s => s[`app_${k}_rating`]).filter(Boolean);
+            return [k, { average: avg(list), count: list.length }];
+          })),
           problemsYes: subs.filter(s => s.had_problems === true).length,
           problemsNo: subs.filter(s => s.had_problems === false).length
         },

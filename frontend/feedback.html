@@ -23,6 +23,9 @@ textarea{min-height:90px;resize:vertical}
 .stars button{background:none;border:none;font-size:2.1rem;line-height:1;padding:2px;cursor:pointer;color:#d1d5db}
 .stars button.on{color:#ffc107}
 .stars-label{font-size:.85rem;color:#6b7280;margin-top:2px;min-height:1.1em}
+.app-row{padding:8px 0;border-bottom:1px solid #f1f5f9}
+.app-name{display:block;font-weight:700;color:#374151;font-size:.95rem;margin-bottom:2px}
+.app-row .stars button{font-size:1.8rem}
 .yesno{display:flex;gap:10px}
 .yesno label{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;border:1.5px solid #d6dde6;border-radius:10px;padding:11px;font-weight:700;cursor:pointer}
 .yesno input{width:auto}
@@ -91,10 +94,16 @@ footer a{color:#ffd76a}
   </div>
 
   <div class="card">
-    <span class="q">6. Rate the food stalls and Click2Eat ordering overall</span>
-    <div class="stars" data-key="food" role="radiogroup" aria-label="Rate the food stalls and Click2Eat ordering"></div>
-    <div class="stars-label" id="lbl-food"></div>
-    <textarea id="foodComment" class="mt" maxlength="2000" placeholder="Comment (optional)"></textarea>
+    <span class="q">6. How was the website/app experience?<small>Rate the parts you used (all optional).</small></span>
+    <div class="app-row"><span class="app-name">Registration</span>
+      <div><div class="stars" data-key="appReg" role="radiogroup" aria-label="Rate Registration"></div><div class="stars-label" id="lbl-appReg"></div></div></div>
+    <div class="app-row"><span class="app-name">Registration payment</span>
+      <div><div class="stars" data-key="appPay" role="radiogroup" aria-label="Rate Registration payment"></div><div class="stars-label" id="lbl-appPay"></div></div></div>
+    <div class="app-row"><span class="app-name">Food ordering (Click2Eat)</span>
+      <div><div class="stars" data-key="appFood" role="radiogroup" aria-label="Rate Food ordering (Click2Eat)"></div><div class="stars-label" id="lbl-appFood"></div></div></div>
+    <div class="app-row"><span class="app-name">Clue Game</span>
+      <div><div class="stars" data-key="appGame" role="radiogroup" aria-label="Rate the Clue Game"></div><div class="stars-label" id="lbl-appGame"></div></div></div>
+    <textarea id="appComment" class="mt" maxlength="2000" placeholder="Comment (optional)"></textarea>
   </div>
 
   <div class="card">
@@ -108,6 +117,11 @@ footer a{color:#ffd76a}
     <span class="q">8. Vendor feedback<small>Pick a food stall, give it stars and a comment. Your rating and comment are shared with that stall.</small></span>
     <div id="vendors"></div>
     <button type="button" class="add" id="addVendor">+ Add feedback for another vendor</button>
+  </div>
+
+  <div class="card">
+    <label class="q" for="otherComments">9. Any other comments?</label>
+    <textarea id="otherComments" maxlength="2000"></textarea>
   </div>
 
   <div id="error" class="err hidden"></div>
@@ -202,7 +216,9 @@ $('form').addEventListener('submit', async e => {
     enjoyed: $('enjoyed').value, notWorked: $('notWorked').value,
     hadProblems: problems, problemsPrepare: problems === 'yes' ? $('problemsPrepare').value : '',
     differently: $('differently').value,
-    foodRating: rating.food || null, foodComment: $('foodComment').value,
+    appRegRating: rating.appReg || null, appPayRating: rating.appPay || null,
+    appFoodRating: rating.appFood || null, appGameRating: rating.appGame || null,
+    appComment: $('appComment').value, otherComments: $('otherComments').value,
     sweetsRating: rating.sweets || null, sweetsComment: $('sweetsComment').value,
     vendors: vendorRows.filter(v => v.vendorId && v.rating)
   };
