@@ -31,6 +31,9 @@ module.exports = function registerFeedback(app, { pool, requireVendor, requirePe
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     )`);
+    // Rating for the Diwali sweet boxes handed out at the event.
+    await pool.query(`ALTER TABLE event_feedback ADD COLUMN IF NOT EXISTS sweets_rating SMALLINT NULL`);
+    await pool.query(`ALTER TABLE event_feedback ADD COLUMN IF NOT EXISTS sweets_comment TEXT NULL`);
     // Vendor ratings belong to one form submission.
     await pool.query(`ALTER TABLE feedback ADD COLUMN IF NOT EXISTS event_feedback_id INTEGER NULL REFERENCES event_feedback(id) ON DELETE CASCADE`);
     await pool.query(`CREATE INDEX IF NOT EXISTS feedback_vendor_idx ON feedback(vendor_id)`);
@@ -59,10 +62,10 @@ module.exports = function registerFeedback(app, { pool, requireVendor, requirePe
     try {
       const known = new Set((await pool.query("SELECT id FROM vendors")).rows.map(r => r.id));
       const name = text(b.name, 100);
-      const ins = await pool.query(`INSERT INTO event_feedback(success_rating, enjoyed, not_worked, had_problems, problems_prepare, differently, food_rating, food_comment, name, phone)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
+      const ins = await pool.query(`INSERT INTO event_feedback(success_rating, enjoyed, not_worked, had_problems, problems_prepare, differently, food_rating, food_comment, sweets_rating, sweets_comment, name, phone)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
         [success, text(b.enjoyed), text(b.notWorked), hadProblems, hadProblems ? text(b.problemsPrepare) : null, text(b.differently),
-         stars(b.foodRating), text(b.foodComment), name, phone]);
+         stars(b.foodRating), text(b.foodComment), stars(b.sweetsRating), text(b.sweetsComment), name, phone]);
       for (const v of vendorRatings.filter(v => known.has(v.id))) {
         await pool.query("INSERT INTO feedback(vendor_id, rating, comment, name, phone, event_feedback_id) VALUES($1,$2,$3,$4,$5,$6)",
           [v.id, v.rating, v.comment, name, phone, ins.rows[0].id]);
@@ -81,6 +84,7 @@ module.exports = function registerFeedback(app, { pool, requireVendor, requirePe
       vr.forEach(r => { (byForm[r.event_feedback_id] = byForm[r.event_feedback_id] || []).push(r); });
       const avg = list => list.length ? Math.round(10 * list.reduce((a, b) => a + b, 0) / list.length) / 10 : null;
       const food = subs.map(s => s.food_rating).filter(Boolean);
+      const sweets = subs.map(s => s.sweets_rating).filter(Boolean);
       const perVendor = {};
       vr.forEach(r => { const p = perVendor[r.vendor_id] = perVendor[r.vendor_id] || { vendor_id: r.vendor_id, vendor_name: r.vendor_name, ratings: [] }; p.ratings.push(r.rating); });
       res.json({
@@ -88,6 +92,7 @@ module.exports = function registerFeedback(app, { pool, requireVendor, requirePe
           count: subs.length,
           successAverage: avg(subs.map(s => s.success_rating)),
           foodAverage: avg(food), foodCount: food.length,
+          sweetsAverage: avg(sweets), sweetsCount: sweets.length,
           problemsYes: subs.filter(s => s.had_problems === true).length,
           problemsNo: subs.filter(s => s.had_problems === false).length
         },

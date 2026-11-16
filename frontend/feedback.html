@@ -98,7 +98,14 @@ footer a{color:#ffd76a}
   </div>
 
   <div class="card">
-    <span class="q">7. Vendor feedback<small>Pick a food stall, give it stars and a comment. Your rating and comment are shared with that stall.</small></span>
+    <span class="q">7. Rate the Diwali sweet boxes</span>
+    <div class="stars" data-key="sweets" role="radiogroup" aria-label="Rate the Diwali sweet boxes"></div>
+    <div class="stars-label" id="lbl-sweets"></div>
+    <textarea id="sweetsComment" class="mt" maxlength="2000" placeholder="Comment (optional)"></textarea>
+  </div>
+
+  <div class="card">
+    <span class="q">8. Vendor feedback<small>Pick a food stall, give it stars and a comment. Your rating and comment are shared with that stall.</small></span>
     <div id="vendors"></div>
     <button type="button" class="add" id="addVendor">+ Add feedback for another vendor</button>
   </div>
@@ -188,7 +195,7 @@ $('form').addEventListener('submit', async e => {
     vendorId: Number(row.querySelector('select').value), rating: rating[row.dataset.key] || 0, comment: row.querySelector('textarea').value.trim()
   }));
   const half = vendorRows.find(v => (v.vendorId && !v.rating) || (!v.vendorId && (v.rating || v.comment)));
-  if (half) return fail(half.vendorId ? 'Please give the vendor a star rating (question 7), or remove it.' : 'Please choose which vendor your rating is for (question 7).');
+  if (half) return fail(half.vendorId ? 'Please give the vendor a star rating (question 8), or remove it.' : 'Please choose which vendor your rating is for (question 8).');
   const problems = document.querySelector('input[name="problems"]:checked')?.value || null;
   const body = {
     successRating: rating.success,
@@ -196,6 +203,7 @@ $('form').addEventListener('submit', async e => {
     hadProblems: problems, problemsPrepare: problems === 'yes' ? $('problemsPrepare').value : '',
     differently: $('differently').value,
     foodRating: rating.food || null, foodComment: $('foodComment').value,
+    sweetsRating: rating.sweets || null, sweetsComment: $('sweetsComment').value,
     vendors: vendorRows.filter(v => v.vendorId && v.rating)
   };
   $('send').disabled = true;

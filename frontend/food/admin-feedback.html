@@ -87,6 +87,7 @@ function render() {
     <div class="stat"><span class="lbl">Responses</span><b>${s.count}</b></div>
     <div class="stat"><span class="lbl">Success of Diwali 2026</span><b><span class="gold">★</span> ${s.successAverage ?? '–'}</b> / 5</div>
     <div class="stat"><span class="lbl">Food stalls & Click2Eat</span><b><span class="gold">★</span> ${s.foodAverage ?? '–'}</b> / 5 <small>(${s.foodCount})</small></div>
+    <div class="stat"><span class="lbl">Sweet boxes</span><b><span class="gold">★</span> ${s.sweetsAverage ?? '–'}</b> / 5 <small>(${s.sweetsCount ?? 0})</small></div>
     <div class="stat"><span class="lbl">Unforeseen problems</span><b>${s.problemsYes}</b> yes · ${s.problemsNo} no</div>`;
   $('vendors').innerHTML = data.vendors.length
     ? `<table><tr><th>Vendor</th><th>Average</th><th>Ratings</th></tr>${data.vendors.map(v => `<tr><td>${esc(v.vendor_name)}</td><td><span class="gold">★</span> <b>${v.average}</b> / 5</td><td>${v.count}</td></tr>`).join('')}</table>`
@@ -94,7 +95,7 @@ function render() {
   const ans = (label, val) => val ? `<div class="ans"><b>${label}</b><p>${esc(val)}</p></div>` : '';
   $('list').innerHTML = data.submissions.length ? data.submissions.map(f => `<div class="sub">
       <div class="sub-head">
-        <span><b>#${f.id}</b> · Success <span class="gold">${starText(f.success_rating)}</span>${f.food_rating ? ` · Food <span class="gold">${starText(f.food_rating)}</span>` : ''}</span>
+        <span><b>#${f.id}</b> · Success <span class="gold">${starText(f.success_rating)}</span>${f.food_rating ? ` · Food <span class="gold">${starText(f.food_rating)}</span>` : ''}${f.sweets_rating ? ` · Sweets <span class="gold">${starText(f.sweets_rating)}</span>` : ''}</span>
         <span class="sub-who">${esc(new Date(f.created_at).toLocaleString())} <button class="del" onclick="removeFb(${f.id})">Delete</button></span>
       </div>
       ${ans('What did you enjoy the most, what worked well?', f.enjoyed)}
@@ -103,6 +104,7 @@ function render() {
       ${ans('How could we prepare better?', f.problems_prepare)}
       ${ans('What would you do differently next time?', f.differently)}
       ${ans('Food stalls & Click2Eat comment', f.food_comment)}
+      ${ans('Sweet boxes comment', f.sweets_comment)}
       ${f.vendors.length ? `<div class="ans"><b>Vendor feedback</b>${f.vendors.map(v => `<span class="vend">${esc(v.vendor_name)} <span class="gold">${starText(v.rating)}</span>${v.comment ? ` · ${esc(v.comment)}` : ''}</span>`).join('')}</div>` : ''}
     </div>`).join('') : '<div class="empty">No feedback yet.</div>';
 }
@@ -132,6 +134,8 @@ $('exportBtn').addEventListener('click', () => {
     'What would you do differently next time?': f.differently || '',
     'Food stalls & Click2Eat (1-5)': f.food_rating || '',
     'Food stalls & Click2Eat comment': f.food_comment || '',
+    'Sweet boxes (1-5)': f.sweets_rating || '',
+    'Sweet boxes comment': f.sweets_comment || '',
     'Vendor ratings': f.vendors.map(v => `${v.vendor_name}: ${v.rating}/5${v.comment ? ` (${v.comment})` : ''}`).join('; ')
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(answers), 'Answers');
@@ -142,6 +146,7 @@ $('exportBtn').addEventListener('click', () => {
     { 'Item': 'Responses', 'Value': s.count },
     { 'Item': 'Success of Diwali 2026 – average', 'Value': s.successAverage ?? '' },
     { 'Item': 'Food stalls & Click2Eat – average', 'Value': s.foodAverage ?? '' },
+    { 'Item': 'Sweet boxes – average', 'Value': s.sweetsAverage ?? '' },
     { 'Item': 'Unforeseen problems – yes', 'Value': s.problemsYes },
     { 'Item': 'Unforeseen problems – no', 'Value': s.problemsNo },
     ...data.vendors.map(v => ({ 'Item': `Vendor: ${v.vendor_name} – average (${v.count} ratings)`, 'Value': v.average }))
