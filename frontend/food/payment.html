@@ -492,8 +492,6 @@
                 }
                 totals[orderId] = data.total;
                 document.getElementById(`total_${orderId}`).textContent = `${data.total}kr`;
-                // The amount changed, so they pay again with the new amount before marking it paid.
-                document.getElementById(`btn-paid-${orderId}`).style.display = "none";
                 await fetchItems(orderId);
             } catch (err) {
                 alert(err.message);
