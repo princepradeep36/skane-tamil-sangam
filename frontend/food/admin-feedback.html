@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Event Feedback - Admin</title>
+<style>
+:root { --primary: #007bff; --bg: #f4f7f9; --card: #ffffff; --text: #333; }
+* { box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; }
+.wrap { max-width: 1000px; margin: 0 auto; }
+.top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.top h1 { margin: 0; font-size: 1.5rem; color: var(--primary); }
+.top-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { text-decoration: none; background: #fff; border: 1px solid #ddd; color: #333; padding: 8px 12px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: .9rem; }
+.btn.export { background: #198754; border-color: #198754; color: #fff; }
+.box { background: var(--card); border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.05); padding: 16px; margin-bottom: 14px; }
+.box h2 { margin: 0 0 10px; font-size: 1.1rem; }
+.hint { color: #666; font-size: .9rem; margin: 0 0 10px; line-height: 1.45; }
+.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.stat { border: 1px solid #eee; border-radius: 10px; padding: 12px; }
+.stat .lbl { display: block; font-size: .8rem; color: #666; font-weight: 600; }
+.stat b { font-size: 1.6rem; }
+.gold { color: #f5a300; }
+table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+th, td { text-align: left; padding: 8px; border-bottom: 1px solid #f0f0f0; }
+th { color: #666; font-size: .8rem; }
+.share { display: flex; gap: 8px; flex-wrap: wrap; }
+.share input { flex: 1 1 260px; padding: 9px; border: 1px solid #ddd; border-radius: 8px; font-size: .9rem; }
+.sub { border: 1px solid #eee; border-radius: 12px; padding: 14px; margin-top: 12px; }
+.sub-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: baseline; margin-bottom: 6px; }
+.sub-who { color: #666; font-size: .85rem; }
+.ans { margin: 8px 0 0; }
+.ans b { display: block; font-size: .8rem; color: #555; }
+.ans p { margin: 2px 0 0; white-space: pre-wrap; line-height: 1.45; }
+.vend { display: inline-block; background: #fff8e1; border-radius: 8px; padding: 4px 8px; margin: 4px 6px 0 0; font-size: .85rem; }
+.del { background: none; border: none; color: #c62828; cursor: pointer; text-decoration: underline; font-size: .8rem; }
+.empty { text-align: center; color: #888; padding: 20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>📝 Event Feedback</h1>
+    <div class="top-actions">
+      <a class="btn" href="admin.html?admin=true">🏠 Admin Home</a>
+      <button class="btn export" id="exportBtn">📥 Export to Excel</button>
+    </div>
+  </div>
+
+  <div class="box">
+    <p class="hint"><b>Feedback form for guests</b>: share this link (Event Messages has a ready WhatsApp message with it). It is also on the homepage.</p>
+    <div class="share"><input id="shareUrl" readonly><button class="btn" onclick="navigator.clipboard?.writeText(document.getElementById('shareUrl').value)">Copy link</button><a class="btn" href="/feedback.html" target="_blank">Open form</a></div>
+  </div>
+
+  <div class="box">
+    <h2>Summary</h2>
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <div class="box">
+    <h2>Vendor ratings</h2>
+    <p class="hint">Average stars per food stall. Each vendor sees only their own ratings and comments, without names or phone numbers.</p>
+    <div id="vendors"></div>
+  </div>
+
+  <div class="box">
+    <h2>All answers</h2>
+    <div id="list"><div class="empty">Loading…</div></div>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="auth.js"></script>
+<script>
+checkAuth('registrations');
+const API = '/food-api';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const starText = n => n ? '★'.repeat(n) + '☆'.repeat(5 - n) : '–';
+const yesNo = v => v === true ? 'Yes' : v === false ? 'No' : '';
+let data = null;
+$('shareUrl').value = `${location.origin}/feedback.html`;
+
+function render() {
+  const s = data.summary;
+  $('stats').innerHTML = `
+    <div class="stat"><span class="lbl">Responses</span><b>${s.count}</b></div>
+    <div class="stat"><span class="lbl">Success of Diwali 2026</span><b><span class="gold">★</span> ${s.successAverage ?? '–'}</b> / 5</div>
+    <div class="stat"><span class="lbl">Food stalls & Click2Eat</span><b><span class="gold">★</span> ${s.foodAverage ?? '–'}</b> / 5 <small>(${s.foodCount})</small></div>
+    <div class="stat"><span class="lbl">Unforeseen problems</span><b>${s.problemsYes}</b> yes · ${s.problemsNo} no</div>`;
+  $('vendors').innerHTML = data.vendors.length
+    ? `<table><tr><th>Vendor</th><th>Average</th><th>Ratings</th></tr>${data.vendors.map(v => `<tr><td>${esc(v.vendor_name)}</td><td><span class="gold">★</span> <b>${v.average}</b> / 5</td><td>${v.count}</td></tr>`).join('')}</table>`
+    : '<div class="empty">No vendor ratings yet.</div>';
+  const ans = (label, val) => val ? `<div class="ans"><b>${label}</b><p>${esc(val)}</p></div>` : '';
+  $('list').innerHTML = data.submissions.length ? data.submissions.map(f => `<div class="sub">
+      <div class="sub-head">
+        <span><b>#${f.id}</b> · Success <span class="gold">${starText(f.success_rating)}</span>${f.food_rating ? ` · Food <span class="gold">${starText(f.food_rating)}</span>` : ''}</span>
+        <span class="sub-who">${esc(f.name || 'Anonymous')}${f.phone ? ' · ' + esc(f.phone) : ''} · ${esc(new Date(f.created_at).toLocaleString())} <button class="del" onclick="removeFb(${f.id})">Delete</button></span>
+      </div>
+      ${ans('What did you enjoy the most, what worked well?', f.enjoyed)}
+      ${ans('What did not work or could have been better?', f.not_worked)}
+      ${f.had_problems !== null ? `<div class="ans"><b>Unforeseen problems?</b><p>${yesNo(f.had_problems)}</p></div>` : ''}
+      ${ans('How could we prepare better?', f.problems_prepare)}
+      ${ans('What would you do differently next time?', f.differently)}
+      ${ans('Food stalls & Click2Eat comment', f.food_comment)}
+      ${f.vendors.length ? `<div class="ans"><b>Vendor feedback</b>${f.vendors.map(v => `<span class="vend">${esc(v.vendor_name)} <span class="gold">${starText(v.rating)}</span>${v.comment ? ` · ${esc(v.comment)}` : ''}</span>`).join('')}</div>` : ''}
+    </div>`).join('') : '<div class="empty">No feedback yet.</div>';
+}
+
+async function load() {
+  const r = await authFetch(`${API}/admin/event-feedback`, { cache: 'no-store' });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { $('list').innerHTML = `<div class="empty">${esc(d.error || 'Could not load the feedback.')}</div>`; return; }
+  data = d; render();
+}
+async function removeFb(id) {
+  if (!confirm('Delete this feedback response (and its vendor ratings)?')) return;
+  await authFetch(`${API}/admin/event-feedback/${id}`, { method: 'DELETE' });
+  load();
+}
+
+$('exportBtn').addEventListener('click', () => {
+  if (!data) return;
+  const wb = XLSX.utils.book_new();
+  const answers = data.submissions.map(f => ({
+    'ID': f.id, 'Submitted': new Date(f.created_at).toLocaleString(),
+    'Success of Diwali 2026 (1-5)': f.success_rating,
+    'What did you enjoy the most, what worked well?': f.enjoyed || '',
+    'What did not work or could have been better?': f.not_worked || '',
+    'Unforeseen problems?': yesNo(f.had_problems),
+    'How could we prepare better?': f.problems_prepare || '',
+    'What would you do differently next time?': f.differently || '',
+    'Food stalls & Click2Eat (1-5)': f.food_rating || '',
+    'Food stalls & Click2Eat comment': f.food_comment || '',
+    'Vendor ratings': f.vendors.map(v => `${v.vendor_name}: ${v.rating}/5${v.comment ? ` (${v.comment})` : ''}`).join('; '),
+    'Name': f.name || '', 'Phone': f.phone || ''
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(answers), 'Answers');
+  const vendorRows = data.submissions.flatMap(f => f.vendors.map(v => ({ 'Response ID': f.id, 'Vendor': v.vendor_name, 'Rating (1-5)': v.rating, 'Comment': v.comment || '' })));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(vendorRows.length ? vendorRows : [{ 'Vendor': '', 'Rating (1-5)': '', 'Comment': '' }]), 'Vendor ratings');
+  const s = data.summary;
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([
+    { 'Item': 'Responses', 'Value': s.count },
+    { 'Item': 'Success of Diwali 2026 – average', 'Value': s.successAverage ?? '' },
+    { 'Item': 'Food stalls & Click2Eat – average', 'Value': s.foodAverage ?? '' },
+    { 'Item': 'Unforeseen problems – yes', 'Value': s.problemsYes },
+    { 'Item': 'Unforeseen problems – no', 'Value': s.problemsNo },
+    ...data.vendors.map(v => ({ 'Item': `Vendor: ${v.vendor_name} – average (${v.count} ratings)`, 'Value': v.average }))
+  ]), 'Summary');
+  XLSX.writeFile(wb, `Diwali-2026-feedback-${new Date().toISOString().slice(0, 10)}.xlsx`);
+});
+
+load();
+</script>
+</body>
+</html>

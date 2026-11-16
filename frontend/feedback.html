@@ -3,34 +3,43 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Feedback | Skåne Tamil Sangam</title>
+<title>Diwali 2026 Feedback | Skåne Tamil Sangam</title>
 <style>
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:linear-gradient(170deg,#003d80,#0056b3 60%,#0b75d1);color:#fff;display:flex;flex-direction:column;align-items:center;padding:20px 16px 28px}
 header{text-align:center;margin-bottom:16px}
 header b{display:block;font-size:1.3rem}
 header span{color:#ffd76a;font-weight:600}
-.card{width:min(520px,100%);background:#fff;color:#1c1c1e;border-radius:22px;padding:20px 18px;box-shadow:0 18px 40px rgba(0,0,0,.25);margin-bottom:14px}
-h1{margin:0 0 4px;font-size:1.3rem;color:#003d80}
-h2{margin:0 0 6px;font-size:1.05rem;color:#003d80}
-.sub{margin:0 0 12px;color:#57534e;font-size:.92rem;line-height:1.45}
-label{display:block;font-weight:700;font-size:.85rem;color:#475569;margin:10px 0 4px}
-input,textarea{width:100%;padding:11px 12px;border:1.5px solid #d6dde6;border-radius:10px;font-size:16px;font-family:inherit}
-textarea{min-height:64px;resize:vertical;margin-top:8px}
+form{width:min(560px,100%)}
+.card{background:#fff;color:#1c1c1e;border-radius:20px;padding:18px;box-shadow:0 18px 40px rgba(0,0,0,.25);margin-bottom:14px}
+h1{margin:0 0 6px;font-size:1.35rem;color:#003d80}
+.sub{margin:0;color:#57534e;font-size:.92rem;line-height:1.45}
+.q{display:block;font-weight:800;color:#1f2937;margin:0 0 8px;line-height:1.35}
+.q .req{color:#c62828}
+.q small{display:block;font-weight:500;color:#6b7280;margin-top:2px}
+input,textarea,select{width:100%;padding:11px 12px;border:1.5px solid #d6dde6;border-radius:10px;font-size:16px;font-family:inherit;background:#fff}
+textarea{min-height:90px;resize:vertical}
 .stars{display:flex;gap:4px}
-.stars button{background:none;border:none;font-size:2rem;line-height:1;padding:2px;cursor:pointer;color:#d1d5db}
+.stars button{background:none;border:none;font-size:2.1rem;line-height:1;padding:2px;cursor:pointer;color:#d1d5db}
 .stars button.on{color:#ffc107}
 .stars-label{font-size:.85rem;color:#6b7280;margin-top:2px;min-height:1.1em}
-.stall{border:1px solid #e5e7eb;border-radius:14px;padding:12px;margin-top:10px}
-.stall.ordered{border-color:#f6c77a;background:#fffbeb}
-.stall.focus{box-shadow:0 0 0 3px #ffc107}
-.stall-name{font-weight:800;display:flex;justify-content:space-between;gap:8px;align-items:center}
-.tag{font-size:.72rem;font-weight:700;background:#fff4dc;color:#7c2d12;border:1px solid #f6c77a;border-radius:999px;padding:2px 8px;white-space:nowrap}
-.send{width:min(520px,100%);background:#ffc107;color:#3d2c06;border:none;border-radius:14px;padding:15px;font-size:1.05rem;font-weight:800;cursor:pointer}
+.yesno{display:flex;gap:10px}
+.yesno label{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;border:1.5px solid #d6dde6;border-radius:10px;padding:11px;font-weight:700;cursor:pointer}
+.yesno input{width:auto}
+.yesno label:has(input:checked){border-color:#0056b3;background:#eef5ff;color:#003d80}
+.vendor{border:1px solid #e5e7eb;border-radius:14px;padding:12px;margin-top:10px;position:relative}
+.vendor .remove{position:absolute;top:8px;right:10px;background:none;border:none;color:#c62828;font-weight:700;cursor:pointer;font-size:.85rem}
+.vendor select{margin:0 0 6px;padding-right:70px}
+.vendor textarea{min-height:64px;margin-top:6px}
+.add{width:100%;margin-top:10px;background:#eef5ff;color:#003d80;border:1.5px dashed #0056b3;border-radius:12px;padding:12px;font-weight:800;font-size:.95rem;cursor:pointer}
+.add:disabled{opacity:.5;cursor:default}
+.mt{margin-top:12px}
+.send{width:100%;background:#ffc107;color:#3d2c06;border:none;border-radius:14px;padding:15px;font-size:1.05rem;font-weight:800;cursor:pointer}
 .send:disabled{opacity:.6}
-.msg{width:min(520px,100%);border-radius:14px;padding:14px;font-weight:700;line-height:1.4;margin-top:12px;text-align:center}
-.msg.ok{background:#dcfce7;color:#166534}
-.msg.bad{background:#fee2e2;color:#991b1b}
+.err{background:#fee2e2;color:#991b1b;border-radius:12px;padding:12px;font-weight:700;margin-bottom:12px}
+.thanks{text-align:center;padding:30px 18px}
+.thanks .big{font-size:3rem}
+.thanks h1{font-size:1.3rem;line-height:1.4}
 .hidden{display:none}
 footer{margin-top:18px;text-align:center;opacity:.9;font-size:.9rem;line-height:1.5}
 footer a{color:#ffd76a}
@@ -39,29 +48,75 @@ footer a{color:#ffd76a}
 <body>
 <header><b>🪔 Diwali 2026</b><span>Skåne Tamil Sangam</span></header>
 
-<div class="card">
-  <h1>⭐ Your feedback</h1>
-  <p class="sub">Thank you for joining us! Tell us how it was. Every rating is optional: rate what you like.</p>
-  <label for="name">Your name (optional)</label>
-  <input id="name" maxlength="100" autocomplete="name">
-  <label for="phone">Phone number (optional)</label>
-  <input id="phone" type="tel" placeholder="+46 70 123 45 67" autocomplete="tel">
-  <p class="sub" style="margin:6px 0 0;font-size:.82rem">With your phone number we show the stalls you ordered from first, and you can change your ratings later.</p>
-</div>
+<form id="form" novalidate>
+  <div class="card">
+    <h1>📝 Diwali 2026 Feedback</h1>
+    <p class="sub">Thank you for celebrating Diwali with us! Your feedback helps us make our next event even better. It takes about 2 minutes. Questions marked <b style="color:#c62828">*</b> are required.</p>
+  </div>
 
-<div class="card">
-  <h2>🪔 The Diwali celebration</h2>
-  <div id="event"></div>
-</div>
+  <div class="card">
+    <span class="q">1. Rate the success of Diwali 2026 <span class="req">*</span></span>
+    <div class="stars" data-key="success" role="radiogroup" aria-label="Rate the success of Diwali 2026"></div>
+    <div class="stars-label" id="lbl-success"></div>
+  </div>
 
-<div class="card">
-  <h2>🍛 Food stalls</h2>
-  <p class="sub">Your rating and comment go to the stall, so they can see what you liked.</p>
-  <div id="stalls"><p class="sub">Loading stalls…</p></div>
-</div>
+  <div class="card">
+    <label class="q" for="enjoyed">2. What did you enjoy the most, what worked well?</label>
+    <textarea id="enjoyed" maxlength="2000"></textarea>
+  </div>
 
-<button class="send" id="send">Send feedback</button>
-<div id="result" class="msg hidden"></div>
+  <div class="card">
+    <label class="q" for="notWorked">3. What did not work or could have been better?</label>
+    <textarea id="notWorked" maxlength="2000"></textarea>
+  </div>
+
+  <div class="card">
+    <span class="q">4. Were there any unforeseen problems?</span>
+    <div class="yesno">
+      <label><input type="radio" name="problems" value="yes"> Yes</label>
+      <label><input type="radio" name="problems" value="no"> No</label>
+    </div>
+    <div id="prepareBox" class="mt hidden">
+      <label class="q" for="problemsPrepare">If yes, how could we prepare better?</label>
+      <textarea id="problemsPrepare" maxlength="2000"></textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <label class="q" for="differently">5. What would you do differently if we do this event again?</label>
+    <textarea id="differently" maxlength="2000"></textarea>
+  </div>
+
+  <div class="card">
+    <span class="q">6. Rate the food stalls and Click2Eat ordering overall</span>
+    <div class="stars" data-key="food" role="radiogroup" aria-label="Rate the food stalls and Click2Eat ordering"></div>
+    <div class="stars-label" id="lbl-food"></div>
+    <textarea id="foodComment" class="mt" maxlength="2000" placeholder="Comment (optional)"></textarea>
+  </div>
+
+  <div class="card">
+    <span class="q">7. Vendor feedback<small>Pick a food stall, give it stars and a comment. Your rating and comment are shared with that stall, without your name or phone number.</small></span>
+    <div id="vendors"></div>
+    <button type="button" class="add" id="addVendor">+ Add feedback for another vendor</button>
+  </div>
+
+  <div class="card">
+    <span class="q">8. Your details (optional)</span>
+    <label class="q" for="name" style="font-weight:600;color:#475569;font-size:.9rem;margin-top:6px">Name</label>
+    <input id="name" maxlength="100" autocomplete="name">
+    <label class="q" for="phone" style="font-weight:600;color:#475569;font-size:.9rem;margin-top:10px">Phone</label>
+    <input id="phone" type="tel" placeholder="+46 70 123 45 67" autocomplete="tel">
+  </div>
+
+  <div id="error" class="err hidden"></div>
+  <button class="send" id="send" type="submit">Submit feedback</button>
+</form>
+
+<div class="card thanks hidden" id="thanks" style="width:min(560px,100%)">
+  <div class="big">🙏</div>
+  <h1>Thanks for your valuable feedback! Looking forward to your continued participation in future events!!!</h1>
+  <p class="sub"><a href="/" style="color:#0056b3;font-weight:700">Back to the homepage</a></p>
+</div>
 
 <footer><a href="/">skanetamilsangam.duckdns.org</a></footer>
 
@@ -69,78 +124,94 @@ footer a{color:#ffd76a}
 const API = '/food-api';
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const params = new URLSearchParams(location.search);
-const focusVendor = Number(params.get('vendor')) || null;
 const WORDS = ['', 'Poor', 'Okay', 'Good', 'Very good', 'Excellent'];
-const ratings = {}; // key: 'event' or vendor id → { rating, comment }
+const rating = {}; // key → 1..5
+let vendors = [], rowSeq = 0;
 
-function starsHtml(key, label) {
-  return `<div class="stars" role="radiogroup" aria-label="${esc(label)}" data-key="${key}">
-      ${[1, 2, 3, 4, 5].map(n => `<button type="button" data-n="${n}" aria-label="${n} star${n > 1 ? 's' : ''}">★</button>`).join('')}
-    </div>
-    <div class="stars-label" id="lbl-${key}"></div>
-    <textarea class="hidden" id="cm-${key}" maxlength="1000" placeholder="Anything to add? (optional)"></textarea>`;
+function starsInto(el) {
+  el.innerHTML = [1, 2, 3, 4, 5].map(n => `<button type="button" data-n="${n}" aria-label="${n} star${n > 1 ? 's' : ''}">★</button>`).join('');
 }
 function paint(key) {
-  const r = ratings[key]?.rating || 0;
+  const r = rating[key] || 0;
   document.querySelectorAll(`.stars[data-key="${key}"] button`).forEach(b => b.classList.toggle('on', Number(b.dataset.n) <= r));
-  $(`lbl-${key}`).textContent = r ? `${r} / 5 · ${WORDS[r]}` : '';
-  $(`cm-${key}`).classList.toggle('hidden', !r);
+  const l = $(`lbl-${key}`); if (l) l.textContent = r ? `${r} / 5 · ${WORDS[r]}` : '';
 }
+document.querySelectorAll('.stars').forEach(starsInto);
 document.addEventListener('click', e => {
   const b = e.target.closest('.stars button');
   if (!b) return;
   const key = b.parentElement.dataset.key;
-  ratings[key] = { ...(ratings[key] || {}), rating: Number(b.dataset.n) };
+  rating[key] = Number(b.dataset.n);
   paint(key);
 });
 
-$('event').innerHTML = starsHtml('event', 'Rate the Diwali celebration');
+document.querySelectorAll('input[name="problems"]').forEach(r => r.addEventListener('change', () => {
+  $('prepareBox').classList.toggle('hidden', r.value !== 'yes' || !r.checked);
+}));
 
-async function loadStalls() {
-  const phone = $('phone').value.trim();
-  try {
-    const r = await fetch(`${API}/feedback/stalls${phone ? `?phone=${encodeURIComponent(phone)}` : ''}`, { cache: 'no-store' });
-    const d = await r.json();
-    const keep = {}; // keep what was already typed
-    document.querySelectorAll('textarea[id^="cm-"]').forEach(t => { keep[t.id] = t.value; });
-    $('stalls').innerHTML = d.stalls.length ? d.stalls.map(s => `
-      <div class="stall ${s.ordered ? 'ordered' : ''} ${s.id === focusVendor ? 'focus' : ''}" id="stall-${s.id}">
-        <div class="stall-name"><span>${esc(s.name)}</span>${s.ordered ? '<span class="tag">You ordered here</span>' : ''}</div>
-        ${starsHtml(s.id, `Rate ${s.name}`)}
-      </div>`).join('') : '<p class="sub">No stalls to rate.</p>';
-    for (const m of d.mine || []) {
-      const key = m.vendor_id === null ? 'event' : m.vendor_id;
-      if (!ratings[key]?.rating) ratings[key] = { rating: m.rating };
-      const t = $(`cm-${key}`);
-      if (t && !keep[`cm-${key}`] && m.comment) t.value = m.comment;
-      if (m.name && !$('name').value) $('name').value = m.name;
-    }
-    for (const [id, v] of Object.entries(keep)) if ($(id) && v) $(id).value = v;
-    Object.keys(ratings).forEach(k => { if ($(`lbl-${k}`)) paint(k); });
-    if (focusVendor && $(`stall-${focusVendor}`)) $(`stall-${focusVendor}`).scrollIntoView({ behavior: 'smooth', block: 'center' });
-  } catch (_) { $('stalls').innerHTML = '<p class="sub">Could not load the stalls. Please try again.</p>'; }
+// ---- vendor rows: each vendor once ----
+function chosen() { return [...document.querySelectorAll('.vendor select')].map(s => s.value).filter(Boolean); }
+function refreshOptions() {
+  const taken = chosen();
+  document.querySelectorAll('.vendor select').forEach(sel => {
+    [...sel.options].forEach(o => { if (o.value) o.disabled = taken.includes(o.value) && o.value !== sel.value; });
+  });
+  $('addVendor').disabled = !vendors.length || document.querySelectorAll('.vendor').length >= vendors.length;
 }
-if (params.get('phone')) $('phone').value = params.get('phone');
-$('phone').addEventListener('change', loadStalls);
-loadStalls();
+function addVendorRow(preselect) {
+  const id = ++rowSeq, key = `v${id}`;
+  const row = document.createElement('div');
+  row.className = 'vendor'; row.dataset.key = key;
+  row.innerHTML = `${document.querySelectorAll('.vendor').length ? '<button type="button" class="remove">✕ Remove</button>' : ''}
+    <select aria-label="Vendor"><option value="">Choose a vendor…</option>${vendors.map(v => `<option value="${v.id}">${esc(v.name)}</option>`).join('')}</select>
+    <div class="stars" data-key="${key}"></div><div class="stars-label" id="lbl-${key}"></div>
+    <textarea maxlength="1000" placeholder="Comment for this vendor (optional)"></textarea>`;
+  $('vendors').appendChild(row);
+  starsInto(row.querySelector('.stars'));
+  const sel = row.querySelector('select');
+  if (preselect && !chosen().includes(String(preselect))) sel.value = String(preselect);
+  sel.addEventListener('change', refreshOptions);
+  row.querySelector('.remove')?.addEventListener('click', () => { delete rating[key]; row.remove(); refreshOptions(); });
+  refreshOptions();
+}
+$('addVendor').addEventListener('click', () => addVendorRow());
 
-$('send').addEventListener('click', async () => {
-  const comment = k => ($(`cm-${k}`)?.value || '').trim();
-  const stalls = Object.keys(ratings).filter(k => k !== 'event' && ratings[k].rating)
-    .map(k => ({ vendorId: Number(k), rating: ratings[k].rating, comment: comment(k) }));
-  const body = { name: $('name').value.trim(), phone: $('phone').value.trim(), stalls };
-  if (ratings.event?.rating) body.event = { rating: ratings.event.rating, comment: comment('event') };
-  const out = $('result');
-  if (!body.event && !stalls.length) { out.className = 'msg bad'; out.textContent = 'Please tap the stars for at least one rating.'; return; }
+fetch(`${API}/feedback/vendors`).then(r => r.json()).then(list => {
+  vendors = Array.isArray(list) ? list : [];
+  if (vendors.length) addVendorRow(new URLSearchParams(location.search).get('vendor'));
+  else $('vendors').innerHTML = '<p class="sub">No food stalls to rate.</p>';
+  refreshOptions();
+}).catch(() => { $('vendors').innerHTML = '<p class="sub">Could not load the vendors.</p>'; });
+
+$('form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const err = $('error'); err.classList.add('hidden');
+  const fail = msg => { err.textContent = msg; err.classList.remove('hidden'); err.scrollIntoView({ behavior: 'smooth', block: 'center' }); };
+  if (!rating.success) return fail('Please rate the success of Diwali 2026 (question 1).');
+  const vendorRows = [...document.querySelectorAll('.vendor')].map(row => ({
+    vendorId: Number(row.querySelector('select').value), rating: rating[row.dataset.key] || 0, comment: row.querySelector('textarea').value.trim()
+  }));
+  const half = vendorRows.find(v => (v.vendorId && !v.rating) || (!v.vendorId && (v.rating || v.comment)));
+  if (half) return fail(half.vendorId ? 'Please give the vendor a star rating (question 7), or remove it.' : 'Please choose which vendor your rating is for (question 7).');
+  const problems = document.querySelector('input[name="problems"]:checked')?.value || null;
+  const body = {
+    successRating: rating.success,
+    enjoyed: $('enjoyed').value, notWorked: $('notWorked').value,
+    hadProblems: problems, problemsPrepare: problems === 'yes' ? $('problemsPrepare').value : '',
+    differently: $('differently').value,
+    foodRating: rating.food || null, foodComment: $('foodComment').value,
+    vendors: vendorRows.filter(v => v.vendorId && v.rating),
+    name: $('name').value, phone: $('phone').value
+  };
   $('send').disabled = true;
   try {
     const r = await fetch(`${API}/feedback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.error || 'Could not send your feedback. Please try again.');
-    out.className = 'msg ok';
-    out.textContent = '🙏 Nandri! Your feedback has been sent.' + (body.phone ? ' You can come back and change it with the same phone number.' : '');
-  } catch (err) { out.className = 'msg bad'; out.textContent = err.message; }
+    $('form').classList.add('hidden');
+    $('thanks').classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (ex) { fail(ex.message); }
   $('send').disabled = false;
 });
 </script>

@@ -1189,7 +1189,7 @@ app.get("/admin/email/log", requirePerm("messages"), async (req, res) => {
 
 /* ================= WHATSAPP MESSAGES (ADMIN, SENT BY HAND) ================= */
 
-const WHATSAPP_KINDS = ['PAYMENT_REMINDER', 'PAYMENT_OPEN', 'SWEETS_PASS', 'CUSTOM'];
+const WHATSAPP_KINDS = ['PAYMENT_REMINDER', 'PAYMENT_OPEN', 'SWEETS_PASS', 'FEEDBACK', 'CUSTOM'];
 
 // Families to message, each with a ready-written WhatsApp text and when they last got this message.
 app.post("/admin/whatsapp/list", requirePerm("messages"), async (req, res) => {
@@ -1261,7 +1261,7 @@ app.post("/admin/whatsapp/sent", requirePerm("messages"), async (req, res) => {
   try {
     const q = await pool.query("SELECT id, whatsapp FROM event_registrations WHERE id=$1", [registrationId]);
     if (!q.rows.length) return res.status(404).json({ error: "Registration not found" });
-    const names = { PAYMENT_REMINDER: 'Payment reminder', PAYMENT_OPEN: 'Payment is now open', SWEETS_PASS: 'Welcome + Diwali QR code', CUSTOM: 'Own message' };
+    const names = { PAYMENT_REMINDER: 'Payment reminder', PAYMENT_OPEN: 'Payment is now open', SWEETS_PASS: 'Welcome + Diwali QR code', FEEDBACK: 'Please share your feedback', CUSTOM: 'Own message' };
     await pool.query(`INSERT INTO event_email_log(registration_id,kind,to_email,subject,status,channel) VALUES($1,$2,$3,$4,'SENT','WHATSAPP')`,
       [q.rows[0].id, kind, String(q.rows[0].whatsapp || '').slice(0, 255), `WhatsApp: ${names[kind]}`]);
     res.json({ success: true, sent_at: new Date().toISOString() });
@@ -1386,7 +1386,7 @@ app.put("/admin/order/:id/payment", requirePerm("food"), async (req, res) => {
 const ensureConnectionTables = registerConnectionGame(app, { pool, requireAdmin: requirePerm("games"), imageContentType });
 const ensureClueTables = registerConnectionGame(app, { pool, requireAdmin: requirePerm("games"), imageContentType, kind: "clue" });
 const ensureSweetsTable = registerSweets(app, { pool, requirePerm, hasPerm, wa });
-const ensureFeedbackTable = registerFeedback(app, { pool, requireVendor, vendorScope, normalizePhone: normalizeFoodPhone, customerPhones });
+const ensureFeedbackTable = registerFeedback(app, { pool, requireVendor, requirePerm, vendorScope, normalizePhone: normalizeFoodPhone });
 
 initializeDatabase()
   .then(() => ensureEventRegistrationLifecycle())

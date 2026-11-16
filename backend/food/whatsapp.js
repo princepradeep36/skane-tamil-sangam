@@ -2,6 +2,7 @@
 // already written (https://wa.me/<number>?text=...), and the admin presses Send.
 const { amountDue } = require("./mailer");
 const { bookingUrl, sweetsPassUrl, sweetsStartText } = require("./booking-link");
+const FEEDBACK_URL = `${(process.env.SITE_URL || "https://skanetamilsangam.duckdns.org").replace(/\/$/, "")}/feedback.html`;
 
 const HEADER = "🪔 *Skåne Tamil Sangam – Diwali 2026* 🪔";
 const FOOTER = `_ℹ️ Please don't reply to this message._
@@ -78,6 +79,20 @@ Pradeep: 0725283137
 
 ${FOOTER}`;
   },
+  // After the event: ask every family to fill in the feedback form.
+  FEEDBACK: r => `${HEADER}
+
+Vanakkam ${r.first_name} 🙏
+Thank you for celebrating *Diwali 2026* with us! 🎉 It was wonderful to see you.
+
+📝 *Please share your feedback*
+It takes about 2 minutes and helps us make our next event even better. You can also rate the food stalls.
+👉 ${FEEDBACK_URL}
+
+Looking forward to seeing you at our future events! 🪔
+
+Nandri! 🙏
+– Skåne Tamil Sangam`,
   // Admin-written text. {first_name}, {amount_due} and {registration_id} are filled in per family.
   CUSTOM: (r, custom) => {
     const fill = s => String(s || "").replace(/\{first_name\}/g, r.first_name).replace(/\{amount_due\}/g, String(amountDue(r))).replace(/\{registration_id\}/g, String(r.id));

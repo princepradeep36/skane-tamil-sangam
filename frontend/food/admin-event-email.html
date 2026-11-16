@@ -106,6 +106,7 @@ th{background:#f8fafc}
           <option value="PAYMENT_REMINDER">Payment reminder</option>
           <option value="PAYMENT_OPEN">Payment is now open</option>
           <option value="SWEETS_PASS">Welcome + Diwali QR code (check-in &amp; sweets)</option>
+          <option value="FEEDBACK">📝 Please share your feedback (feedback form link)</option>
           <option value="CUSTOM">My own message</option>
         </select>
       </div>
@@ -192,7 +193,7 @@ th{background:#f8fafc}
 checkAuth('messages');
 const API = '/food-api';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const KIND_NAMES = { REGISTRATION: 'Registration confirmed', PAYMENT_RECEIVED: 'Payment received', PAYMENT_OPEN: 'Payment is open', PAYMENT_REMINDER: 'Payment reminder', SWEETS_PASS: 'Welcome + Diwali QR code', CUSTOM: 'Own message' };
+const KIND_NAMES = { REGISTRATION: 'Registration confirmed', PAYMENT_RECEIVED: 'Payment received', PAYMENT_OPEN: 'Payment is open', PAYMENT_REMINDER: 'Payment reminder', SWEETS_PASS: 'Welcome + Diwali QR code', FEEDBACK: 'Please share your feedback', CUSTOM: 'Own message' };
 const $ = id => document.getElementById(id);
 let emailReady = false;
 
@@ -288,7 +289,7 @@ let waRows = [];
 function waLink(digits, text) { return waUrl(digits, text); }
 $('waKind').addEventListener('change', () => {
   $('waCustomBox').style.display = $('waKind').value === 'CUSTOM' ? '' : 'none';
-  if ($('waKind').value === 'SWEETS_PASS') $('waAudience').value = 'ALL';
+  if ($('waKind').value === 'SWEETS_PASS' || $('waKind').value === 'FEEDBACK') $('waAudience').value = 'ALL';
   else if ($('waKind').value !== 'CUSTOM') $('waAudience').value = 'UNPAID';
   $('waArea').style.display = 'none';
 });

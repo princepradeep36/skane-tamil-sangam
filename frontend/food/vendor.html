@@ -114,8 +114,8 @@
             </a>
             <a href="#" id="fb-link" class="card">
                 <div class="icon">⭐</div>
-                <div class="title">Ratings & Feedback</div>
-                <div class="desc">Star ratings and comments from guests about your stall</div>
+                <div class="title">Feedback</div>
+                <div class="desc">Guests' star ratings and comments about your stall</div>
             </a>
             <a href="#" onclick="showPasswordModal()" class="card">
                 <div class="icon">🔑</div>
@@ -145,7 +145,7 @@
         // Update Links
         document.getElementById("dash-link").href = `vendor-live.html?vendor_id=${vendorId}`;
         document.getElementById("sum-link").href = `vendor-stats.html?vendor_id=${vendorId}`;
-        document.getElementById("fb-link").href = `vendor-feedback.html?vendor_id=${vendorId}`;
+        document.getElementById("fb-link").href = `vendor-live.html?vendor_id=${vendorId}&tab=feedback`;
         document.getElementById("menu-link").href = `vendor-menu.html?vendor_id=${vendorId}`;
 
         document.getElementById("menu-link").href = `vendor-menu.html?vendor_id=${vendorId}`;

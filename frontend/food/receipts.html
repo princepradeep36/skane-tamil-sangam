@@ -222,7 +222,7 @@
             <span>Total Paid</span>
             <span>${order.total}kr</span>
           </div>
-          <a href="/feedback.html?vendor=${order.vendor_id}&phone=${encodeURIComponent(phone)}" style="display:block; text-align:center; margin-top:10px; padding:9px; border-radius:8px; background:#fff8e1; color:#8a5a00; font-weight:700; text-decoration:none;">⭐ Rate this stall</a>
+          <a href="/feedback.html?vendor=${order.vendor_id}" style="display:block; text-align:center; margin-top:10px; padding:9px; border-radius:8px; background:#fff8e1; color:#8a5a00; font-weight:700; text-decoration:none;">⭐ Rate this stall</a>
         `;
           ordersDiv.appendChild(card);
           fetchItems(order.id);

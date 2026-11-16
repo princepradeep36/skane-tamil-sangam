@@ -292,6 +292,13 @@
     .part-btns { display:flex; gap:8px; flex-wrap:wrap; }
     .part-btns .status-btn { flex:1 1 140px; }
     .cat-tag { font-size:.8em; }
+    .fb-star { color:#f5a300; letter-spacing:1px; }
+    .fb-avg { font-size:1.8rem; font-weight:800; margin-bottom:8px; }
+    .fb-avg small { font-size:.9rem; color:#666; font-weight:600; }
+    .fb-bar { display:flex; align-items:center; gap:8px; font-size:.85rem; color:#555; margin:3px 0; }
+    .fb-bar i { flex:1; height:8px; background:#eee; border-radius:4px; overflow:hidden; display:block; }
+    .fb-bar i span { display:block; height:100%; background:#ffc107; }
+    .fb-comment { margin:8px 0 0; white-space:pre-wrap; line-height:1.45; }
   </style>
 <link rel="stylesheet" href="../responsive.css?v=20261015">
 </head>
@@ -337,6 +344,7 @@
       <div class="order-tabs" role="tablist">
         <button class="order-tab active" data-tab="paid" role="tab" onclick="selectTab('paid')">✅ Paid <span class="tab-count" id="count-paid">0</span></button>
         <button class="order-tab" data-tab="unpaid" role="tab" onclick="selectTab('unpaid')">⏳ Unpaid <span class="tab-count" id="count-unpaid">0</span></button>
+        <button class="order-tab" data-tab="feedback" role="tab" onclick="selectTab('feedback')">⭐ Feedback <span class="tab-count" id="count-fb">0</span></button>
       </div>
       <input type="search" class="search" id="search" placeholder="🔍 Search name, phone or item" oninput="renderOrders()" autocomplete="off">
     </div>
@@ -353,7 +361,8 @@
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const ordersDiv = document.getElementById("orders");
     let allOrders = [];
-    let currentTab = 'paid';
+    let currentTab = new URLSearchParams(location.search).get('tab') === 'feedback' ? 'feedback' : 'paid';
+    let vendorFeedback = { count: 0, average: null, counts: [0, 0, 0, 0, 0], items: [] };
 
     // Load Vendors for dropdown
     const role = sessionStorage.getItem("user_role");
@@ -451,9 +460,11 @@ Only press OK if the money is in. The order then moves to Paid and the customer 
 
       Promise.all([
         authFetch(`${API}/vendor-orders/${vendorId}`).then(res => res.json()),
-        authFetch(`${API}/vendor-unpaid-orders/${vendorId}`).then(res => res.ok ? res.json() : [])
+        authFetch(`${API}/vendor-unpaid-orders/${vendorId}`).then(res => res.ok ? res.json() : []),
+        authFetch(`${API}/vendor/feedback?vendorId=${vendorId}`).then(res => res.ok ? res.json() : null).catch(() => null)
       ])
-        .then(([paidRows, unpaidRows]) => {
+        .then(([paidRows, unpaidRows, feedback]) => {
+          if (feedback) vendorFeedback = feedback;
           const orders = {};
           [...paidRows.map(r => ({ ...r, paid: true })), ...unpaidRows.map(r => ({ ...r, paid: false }))].forEach(row => {
             if (!orders[row.order_id]) {
@@ -496,12 +507,31 @@ Only press OK if the money is in. The order then moves to Paid and the customer 
           </div>`;
     }
 
+    // Guests' star ratings and comments for this stall (from the Diwali feedback form). No names or phone numbers.
+    function renderFeedback() {
+      const f = vendorFeedback;
+      if (!f.count) { ordersDiv.innerHTML = '<div class="empty-state">No feedback yet. Guests can rate your stall on the feedback form.</div>'; return; }
+      const max = Math.max(1, ...f.counts);
+      ordersDiv.innerHTML = `<div class="customer-card fb-summary">
+          <div class="fb-avg"><span class="fb-star">★</span> ${f.average} <small>/ 5 · ${f.count} rating${f.count === 1 ? '' : 's'}</small></div>
+          ${[5, 4, 3, 2, 1].map(n => `<div class="fb-bar">${n}★ <i><span style="width:${100 * f.counts[n - 1] / max}%"></span></i> ${f.counts[n - 1]}</div>`).join('')}
+        </div>` + f.items.map(i => `<div class="customer-card">
+          <div class="customer-header"><span class="fb-star">${'★'.repeat(i.rating)}<span style="color:#ddd">${'★'.repeat(5 - i.rating)}</span></span>
+            <span class="customer-phone">${esc(new Date(i.created_at).toLocaleString())}</span></div>
+          ${i.comment ? `<p class="fb-comment">${esc(i.comment)}</p>` : '<p class="fb-comment" style="color:#999">No comment</p>'}
+        </div>`).join('');
+    }
+
     function renderOrders() {
       const query = document.getElementById("search").value.trim().toLowerCase();
       const paid = allOrders.filter(o => o.paid);
       const unpaid = allOrders.filter(o => !o.paid);
       document.getElementById("count-paid").textContent = paid.length;
       document.getElementById("count-unpaid").textContent = unpaid.length;
+      document.getElementById("count-fb").textContent = vendorFeedback.count;
+      document.querySelectorAll('.order-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === currentTab));
+      document.getElementById("search").hidden = currentTab === 'feedback';
+      if (currentTab === 'feedback') { renderFeedback(); return; }
 
       const list = (currentTab === 'paid' ? paid : unpaid).filter(o => matches(o, query));
       ordersDiv.innerHTML = currentTab === 'unpaid'
