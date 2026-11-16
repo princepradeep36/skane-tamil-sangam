@@ -27,9 +27,12 @@ textarea{min-height:90px;resize:vertical}
 .yesno label{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;border:1.5px solid #d6dde6;border-radius:10px;padding:11px;font-weight:700;cursor:pointer}
 .yesno input{width:auto}
 .yesno label:has(input:checked){border-color:#0056b3;background:#eef5ff;color:#003d80}
-.vendor{border:1px solid #e5e7eb;border-radius:14px;padding:12px;margin-top:10px;position:relative}
-.vendor .remove{position:absolute;top:8px;right:10px;background:none;border:none;color:#c62828;font-weight:700;cursor:pointer;font-size:.85rem}
-.vendor select{margin:0 0 6px;padding-right:70px}
+.vendor{border:1px solid #e5e7eb;border-radius:14px;padding:12px;margin-top:10px}
+.vendor-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;min-height:28px}
+.vendor-head span{font-size:.8rem;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:.04em}
+.vendor .remove{background:#f3f4f6;border:none;color:#4b5563;font-weight:600;cursor:pointer;font-size:.8rem;border-radius:999px;padding:5px 12px;font-family:inherit}
+.vendor .remove:hover{background:#fee2e2;color:#b91c1c}
+.vendor select{margin:0 0 6px}
 .vendor textarea{min-height:64px;margin-top:6px}
 .add{width:100%;margin-top:10px;background:#eef5ff;color:#003d80;border:1.5px dashed #0056b3;border-radius:12px;padding:12px;font-weight:800;font-size:.95rem;cursor:pointer}
 .add:disabled{opacity:.5;cursor:default}
@@ -144,6 +147,7 @@ document.querySelectorAll('input[name="problems"]').forEach(r => r.addEventListe
 // ---- vendor rows: each vendor once ----
 function chosen() { return [...document.querySelectorAll('.vendor select')].map(s => s.value).filter(Boolean); }
 function refreshOptions() {
+  document.querySelectorAll('.vendor .vendor-no').forEach((el, i) => { el.textContent = `Vendor ${i + 1}`; });
   const taken = chosen();
   document.querySelectorAll('.vendor select').forEach(sel => {
     [...sel.options].forEach(o => { if (o.value) o.disabled = taken.includes(o.value) && o.value !== sel.value; });
@@ -154,7 +158,7 @@ function addVendorRow(preselect) {
   const id = ++rowSeq, key = `v${id}`;
   const row = document.createElement('div');
   row.className = 'vendor'; row.dataset.key = key;
-  row.innerHTML = `${document.querySelectorAll('.vendor').length ? '<button type="button" class="remove">✕ Remove</button>' : ''}
+  row.innerHTML = `<div class="vendor-head"><span class="vendor-no"></span>${document.querySelectorAll('.vendor').length ? '<button type="button" class="remove" aria-label="Remove this vendor">Remove</button>' : ''}</div>
     <select aria-label="Vendor"><option value="">Choose a vendor…</option>${vendors.map(v => `<option value="${v.id}">${esc(v.name)}</option>`).join('')}</select>
     <div class="stars" data-key="${key}"></div><div class="stars-label" id="lbl-${key}"></div>
     <textarea maxlength="1000" placeholder="Comment for this vendor (optional)"></textarea>`;
