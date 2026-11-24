@@ -251,6 +251,7 @@ function renderList() {
       </div>
       <div class="acts">
         <button class="btn" type="button" onclick="edit(${ev.id})">Edit</button>
+        <button class="btn" type="button" onclick="duplicate(${ev.id})" title="Make a copy to edit into the next event">⧉ Duplicate</button>
         ${ev.isCurrent ? '' : `<button class="btn" type="button" onclick="makeCurrent(${ev.id})">Make current</button>`}
         ${!ev.isCurrent && !ev.registrations && !ev.orders ? `<button class="btn danger" type="button" onclick="removeEvent(${ev.id})">Delete</button>` : ''}
       </div>
@@ -315,6 +316,16 @@ function openEditor(ev) {
   $('editor').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 function edit(id) { openEditor(events.find(e => e.id === id)); }
+// A full copy (texts, prices, banner, partner logo) to change into the next event.
+async function duplicate(id) {
+  const r = await authFetch(`${API}/admin/events/${id}/duplicate`, { method: 'POST', headers: { 'X-Event-Id': '' } });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) return alert(d.error || 'Could not copy the event.');
+  await load();
+  openEditor(events.find(e => e.id === d.id) || d);
+  $('msg').className = 'msg ok';
+  $('msg').textContent = 'Copy made. Change the name and date (and anything else), then press Save event.';
+}
 $('newBtn').onclick = () => openEditor(null);
 $('cancelBtn').onclick = () => { $('editor').hidden = true; editing = null; };
 

@@ -249,6 +249,29 @@ function createEvents(pool) {
     const COLS = ["name", "short_name", "emoji", "event_date", "time_text", "venue", "summary", "adult_price", "child_price", "intro_html", "consent_html", "thanks_html",
       "contacts_text", "partner_name", "ask_volunteer", "ask_cultural", "registration_open", "food_open", "sweets_enabled", "sweets_start_at", "menu_mode"];
 
+    // Duplicate: a full copy of an event (texts, prices, switches, banner and partner logo) to edit
+    // into the next one. The copy has no date, is not current and has registration and food closed.
+    app.post("/admin/events/:id/duplicate", requireEvents, async (req, res) => {
+      const src = get(req.params.id);
+      if (!src) return res.status(404).json({ error: "Event not found" });
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const values = { ...src, name: `Copy of ${src.name}`.slice(0, 150), short_name: `Copy of ${src.short_name}`.slice(0, 60),
+          event_date: null, sweets_start_at: null, registration_open: false, food_open: false };
+        const cols = [...COLS, "banner_fallback", "partner_logo_fallback"];
+        const q = await client.query(`INSERT INTO events(${cols.join(",")}) VALUES(${cols.map((_, i) => `$${i + 1}`).join(",")}) RETURNING id`,
+          cols.map(c => values[c] ?? null));
+        const id = q.rows[0].id;
+        await client.query(`INSERT INTO event_images(event_id, kind, content_type, image)
+          SELECT $1, kind, content_type, image FROM event_images WHERE event_id = $2`, [id, src.id]);
+        await client.query("COMMIT");
+        await reload();
+        res.status(201).json(adminView(get(id)));
+      } catch (err) { await client.query("ROLLBACK"); res.status(500).json({ error: err.message }); }
+      finally { client.release(); }
+    });
+
     app.post("/admin/events", requireEvents, async (req, res) => {
       const { values, error } = readForm(req.body);
       if (error) return res.status(400).json({ error });
