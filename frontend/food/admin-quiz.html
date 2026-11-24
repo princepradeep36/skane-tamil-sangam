@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quiz Game</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;background:#f4f7f9;margin:0;padding:20px;color:#222}
+*{box-sizing:border-box}
+.wrap{max-width:1100px;margin:auto}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.top h1{margin:0}.top p{margin:4px 0 0;color:#667085}
+.card{background:#fff;border-radius:14px;padding:20px;box-shadow:0 3px 12px #0001;margin-top:18px}
+.card h2{margin:0 0 12px;font-size:1.15rem}
+a.btn,button{border:0;border-radius:10px;padding:11px 16px;text-decoration:none;cursor:pointer;font-weight:bold;font-size:15px;display:inline-block}
+.back{background:#476cff;color:#fff}.ghost{background:#eef2f7;color:#1f2937}.primary{background:#0056b3;color:#fff}.go{background:#16a34a;color:#fff}.bad{background:#dc2626;color:#fff}.warn{background:#ffc107;color:#3d2c06}
+button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.hint{color:#667085;font-size:.9rem}
+.big{font-size:1.2rem;padding:15px 24px}
+.status{display:inline-block;padding:4px 12px;border-radius:999px;font-weight:bold;font-size:.85rem;background:#eef2f7;margin-left:8px}
+.pill{display:inline-block;background:#eef2f7;border-radius:999px;padding:3px 10px;margin:2px;font-size:.88rem}
+.names{max-height:170px;overflow:auto;margin:10px 0}
+.game{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;align-items:start}
+@media(max-width:800px){.game{grid-template-columns:minmax(0,1fr)}}
+.qtext{font-size:1.3rem;font-weight:bold;margin:0 0 10px}
+.qimg{max-width:100%;max-height:260px;border-radius:10px;display:block;margin-bottom:10px;background:#e5e7eb}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.opt{border-radius:10px;padding:10px 12px;color:#fff;font-weight:bold;display:flex;gap:8px;align-items:center;position:relative}
+.opt .l{background:#fff3;border-radius:6px;padding:2px 8px}
+.opt .n{margin-left:auto;background:#0003;border-radius:999px;padding:1px 9px;font-size:.85rem}
+.opt.dim{opacity:.35}
+.opt.ok{outline:4px solid #111;outline-offset:-4px}
+.c0{background:#e11d48}.c1{background:#2563eb}.c2{background:#d97706}.c3{background:#16a34a}
+.timer{font-size:2.4rem;font-weight:bold;color:#0056b3}
+.side .line{margin:6px 0}
+.rank{margin:0;padding-left:22px}.rank li{margin:3px 0}
+/* Question editor */
+.q{border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-top:12px}
+.q.new{border:2px dashed #93c5fd;background:#f8fbff}
+.q-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.q-num{font-weight:bold;color:#0056b3}
+.q-head .sp{flex:1}
+.small{padding:7px 10px;font-size:13px}
+.q textarea{width:100%;padding:10px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:15px;font-family:inherit;resize:vertical;min-height:46px}
+.q-body{display:grid;grid-template-columns:160px minmax(0,1fr);gap:12px;align-items:start}
+@media(max-width:650px){.q-body{grid-template-columns:minmax(0,1fr)}}
+.pic{width:160px;height:110px;border:2px dashed #cbd5e1;border-radius:10px;display:flex;align-items:center;justify-content:center;text-align:center;color:#475569;font-size:13px;font-weight:bold;cursor:pointer;position:relative;overflow:hidden;background:#f8fafc}
+.pic img{width:100%;height:100%;object-fit:cover}
+.pic input{display:none}
+.pic .rm{position:absolute;right:4px;top:4px;padding:1px 8px;font-size:13px;background:#dc2626;color:#fff;border-radius:6px}
+.edit-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+@media(max-width:650px){.edit-opts{grid-template-columns:1fr}}
+.edit-opt{display:flex;align-items:center;gap:6px;border-radius:10px;padding:5px 8px;color:#fff}
+.edit-opt b{width:22px;text-align:center}
+.edit-opt input[type=text]{flex:1;min-width:0;padding:8px 9px;border:0;border-radius:7px;font-size:14px}
+.edit-opt label{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:bold;white-space:nowrap;cursor:pointer}
+.edit-opt input[type=radio]{width:18px;height:18px;margin:0}
+.q-foot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.q-foot select{padding:8px;border-radius:8px;border:1px solid #d0d5dd;font-size:14px}
+.saved{color:#16a34a;font-weight:bold;font-size:.9rem}
+[hidden]{display:none!important}
+</style>
+<link rel="stylesheet" href="../responsive.css?v=20261015">
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div><h1>🎯 Quiz Game</h1><p>Questions with four answers on every phone. Faster correct answers score more points.</p></div>
+    <div class="row"><a class="btn go" href="../quiz-screen.html" target="_blank" rel="noopener">🖥️ Open stage screen</a><a class="btn back" href="admin.html?admin=true">Admin Home</a></div>
+  </div>
+
+  <div class="card" id="control">Loading…</div>
+
+  <div class="card">
+    <h2>Questions</h2>
+    <p class="hint" style="margin:0">Each question has text, a picture, or both, and two to four answers (A to D). Tick the correct answer. Players see the question and all answers on their phone and on the stage screen, and tap one. A correct answer is worth up to 1000 points: the faster, the more (500 at the last second).</p>
+    <div id="questions"></div>
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script>
+checkAuth('games');
+const API = '/food-api';
+const $ = id => document.getElementById(id);
+const LETTERS = ['A', 'B', 'C', 'D'];
+const TIMES = [5, 10, 20, 30, 45, 60, 90, 120];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const json = { 'Content-Type': 'application/json' };
+
+/* ---------- Running the game ---------- */
+let lastState = '';
+let state = null;
+
+async function act(action, confirmText) {
+  if (confirmText && !confirm(confirmText)) return;
+  const r = await authFetch(`${API}/admin/quiz/action`, { method: 'POST', headers: json, body: JSON.stringify({ action }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) return alert(d.error || 'That did not work.');
+  renderControl(d);
+}
+
+function optionsHtml(s) {
+  const q = s.question;
+  const showCounts = s.counts;
+  return `<div class="opts">${q.options.map((o, i) => `<div class="opt c${i}${showCounts && i !== s.correct ? ' dim' : ''}${i === s.correct ? ' ok' : ''}">
+    <span class="l">${LETTERS[i]}</span><span>${esc(o)}${i === s.correct ? ' ✔' : ''}</span>${showCounts ? `<span class="n">${s.counts[i]}</span>` : ''}</div>`).join('')}</div>`;
+}
+
+function renderControl(s) {
+  state = s;
+  const key = JSON.stringify({ ...s, msLeft: Math.ceil(s.msLeft / 1000) });
+  if (key === lastState) return;
+  lastState = key;
+  const el = $('control');
+  const top5 = list => list.map((p, i) => `<li><b>${esc(p.name)}</b>: ${p.score}${p.gained ? ` <span class="hint">(+${p.gained})</span>` : ''}</li>`).join('');
+  if (s.status === 'IDLE' || s.status === 'ENDED') {
+    el.innerHTML = `<h2>Run the quiz <span class="status">${s.status === 'ENDED' ? 'Finished' : 'Not started'}</span></h2>
+      ${s.status === 'ENDED' ? `<p><b>Final top 5</b> <span class="hint">(the stage screen shows the winners)</span></p><ol class="rank">${top5(s.top || []) || '<li>Nobody scored.</li>'}</ol>` : ''}
+      <p class="hint">1. Open the stage screen on the projector. 2. Open the quiz for joining: the QR code appears on the stage screen.</p>
+      <button class="primary big" onclick="act('open-lobby')">Open quiz for joining</button>`;
+    return;
+  }
+  if (s.status === 'LOBBY') {
+    el.innerHTML = `<h2>Players are joining <span class="status">${s.playerCount} joined</span></h2>
+      <p class="hint">${s.showRules ? '📜 The stage screen is showing the <b>rules</b>. Read them out, then start.' : 'The QR code is on the stage screen. When everyone has joined, show the rules, then start. Latecomers can still join during the quiz.'}</p>
+      <div class="names">${s.playerNames.map(n => `<span class="pill">${esc(n)}</span>`).join('') || '<span class="hint">Nobody yet…</span>'}</div>
+      <div class="row">
+        <button class="ghost" onclick="act('${s.showRules ? 'hide-rules' : 'show-rules'}')">${s.showRules ? '📱 Show QR code again' : '📜 Show rules on screen'}</button>
+        <button class="go big" onclick="act('start')">▶ Start quiz</button>
+        <button class="ghost" onclick="act('reset','Close the quiz? Everyone who joined will be removed.')">Cancel</button>
+      </div>`;
+    return;
+  }
+  const q = s.question;
+  const head = `<h2>Question ${s.questionNumber} of ${s.questionTotal} <span class="status">${{ QUESTION: 'Answering', RESULT: 'Correct answer shown', BOARD: 'Top 5 shown' }[s.status]}</span></h2>`;
+  const left = `<div>${q.text ? `<p class="qtext">${esc(q.text)}</p>` : ''}${q.image ? `<img class="qimg" src="${API}/quiz/image/${q.image}" alt="">` : ''}${optionsHtml(s)}</div>`;
+  let side;
+  if (s.status === 'QUESTION') {
+    side = `<div class="timer" id="timer">${Math.ceil(s.msLeft / 1000)}s</div>
+      <p class="line"><b>${s.answerCount}</b> of ${s.playerCount} answered</p>
+      <p class="hint">The question closes by itself when the time is up or everyone has answered.</p>
+      <button class="warn" onclick="act('stop-timer')">⏹ Stop timer now</button>`;
+  } else if (s.status === 'RESULT') {
+    side = `<p class="line"><b>${s.correctCount}</b> of ${s.playerCount} got it right.</p>
+      <p class="hint">The stage shows the correct answer and how many chose each one. Phones show each player's points.</p>
+      <button class="primary big" onclick="act('next')">🏆 Show top 5</button>`;
+  } else {
+    side = `<p><b>Top 5 on the stage</b></p><ol class="rank">${top5(s.top || []) || '<li>Nobody has scored yet.</li>'}</ol>
+      <button class="primary big" onclick="act('next')">${s.isLast ? '🎉 Show final winners' : '▶ Next question'}</button>`;
+  }
+  el.innerHTML = `${head}<div class="game">${left}<div class="side">${side}
+    <p style="margin-top:18px"><button class="bad small" onclick="act('end','End the quiz now and show the winners?')">End quiz</button></p></div></div>`;
+}
+
+async function poll() {
+  try {
+    const r = await authFetch(`${API}/admin/quiz/state`, { cache: 'no-store' });
+    if (r.ok) renderControl(await r.json());
+  } catch (e) {}
+}
+
+/* ---------- Questions ---------- */
+let questions = [];
+const imageUrls = {};
+
+async function imageUrl(id) {
+  if (!imageUrls[id]) {
+    const r = await authFetch(`${API}/admin/quiz/images/${id}?t=${Date.now()}`);
+    imageUrls[id] = r.ok ? URL.createObjectURL(await r.blob()) : '';
+  }
+  return imageUrls[id];
+}
+
+function editorHtml(q, i) {
+  const isNew = !q.id;
+  const id = q.id || 'new';
+  return `<div class="q${isNew ? ' new' : ''}" data-id="${id}">
+    <div class="q-head"><span class="q-num">${isNew ? '+ New question' : `Question ${i + 1}`}</span><span class="sp"></span>
+      ${isNew ? '' : `<button class="ghost small" onclick="moveQ(${q.id},-1)" ${i === 0 ? 'disabled' : ''}>↑</button>
+      <button class="ghost small" onclick="moveQ(${q.id},1)" ${i === questions.length - 1 ? 'disabled' : ''}>↓</button>
+      <button class="bad small" onclick="deleteQ(${q.id})">Delete</button>`}</div>
+    <div class="q-body">
+      <label class="pic" title="Picture for this question (optional)">${q.hasImage ? `<img data-img="${q.id}" alt=""><button class="rm" onclick="event.preventDefault();removeImage(${q.id})">✕</button>` : `<span>🖼️<br>${isNew ? 'Add a picture after saving' : 'Add picture<br>(optional)'}</span>`}
+        ${isNew ? '' : `<input type="file" accept="image/*" onchange="uploadImage(${q.id}, this)">`}</label>
+      <div>
+        <textarea maxlength="500" rows="2" data-f="text" placeholder="Question, e.g. Which festival is celebrated in January?">${esc(q.text)}</textarea>
+        <div class="edit-opts">${LETTERS.map((L, j) => `<div class="edit-opt c${j}"><b>${L}</b>
+          <input type="text" maxlength="150" data-f="opt" value="${esc(q.options[j])}" placeholder="Answer ${L}${j > 1 ? ' (optional)' : ''}">
+          <label><input type="radio" name="ok-${id}" value="${j}" ${q.correct === j ? 'checked' : ''}> Correct</label></div>`).join('')}</div>
+      </div>
+    </div>
+    <div class="q-foot">
+      <label class="hint">Time to answer <select data-f="seconds">${TIMES.map(t => `<option value="${t}" ${t === (q.seconds || 20) ? 'selected' : ''}>${t} seconds</option>`).join('')}</select></label>
+      <button class="${isNew ? 'go' : 'primary'}" onclick="saveQ('${id}')">${isNew ? '+ Add question' : 'Save changes'}</button>
+      <span class="saved" data-saved></span>
+    </div>
+  </div>`;
+}
+
+function readEditor(id) {
+  const box = document.querySelector(`.q[data-id="${id}"]`);
+  const ok = box.querySelector(`input[name="ok-${id}"]:checked`);
+  return {
+    box,
+    body: {
+      text: box.querySelector('[data-f=text]').value,
+      options: [...box.querySelectorAll('[data-f=opt]')].map(i => i.value),
+      correct: ok ? Number(ok.value) : -1,
+      seconds: Number(box.querySelector('[data-f=seconds]').value)
+    }
+  };
+}
+
+async function saveQ(id) {
+  const { box, body } = readEditor(id);
+  if (id === 'new' && !body.text.trim()) {
+    if (!confirm('This question has no text. You can add a picture after saving. Continue?')) return;
+  }
+  const r = await authFetch(id === 'new' ? `${API}/admin/quiz/questions` : `${API}/admin/quiz/questions/${id}`,
+    { method: id === 'new' ? 'POST' : 'PUT', headers: json, body: JSON.stringify(body) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) return alert(d.error || 'Could not save.');
+  if (id === 'new') return loadQuestions();
+  box.querySelector('[data-saved]').textContent = '✓ Saved';
+  setTimeout(() => { box.querySelector('[data-saved]').textContent = ''; }, 2000);
+}
+
+async function moveQ(id, direction) {
+  await authFetch(`${API}/admin/quiz/questions/${id}/move`, { method: 'POST', headers: json, body: JSON.stringify({ direction }) });
+  loadQuestions();
+}
+async function deleteQ(id) {
+  if (!confirm('Delete this question?')) return;
+  await authFetch(`${API}/admin/quiz/questions/${id}`, { method: 'DELETE' });
+  loadQuestions();
+}
+async function removeImage(id) {
+  if (!confirm('Remove the picture from this question?')) return;
+  await authFetch(`${API}/admin/quiz/questions/${id}/image`, { method: 'DELETE' });
+  delete imageUrls[id];
+  loadQuestions();
+}
+
+// Resize big photos before uploading (the stage needs at most about 1600 pixels).
+function shrink(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const src = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(src);
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error('Could not read the image.')), 'image/jpeg', 0.85);
+    };
+    img.onerror = () => { URL.revokeObjectURL(src); reject(new Error(`${file.name} could not be opened as an image.`)); };
+    img.src = src;
+  });
+}
+
+async function uploadImage(id, input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.closest('.pic').querySelector('span, img').outerHTML = '<span>Uploading…</span>';
+  try {
+    const r = await authFetch(`${API}/admin/quiz/questions/${id}/image`, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: await shrink(file) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Could not upload the picture.');
+  } catch (e) { alert(e.message); }
+  delete imageUrls[id];
+  loadQuestions();
+}
+
+async function loadQuestions() {
+  const r = await authFetch(`${API}/admin/quiz/questions`, { cache: 'no-store' });
+  if (!r.ok) return;
+  questions = await r.json();
+  $('questions').innerHTML = questions.map(editorHtml).join('') + editorHtml({ text: '', options: ['', '', '', ''], correct: -1, seconds: 20 }, questions.length);
+  for (const img of document.querySelectorAll('img[data-img]')) img.src = await imageUrl(img.dataset.img);
+}
+
+// The countdown on this page runs locally between polls.
+setInterval(() => {
+  if (state && state.status === 'QUESTION' && $('timer')) {
+    state.msLeft = Math.max(0, state.msLeft - 250);
+    $('timer').textContent = `${Math.ceil(state.msLeft / 1000)}s`;
+  }
+}, 250);
+
+poll();
+setInterval(poll, 1000);
+loadQuestions();
+</script>
+</body>
+</html>

@@ -10,7 +10,7 @@ const PERMISSIONS = {
   checkin: "QR scanner: entrance check-in",
   sweets: "QR scanner: sweet boxes",
   scan_override: "QR scanner: “Give anyway” & undo",
-  games: "Stage games (Connection & Clue)",
+  games: "Stage games (Quiz & Clue)",
   food: "Food: orders, vendors, menus, live dashboard, sales",
   settings: "Site controls"
 };

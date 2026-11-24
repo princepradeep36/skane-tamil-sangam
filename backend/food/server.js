@@ -11,6 +11,7 @@ const mailer = require("./mailer");
 const wa = require("./whatsapp");
 const { validBookingKey } = require("./booking-link");
 const registerConnectionGame = require("./connection-game"); // not "whatsapp": route bodies use that name for the phone field
+const registerQuizGame = require("./quiz-game");
 const registerSweets = require("./sweets");
 const registerFeedback = require("./feedback");
 const registerStaff = require("./staff");
@@ -1399,6 +1400,7 @@ app.put("/admin/order/:id/payment", requirePerm("food"), async (req, res) => {
 
 const ensureConnectionTables = registerConnectionGame(app, { pool, requireAdmin: requirePerm("games"), imageContentType });
 const ensureClueTables = registerConnectionGame(app, { pool, requireAdmin: requirePerm("games"), imageContentType, kind: "clue" });
+const ensureQuizTables = registerQuizGame(app, { pool, requireAdmin: requirePerm("games"), imageContentType });
 const ensureSweetsTable = registerSweets(app, { pool, requirePerm, hasPerm, wa, events });
 const ensureFeedbackTable = registerFeedback(app, { pool, requireVendor, requirePerm, vendorScope, normalizePhone: normalizeFoodPhone, events });
 events.register(app, { requirePerm, imageContentType, express });
@@ -1408,6 +1410,7 @@ initializeDatabase()
   .then(() => mailer.ensureEmailLog())
   .then(() => ensureConnectionTables())
   .then(() => ensureClueTables())
+  .then(() => ensureQuizTables())
   .then(() => ensureStaffColumns())
   .then(() => ensureSweetsTable())
   .then(() => ensureFeedbackTable())

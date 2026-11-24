@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Quiz Game | Skåne Tamil Sangam</title>
+<style>
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:linear-gradient(170deg,#2e1065,#4c1d95 55%,#6d28d9);color:#fff;display:flex;flex-direction:column;min-height:100dvh;-webkit-tap-highlight-color:transparent}
+header{padding:12px 16px 4px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+header b{font-size:1.1rem}
+header span{color:#fde68a;font-weight:700;font-size:.9rem}
+main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:14px 14px 18px;text-align:center}
+.join{width:min(360px,100%);background:#fff;color:#1c1c1e;border-radius:20px;padding:24px;box-shadow:0 18px 40px rgba(0,0,0,.25)}
+.join h1{margin:0 0 6px;font-size:1.5rem;color:#4c1d95}
+.join p{margin:0 0 16px;color:#57534e}
+.join input{width:100%;font-size:1.1rem;padding:14px;border:1.5px solid #d0d5dd;border-radius:12px}
+.join button{width:100%;margin-top:12px;font-size:1.15rem;font-weight:800;padding:14px;border:0;border-radius:12px;background:#facc15;color:#1c1c1e;cursor:pointer}
+.err{color:#b42318;font-weight:600;margin-top:10px;min-height:1.2em}
+.big{font-size:clamp(1.6rem,8vw,2.3rem);font-weight:900;line-height:1.2;margin:0}
+.sub{font-size:1.05rem;margin:0;opacity:.92;line-height:1.45;max-width:340px}
+.emoji{font-size:4.2rem;line-height:1}
+.howto{width:min(360px,100%);background:rgba(255,255,255,.12);border-radius:18px;padding:16px 18px;text-align:left}
+.howto h2{margin:0 0 10px;font-size:1.1rem;color:#fde68a}
+.howto ol{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:9px}
+.howto li{display:flex;gap:10px;line-height:1.4;font-size:.97rem}
+.howto li span{flex:0 0 auto;font-size:1.2rem;line-height:1.3}
+/* Question */
+main.q{justify-content:flex-start;gap:12px}
+.qbar{width:100%;max-width:560px;display:flex;align-items:center;gap:10px}
+.qbar .count{flex:0 0 auto;width:56px;height:56px;border-radius:50%;background:#fff;color:#4c1d95;font-weight:900;font-size:1.5rem;display:flex;align-items:center;justify-content:center}
+.qbar .count.low{background:#facc15;color:#422006}
+.track{flex:1;height:10px;border-radius:999px;background:rgba(255,255,255,.2);overflow:hidden}
+.track div{height:100%;background:#facc15;border-radius:999px}
+.qtext{width:100%;max-width:560px;background:#fff;color:#1c1c1e;border-radius:16px;padding:14px 16px;font-size:clamp(1.1rem,5vw,1.45rem);font-weight:800;line-height:1.3}
+.qimg{max-width:min(560px,100%);max-height:32vh;border-radius:14px;object-fit:contain;background:rgba(0,0,0,.2)}
+.opts{width:100%;max-width:560px;display:grid;grid-template-columns:1fr;gap:10px}
+.opt{display:flex;align-items:center;gap:12px;width:100%;min-height:64px;border:0;border-radius:14px;padding:12px 14px;color:#fff;font-size:1.15rem;font-weight:800;text-align:left;cursor:pointer;box-shadow:0 5px 0 rgba(0,0,0,.25);touch-action:manipulation;line-height:1.25}
+.opt:active{transform:translateY(4px);box-shadow:0 1px 0 rgba(0,0,0,.25)}
+.opt .l{flex:0 0 auto;width:36px;height:36px;border-radius:9px;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:1.15rem}
+.opt .t{flex:1;min-width:0;word-break:break-word}
+.opt .m{flex:0 0 auto;font-size:1.4rem}
+.opt:disabled{cursor:default}
+.opt.dim{opacity:.35}
+.opt.pick{outline:4px solid #fff;outline-offset:-4px}
+.c0{background:#e11d48}.c1{background:#2563eb}.c2{background:#d97706}.c3{background:#16a34a}
+.panel{width:min(380px,100%);padding:22px 20px;border-radius:22px;background:rgba(255,255,255,.12)}
+.panel.ok{background:#16a34a}
+.panel.no{background:#dc2626}
+.panel .pts{display:inline-block;margin-top:10px;background:#fff;color:#14532d;border-radius:999px;padding:6px 18px;font-weight:900;font-size:1.4rem}
+.panel.no .pts{color:#7f1d1d}
+.locked{font-weight:800;font-size:1.1rem;background:rgba(255,255,255,.15);border-radius:14px;padding:10px 14px;width:100%;max-width:560px}
+.rankline{font-size:1.1rem;font-weight:700}
+footer{padding:8px 16px 14px;text-align:center;font-size:.9rem;opacity:.85}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header><b>🎯 Quiz Game</b><span id="progress">Skåne Tamil Sangam</span></header>
+<main id="app"></main>
+<footer id="who"></footer>
+<script>
+const API = '/food-api';
+const TOKEN_KEY = 'quizToken';
+const LETTERS = ['A', 'B', 'C', 'D'];
+const app = document.getElementById('app');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let memoryToken = null;
+const store = {
+  get() { try { return localStorage.getItem(TOKEN_KEY) || memoryToken; } catch (e) { return memoryToken; } },
+  set(v) { memoryToken = v; try { v ? localStorage.setItem(TOKEN_KEY, v) : localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
+};
+let lastView = '';
+let me = null;
+let deadline = 0; // local time when the current question closes
+let sending = false;
+
+function render(key, html, cls = '') {
+  // Only touch the page when something changed, so tapping and typing are never interrupted.
+  if (key === lastView) return false;
+  lastView = key;
+  app.className = cls;
+  app.innerHTML = html;
+  return true;
+}
+
+const HOW_TO_PLAY = `<div class="howto"><h2>How to play</h2><ol>
+  <li><span>📱</span><div>Each question and its <b>four answers</b> appear on your phone and on the big screen.</div></li>
+  <li><span>👆</span><div>Tap the answer you think is right. You get <b>one tap</b> per question.</div></li>
+  <li><span>⚡</span><div><b>Be quick!</b> A correct answer is worth up to <b>1000 points</b>: the faster you tap, the more you get.</div></li>
+  <li><span>🏆</span><div>After every question the <b>top 5</b> are shown on the big screen. Highest total wins!</div></li>
+</ol></div>`;
+
+function showJoin(status) {
+  const open = ['LOBBY', 'QUESTION', 'RESULT', 'BOARD'].includes(status);
+  document.getElementById('progress').textContent = 'Skåne Tamil Sangam';
+  document.getElementById('who').textContent = '';
+  if (!open) {
+    render('closed' + status, status === 'ENDED'
+      ? `<div class="emoji">🎉</div><p class="big">The quiz has finished</p><p class="sub">Thank you for playing!</p>`
+      : `<div class="emoji">⏳</div><p class="big">The quiz hasn't opened yet</p><p class="sub">This page will open by itself when it starts. Please keep it open.</p>${HOW_TO_PLAY}`);
+    return;
+  }
+  if (lastView === 'join') return;
+  render('join', `<form class="join" id="joinForm">
+      <h1>Join the quiz</h1><p>Type the name to show on the big screen.</p>
+      <input id="name" maxlength="30" autocomplete="name" placeholder="Your name" required>
+      <button type="submit">Join</button><div class="err" id="err"></div></form>${HOW_TO_PLAY}`);
+  document.getElementById('joinForm').onsubmit = async e => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    try {
+      const r = await fetch(`${API}/quiz/join`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: document.getElementById('name').value }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Could not join. Please try again.');
+      store.set(d.token);
+      lastView = '';
+      tick();
+    } catch (err) {
+      document.getElementById('err').textContent = err.message;
+      btn.disabled = false;
+    }
+  };
+}
+
+function optionButtons(v, mode) {
+  // mode: 'play' (tap to answer), 'locked' (answered, waiting), 'result' (show the correct one)
+  return `<div class="opts">${v.question.options.map((o, i) => {
+    const cls = [`opt c${i}`];
+    let mark = '';
+    if (mode === 'locked' && i !== v.myChoice) cls.push('dim');
+    if (mode === 'locked' && i === v.myChoice) cls.push('pick');
+    if (mode === 'result') {
+      if (i === v.correct) mark = '✔'; else cls.push('dim');
+      if (i === v.myChoice) cls.push('pick');
+      if (i === v.myChoice && i !== v.correct) mark = '✖';
+    }
+    return `<button class="${cls.join(' ')}" ${mode === 'play' ? `onclick="answer(${i})"` : 'disabled'}><span class="l">${LETTERS[i]}</span><span class="t">${esc(o)}</span><span class="m">${mark}</span></button>`;
+  }).join('')}</div>`;
+}
+
+function questionHead(v, withTimer) {
+  const q = v.question;
+  return `${withTimer ? `<div class="qbar"><div class="count" id="count"></div><div class="track"><div id="track"></div></div></div>` : ''}
+    ${q.text ? `<div class="qtext">${esc(q.text)}</div>` : ''}
+    ${q.image ? `<img class="qimg" src="${API}/quiz/image/${q.image}" alt="Question picture">` : ''}`;
+}
+
+const ordinal = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] || ['th', 'st', 'nd', 'rd'][n % 100] || 'th');
+
+function showPlayer(v) {
+  me = v;
+  document.getElementById('who').textContent = `${v.name} · ${v.score} points`;
+  document.getElementById('progress').textContent = v.status === 'ENDED' ? 'Final result' : v.questionNumber ? `Question ${v.questionNumber} of ${v.questionTotal}` : 'Skåne Tamil Sangam';
+  if (v.status === 'LOBBY') {
+    render('lobby', `<div class="emoji">✅</div><p class="big">You're in, ${esc(v.name)}!</p><p class="sub">Look at the big screen. The quiz starts soon.</p>${HOW_TO_PLAY}`);
+  } else if (v.status === 'QUESTION') {
+    deadline = Date.now() + v.msLeft;
+    if (v.myChoice === null) {
+      render(`q${v.questionNumber}`, questionHead(v, true) + optionButtons(v, 'play'), 'q');
+    } else {
+      render(`q${v.questionNumber}-sent${v.myChoice}`, questionHead(v, true) + `<div class="locked">🔒 Answer locked in! Waiting for the others…</div>` + optionButtons(v, 'locked'), 'q');
+    }
+    updateTimer();
+  } else if (v.status === 'RESULT' || v.status === 'BOARD') {
+    const answered = v.myChoice !== null && v.myChoice !== undefined;
+    const panel = v.wasCorrect
+      ? `<div class="panel ok"><div class="emoji">🎉</div><p class="big">Correct!</p><span class="pts">+${v.points}</span>${v.streak > 1 ? `<p class="sub" style="margin-top:10px">🔥 ${v.streak} in a row!</p>` : ''}</div>`
+      : `<div class="panel no"><div class="emoji">${answered ? '😕' : '⏰'}</div><p class="big">${answered ? 'Not this time' : "Time's up"}</p><span class="pts">+0</span></div>`;
+    render(`r${v.questionNumber}-${v.rank}-${v.score}`, `${panel}<p class="rankline">You are ${ordinal(v.rank)} of ${v.playerCount} · ${v.score} points</p>` + questionHead(v, false) + optionButtons(v, 'result'), 'q');
+  } else if (v.status === 'ENDED') {
+    const medal = ['🥇', '🥈', '🥉'][v.rank - 1] || '🎉';
+    render(`end-${v.rank}-${v.score}`, `<div class="emoji">${medal}</div><p class="big">You finished ${ordinal(v.rank)}!</p><p class="sub">${v.score} points out of ${v.playerCount} players.${v.winner && v.rank !== 1 ? `<br>Winner: <b>${esc(v.winner)}</b>` : ''}</p><p class="sub">Thank you for playing!</p>`);
+  } else {
+    render('wait' + v.status, `<div class="emoji">⏳</div><p class="big">Please wait…</p>`);
+  }
+}
+
+function updateTimer() {
+  const c = document.getElementById('count');
+  if (!c || !me || !me.question) return;
+  const left = Math.max(0, deadline - Date.now());
+  c.textContent = Math.ceil(left / 1000);
+  c.classList.toggle('low', left <= 5000);
+  document.getElementById('track').style.width = `${Math.min(100, left / (me.question.seconds * 10))}%`;
+}
+setInterval(updateTimer, 200);
+
+async function answer(choice) {
+  if (sending) return;
+  sending = true;
+  // Show the tap straight away; the server confirms it.
+  showPlayer({ ...me, myChoice: choice });
+  try {
+    const r = await fetch(`${API}/quiz/answer`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: store.get(), choice }) });
+    const d = await r.json().catch(() => ({}));
+    if (d.needJoin) { store.set(null); lastView = ''; return tick(); }
+    if (d.status) { lastView = ''; showPlayer(d); }
+  } catch (e) {
+    lastView = '';
+    showPlayer({ ...me, myChoice: null });
+    alert('Your answer was not sent. Please tap again.');
+  } finally { sending = false; }
+}
+
+async function tick() {
+  if (sending) return;
+  try {
+    const token = store.get();
+    const r = await fetch(`${API}/quiz/me?token=${encodeURIComponent(token || '')}`, { cache: 'no-store' });
+    if (!r.ok) return;
+    const v = await r.json();
+    if (sending) return;
+    if (v.needJoin) { if (token) store.set(null); showJoin(v.status); } else showPlayer(v);
+  } catch (e) {}
+}
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
