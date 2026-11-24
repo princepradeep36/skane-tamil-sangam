@@ -747,6 +747,7 @@
     let cart = {};
     let allVendors = [];
     let activeCategory = 'FOOD';
+    let menuMode = 'BOTH';
     let activeVendor = 'ALL';
     let snacksOffered = false;
     let sheetItem = null;
@@ -759,6 +760,9 @@
       .then(res => res.ok ? res.json() : null)
       .catch(() => null)
       .then(settings => {
+        // Events that sell only food or only snacks: show just that, with no Food / Snacks tabs.
+        menuMode = (settings && settings.event && settings.event.menuMode) || 'BOTH';
+        if (menuMode !== 'BOTH') activeCategory = menuMode;
         if (settings && settings.food_ordering_enabled === false) {
           document.getElementById("vendors").innerHTML = `<div style="background:#fff3cd; border:1px solid #ffeeba; color:#856404; padding:20px; border-radius:15px; margin-top:10px; text-align:center;"><strong>Food ordering is closed.</strong><p style="margin-bottom:0">New orders are not being taken right now. You can still pay pending orders and view your receipts.</p></div>`;
           document.getElementById("checkoutBtn").style.display = "none";
@@ -768,7 +772,7 @@
       });
 
     function loadVendors() {
-    fetch(`${API}/vendors`)
+    fetch(`${API}/vendors?for=menu`)
       .then(res => {
         if (!res.ok) throw new Error();
         return res.json();
@@ -780,7 +784,7 @@
         ['FOOD', 'SNACKS'].forEach(c => {
           document.getElementById(`count-${c}`).innerText = vendors.reduce((n, v) => n + v.menu.filter(m => categoryOf(m) === c).length, 0);
         });
-        document.getElementById("category-tabs").style.display = "flex";
+        document.getElementById("category-tabs").style.display = menuMode === 'BOTH' ? "flex" : "none";
         document.getElementById("menuSearch").style.display = "";
         renderVendorBar();
         renderMenu();
@@ -881,7 +885,7 @@
     function renderMenu() {
         const container = document.getElementById("vendors");
         const query = (document.getElementById("menuSearch").value || '').trim().toLowerCase();
-        document.getElementById("category-tabs").style.display = query || !allVendors.length ? "none" : "flex";
+        document.getElementById("category-tabs").style.display = query || !allVendors.length || menuMode !== 'BOTH' ? "none" : "flex";
         document.getElementById("vendor-bar").style.display = query ? "none" : (allVendors.filter(v => v.menu.length).length > 1 ? "flex" : "none");
         const vendors = query ? searchedVendors(query) : allVendors
           .filter(v => activeVendor === 'ALL' || String(v.id) === String(activeVendor))

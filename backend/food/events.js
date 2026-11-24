@@ -14,6 +14,7 @@ const TEXT_FIELDS = {
   contacts_text: 1000, partner_name: 150
 };
 const HTML_FIELDS = ["intro_html", "consent_html", "thanks_html"];
+const MENU_MODES = ["BOTH", "FOOD", "SNACKS"];
 const BOOL_FIELDS = ["ask_volunteer", "ask_cultural", "registration_open", "food_open", "sweets_enabled"];
 const IMAGE_KINDS = ["banner", "partner"];
 
@@ -73,6 +74,8 @@ function createEvents(pool) {
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)`);
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS events_one_current ON events ((TRUE)) WHERE is_current`);
+    // What Click2Eat sells at this event: BOTH (food and snacks), FOOD only or SNACKS only.
+    await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS menu_mode VARCHAR(10) NOT NULL DEFAULT 'BOTH'`);
     await pool.query(`CREATE TABLE IF NOT EXISTS event_images (
       event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
       kind VARCHAR(20) NOT NULL,
@@ -158,7 +161,7 @@ function createEvents(pool) {
       introHtml: ev.intro_html, consentHtml: ev.consent_html, thanksHtml: ev.thanks_html,
       partnerName: ev.partner_name, partnerLogoUrl: ev.partner_name ? imageUrl(ev, "partner") : null, bannerUrl: imageUrl(ev, "banner"),
       askVolunteer: ev.ask_volunteer, askCultural: ev.ask_cultural,
-      registrationOpen: ev.registration_open, foodOpen: ev.food_open,
+      registrationOpen: ev.registration_open, foodOpen: ev.food_open, menuMode: ev.menu_mode || "BOTH",
       sweetsEnabled: ev.sweets_enabled, sweetsStartAt: ev.sweets_start_at
     };
   }
@@ -186,6 +189,7 @@ function createEvents(pool) {
     v.consent_html = cleanHtml(b.consentHtml);
     v.thanks_html = cleanHtml(b.thanksHtml);
     for (const [from, to] of [["askVolunteer", "ask_volunteer"], ["askCultural", "ask_cultural"], ["registrationOpen", "registration_open"], ["foodOpen", "food_open"], ["sweetsEnabled", "sweets_enabled"]]) v[to] = !!b[from];
+    v.menu_mode = MENU_MODES.includes(b.menuMode) ? b.menuMode : "BOTH";
     if (b.sweetsStartAt) {
       const t = new Date(b.sweetsStartAt);
       if (isNaN(t)) return { error: "Please check the sweet box start time." };
@@ -232,7 +236,7 @@ function createEvents(pool) {
     });
 
     const COLS = ["name", "short_name", "emoji", "event_date", "time_text", "venue", "summary", "adult_price", "child_price", "intro_html", "consent_html", "thanks_html",
-      "contacts_text", "partner_name", "ask_volunteer", "ask_cultural", "registration_open", "food_open", "sweets_enabled", "sweets_start_at"];
+      "contacts_text", "partner_name", "ask_volunteer", "ask_cultural", "registration_open", "food_open", "sweets_enabled", "sweets_start_at", "menu_mode"];
 
     app.post("/admin/events", requireEvents, async (req, res) => {
       const { values, error } = readForm(req.body);
@@ -321,7 +325,12 @@ function createEvents(pool) {
     await reload();
   }
 
-  const api = { ensureTables, reload, register, current, get, currentEventId, adminEventId, whenText, shortWhenText, publicView, setCurrentSwitch, cleanHtml };
+  // Menu categories guests can order at the current event.
+  function menuCategories(ev = current()) {
+    const mode = (ev && ev.menu_mode) || "BOTH";
+    return mode === "BOTH" ? ["FOOD", "SNACKS"] : [mode];
+  }
+  const api = { menuCategories, ensureTables, reload, register, current, get, currentEventId, adminEventId, whenText, shortWhenText, publicView, setCurrentSwitch, cleanHtml };
   createEvents.instance = api;
   return api;
 }

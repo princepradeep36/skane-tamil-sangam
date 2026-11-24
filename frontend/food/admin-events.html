@@ -176,6 +176,10 @@
       <div class="switches">
         <div class="sw"><div><b>Registration open</b><span>New registrations and changes. When closed, families can still find their booking and pay.</span></div><label class="switch"><input type="checkbox" id="registrationOpen"><span class="slider"></span></label></div>
         <div class="sw"><div><b>Click2Eat food ordering open</b><span>Only paid registrations of this event can order food.</span></div><label class="switch"><input type="checkbox" id="foodOpen"><span class="slider"></span></label></div>
+        <div class="sw"><div><b>What Click2Eat sells</b><span>Guests only see what is on sale. Pick "Snacks only" when there are no food stalls.</span></div>
+          <select id="menuMode" style="font:inherit;padding:8px 10px;border-radius:9px;border:1px solid #d0d5dd;background:#fff;max-width:48%">
+            <option value="BOTH">Food and snacks</option><option value="FOOD">Food only</option><option value="SNACKS">Snacks only</option>
+          </select></div>
       </div>
       <p class="hint" style="margin:8px 0 0">These only matter while this is the current event. Site Controls changes the same switches.</p>
     </fieldset>
@@ -272,6 +276,7 @@ function toLocalInput(iso) {
 function fillForm(ev, { keepDates } = {}) {
   FIELDS.forEach(f => { $(f).value = ev[f] ?? ''; });
   SWITCHES.forEach(f => { $(f).checked = !!ev[f]; });
+  $('menuMode').value = ev.menuMode || 'BOTH';
   $('sweetsStartAt').value = keepDates === false ? '' : toLocalInput(ev.sweetsStartAt);
   setHtml('introHtml', ev.introHtml);
   setHtml('consentHtml', ev.consentHtml);
@@ -335,6 +340,7 @@ function formData() {
   d.adultPrice = Number(d.adultPrice || 0);
   d.childPrice = Number(d.childPrice || 0);
   SWITCHES.forEach(f => { d[f] = $(f).checked; });
+  d.menuMode = $('menuMode').value;
   d.sweetsStartAt = $('sweetsStartAt').value ? new Date($('sweetsStartAt').value).toISOString() : '';
   d.introHtml = getHtml('introHtml');
   d.consentHtml = getHtml('consentHtml');

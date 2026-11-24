@@ -365,7 +365,7 @@
 
         async function loadVendors() {
             try {
-                const [res, settings] = await Promise.all([fetch(`${API}/vendors`), fetch(`${API}/settings`)]);
+                const [res, settings] = await Promise.all([fetch(`${API}/vendors?for=menu`), fetch(`${API}/settings`)]);
                 const vendors = await res.json();
                 vendors.forEach(v => vendorsCache[v.name] = v); // Map by name for easy lookup
                 orderingOpen = settings.ok ? (await settings.json()).food_ordering_enabled !== false : true;

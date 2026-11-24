@@ -253,6 +253,7 @@
             <div class="body"><p class="name">${esc(ev.emoji || '')} ${esc(ev.name || ev.shortName || 'Our next event')}</p>
             <div class="when">${esc([ev.whenText || ev.shortWhenText, ev.venue].filter(Boolean).join(' · '))}</div>`;
     }
+    const foodWord = ev => ({ FOOD: 'food', SNACKS: 'snacks' }[ev && ev.menuMode] || 'food & snacks');
     function isOver(ev) { return ev && ev.date && new Date(ev.date + 'T23:59:59') < new Date(); }
 
     function renderEventLoggedOut(ev) {
@@ -263,7 +264,7 @@
             ${open ? `<div class="status info"><span class="ico">🎟️</span><div><b>Registration is open</b><span class="muted">Log in to see your booking, or find it with your phone number.</span></div></div>` : ''}
             <div class="btns">${open ? `<a class="btn gold" href="event-registration.html">Register</a>` : `<a class="btn gold" href="events.html#diwali">See event</a>`}
             <a class="btn ghost" href="event-registration.html#lookup-panel">Find my booking</a></div>
-            ${ev.foodOpen ? `<div class="btns one"><a class="btn plain" href="food/menu.html">🍛 Order food (Click2Eat)</a></div>` : ''}
+            <div class="btns one">${ev.foodOpen ? `<a class="btn plain" href="food/menu.html">🍛 Order ${foodWord(ev)} (Click2Eat)</a>` : `<a class="btn plain" href="food/index.html">🍛 Pay or view my food orders</a>`}</div>
             </div>`;
         card.hidden = false;
     }
@@ -322,7 +323,7 @@
                 <span class="amt">${kr(o.total)}</span></li>`).join('')}</ul>`
             : `<p class="muted" style="margin:0">No food orders yet.</p>`;
         card.innerHTML = `<h2>🍛 My food orders <span class="count">${orders.length ? orders.length : ''}</span></h2>${list}
-            <div class="btns">${ev && ev.foodOpen ? `<a class="btn gold" href="food/menu.html?${q}">Order food</a>` : ''}
+            <div class="btns">${ev && ev.foodOpen ? `<a class="btn gold" href="food/menu.html?${q}">Order ${foodWord(ev)}</a>` : ''}
             ${orders.length ? `<a class="btn ghost" href="food/receipts.html?phone=${encodeURIComponent(phone)}">Receipts</a>` : ''}
             ${orders.some(o => o.payment_status !== 'PAID') ? `<a class="btn primary" href="food/payment.html?phone=${encodeURIComponent(phone)}">💳 Pay</a>` : ''}</div>`;
         const n = card.querySelectorAll('.btns .btn').length;

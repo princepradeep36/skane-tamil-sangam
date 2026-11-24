@@ -90,7 +90,7 @@ async function getSettings() {
   result.rows.forEach(r => { if (r.key in settings) settings[r.key] = r.value; });
   const ev = events.current();
   for (const [key, column] of Object.entries(EVENT_SWITCHES)) settings[key] = ev ? !!ev[column] : false;
-  if (ev) settings.event = { id: ev.id, name: ev.name, shortName: ev.short_name };
+  if (ev) settings.event = { id: ev.id, name: ev.name, shortName: ev.short_name, menuMode: ev.menu_mode || "BOTH" };
   return settings;
 }
 
@@ -299,6 +299,13 @@ app.get("/vendors", async (req, res) => {
     GROUP BY v.id 
     ORDER BY v.id
   `, [events.currentEventId()]);
+  // Guest menus (?for=menu) only show what this event sells (Food only, Snacks only or both), and
+  // leave out stalls with nothing to show. Vendor and admin pages get every item.
+  if (req.query.for === "menu") {
+    const allowed = events.menuCategories();
+    const categoryOf = m => (m.category === "SNACKS" ? "SNACKS" : "FOOD");
+    return res.json(vendors.rows.map(v => ({ ...v, menu: v.menu.filter(m => allowed.includes(categoryOf(m))) })).filter(v => v.menu.length));
+  }
   res.json(vendors.rows);
 });
 
@@ -450,12 +457,13 @@ async function orderProblem(cart) {
     for (const item of cart[vendorId].items || []) wanted.set(Number(item.id), (wanted.get(Number(item.id)) || 0) + Number(item.quantity || 0));
   }
   if (!wanted.size) return "Your cart is empty.";
-  const q = await pool.query(`SELECT m.id, m.item_name, m.is_active, m.sold_out, m.max_quantity, v.closed, v.name AS vendor,
+  const q = await pool.query(`SELECT m.id, m.item_name, m.is_active, m.sold_out, m.max_quantity, m.category, v.closed, v.name AS vendor,
       (SELECT COALESCE(SUM(si.quantity), 0) FROM order_items si JOIN orders so ON so.id = si.order_id WHERE si.menu_item_id = m.id AND so.event_id = $2)::int AS sold
     FROM menu_items m JOIN vendors v ON v.id = m.vendor_id WHERE m.id = ANY($1)`, [[...wanted.keys()], events.currentEventId()]);
   for (const id of wanted.keys()) if (!q.rows.some(r => r.id === id)) return "An item in your cart is no longer on the menu. Please refresh the page.";
   for (const r of q.rows) {
     if (r.closed) return `${r.vendor} is closed now, so ${r.item_name} can't be ordered. Please remove it from your cart.`;
+    if (!events.menuCategories().includes(r.category === "SNACKS" ? "SNACKS" : "FOOD")) return `${r.item_name} isn't sold at this event. Please remove it from your cart.`;
     if (!r.is_active || r.sold_out) return `${r.item_name} is sold out. Please remove it from your cart.`;
     const max = Number(r.max_quantity) || 0;
     if (max > 0 && r.sold + wanted.get(r.id) > max) {
@@ -531,11 +539,12 @@ async function findUnpaidOrder(req, res) {
 // Returns an error message when adding `extra` more of a menu item isn't possible, otherwise null.
 async function cannotAdd(menuItemId, extra) {
   if (!(await getSettings()).food_ordering_enabled) return "Food ordering is closed now, so you can only lower quantities or remove items.";
-  const q = await pool.query(`SELECT m.item_name, m.max_quantity, m.is_active, m.sold_out, v.closed, v.name AS vendor,
+  const q = await pool.query(`SELECT m.item_name, m.max_quantity, m.is_active, m.sold_out, m.category, v.closed, v.name AS vendor,
     (SELECT COALESCE(SUM(si.quantity), 0) FROM order_items si JOIN orders so ON so.id = si.order_id WHERE si.menu_item_id = m.id AND so.event_id = $2)::int AS sold
     FROM menu_items m JOIN vendors v ON v.id = m.vendor_id WHERE m.id = $1`, [menuItemId, events.currentEventId()]);
   const item = q.rows[0];
   if (!item || !item.is_active) return "This item isn't available any more.";
+  if (!events.menuCategories().includes(item.category === "SNACKS" ? "SNACKS" : "FOOD")) return `${item.item_name} isn't sold at this event.`;
   if (item.closed) return `${item.vendor} is closed now, so you can only lower quantities or remove items.`;
   if (item.sold_out) return `${item.item_name} is sold out.`;
   const max = Number(item.max_quantity) || 0;
