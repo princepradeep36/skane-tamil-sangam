@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Admin Login | Skåne Tamil Sangam</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root { --primary: #4f46e5; --ink: #0f172a; --muted: #64748b; --bg: #f5f6fb; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--ink);
+    background: radial-gradient(1200px 500px at 50% -120px, #e0e7ff 0%, rgba(224, 231, 255, 0) 70%), var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  .card { width: 100%; max-width: 400px; background: #fff; border: 1px solid #e8eaf2; border-radius: 20px; padding: 34px 30px 28px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 12px 32px rgba(15, 23, 42, .08); }
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
+  .brand img { width: 52px; height: 52px; object-fit: contain; }
+  .brand b { display: block; font-size: 1.05rem; letter-spacing: .02em; }
+  .brand span { color: var(--muted); font-size: .85rem; }
+  h1 { font-size: 1.5rem; margin: 0 0 6px; letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin: 0 0 24px; font-size: .95rem; }
+  label { display: block; font-weight: 600; font-size: .85rem; margin: 0 0 6px; color: #334155; }
+  input { width: 100%; padding: 13px 14px; border: 1.5px solid #e2e8f0; border-radius: 12px; font: inherit; font-size: 1rem; margin-bottom: 16px; background: #fcfcfe; }
+  input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(79, 70, 229, .12); background: #fff; }
+  button { width: 100%; padding: 14px; border: 0; border-radius: 12px; background: var(--primary); color: #fff; font: inherit; font-weight: 700; font-size: 1.02rem; cursor: pointer; margin-top: 4px; }
+  button:hover { background: #4338ca; }
+  button:disabled { opacity: .6; cursor: wait; }
+  .error { display: none; margin-top: 16px; padding: 11px 13px; border-radius: 10px; background: #fff1f2; border: 1px solid #fecdd3; color: #be123c; font-size: .9rem; }
+  .foot { margin-top: 22px; padding-top: 16px; border-top: 1px solid #f1f5f9; font-size: .85rem; color: var(--muted); text-align: center; }
+  .foot a { color: var(--primary); font-weight: 600; text-decoration: none; }
+</style>
+</head>
+<body>
+  <form class="card" id="form" autocomplete="on">
+    <div class="brand">
+      <img src="/logo.png" alt="">
+      <div><b>SKÅNE TAMIL SANGAM</b><span>Admin</span></div>
+    </div>
+    <h1>Admin login</h1>
+    <p class="sub">For Sangam admins and volunteer staff accounts.</p>
+    <label for="username">Username</label>
+    <input id="username" name="username" autocomplete="username" autocapitalize="none" required>
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <button type="submit" id="btn">Sign in</button>
+    <div class="error" id="error"></div>
+    <div class="foot">Food stall vendor? <a href="/food/login.html">Use the Click2Eat login</a></div>
+  </form>
+<script>
+const form = document.getElementById('form');
+const err = document.getElementById('error');
+function show(text) { err.textContent = text; err.style.display = 'block'; }
+
+// Already signed in as admin or staff: go straight on.
+(function () {
+  const role = sessionStorage.getItem('user_role');
+  if (sessionStorage.getItem('auth_token') && ['admin', 'staff', 'scanner'].includes(role)) location.replace('/food/admin.html?admin=true');
+})();
+
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+  err.style.display = 'none';
+  const btn = document.getElementById('btn');
+  btn.disabled = true;
+  try {
+    const res = await fetch('/food-api/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: document.getElementById('username').value.trim(), password: document.getElementById('password').value })
+    });
+    if (!res.ok) throw new Error('Wrong username or password.');
+    const data = await res.json();
+    if (data.role === 'vendor') throw new Error('This is a vendor account. Please sign in on the Click2Eat login instead.');
+    sessionStorage.clear();
+    sessionStorage.setItem('user_role', data.role);
+    sessionStorage.setItem('auth_token', data.token);
+    sessionStorage.setItem('vendor_id', '');
+    sessionStorage.setItem('user_perms', JSON.stringify(data.permissions || []));
+    const perms = data.permissions || [];
+    // Scanner-only accounts open straight on the QR scanner.
+    const scannerOnly = data.role === 'scanner' || (data.role === 'staff' && perms.length && perms.every(p => ['checkin', 'sweets', 'scan_override'].includes(p)));
+    location.href = scannerOnly ? '/food/admin-sweets.html' : '/food/admin.html?admin=true';
+  } catch (e2) {
+    show(e2.message || 'Could not sign in. Please try again.');
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

@@ -4,12 +4,20 @@ const { amountDue } = require("./mailer");
 const { bookingUrl, sweetsPassUrl, sweetsStartText } = require("./booking-link");
 const FEEDBACK_URL = `${(process.env.SITE_URL || "https://skanetamilsangam.duckdns.org").replace(/\/$/, "")}/feedback.html`;
 
-const HEADER = "🪔 *Skåne Tamil Sangam – Diwali 2026* 🪔";
-const FOOTER = `_ℹ️ Please don't reply to this message._
+const events = require("./events");
 
-📅 Sun 15 Nov · 10:00 AM · Tryckeriet
+// Header and footer use the registration's event (Events page): name, emoji, date, time and venue.
+const ev = r => events.of(r);
+const short = r => ev(r).short_name || ev(r).name || "our event";
+const HEADER = r => `${ev(r).emoji || "🎉"} *Skåne Tamil Sangam – ${short(r)}* ${ev(r).emoji || "🎉"}`;
+const FOOTER = r => {
+  const when = events.instance ? events.instance.shortWhenText(ev(r)) : "";
+  return `_ℹ️ Please don't reply to this message._
+${when ? `
+📅 ${when}` : ""}
 Nandri! 🙏
 – Skåne Tamil Sangam`;
+};
 
 // Amount, Swish details and the personal link that opens the family's booking.
 function paymentBlock(r) {
@@ -17,7 +25,7 @@ function paymentBlock(r) {
   if (r.payment_status === "PAID" || due <= 0) return "";
   return `💰 *Amount:* ${due} kr
 📱 *Swish:* ${r.swish_number || "will be shared soon"}
-📝 *Message:* Diwali 2026 Reg ${r.id}
+📝 *Message:* ${short(r)} Reg ${r.id}
 
 👉 *Pay & confirm here:*
 ${bookingUrl(r)}
@@ -27,7 +35,7 @@ After paying, upload your Swish screenshot and tap *Mark as Paid*. ✅`;
 
 function message(r, sentence, note) {
   const payment = paymentBlock(r);
-  return `${HEADER}
+  return `${HEADER(r)}
 
 Vanakkam ${r.first_name} 🙏
 ${sentence}${payment ? `
@@ -36,26 +44,29 @@ ${payment}` : ""}${note ? `
 
 ${note}` : ""}
 
-${FOOTER}`;
+${FOOTER(r)}`;
 }
 
 const ALREADY_PAID_NOTE = "💡 *Already paid?* Please open the link above, upload your payment screenshot on the event registration page and tap *Mark as Paid*, so we can confirm it.";
 
 const MESSAGES = {
-  PAYMENT_OPEN: r => message(r, "Payment for Diwali 2026 is now open."),
+  PAYMENT_OPEN: r => message(r, `Payment for ${short(r)} is now open.`),
   PAYMENT_REMINDER: r => message(r, "Just a gentle reminder that your registration payment is still pending.", ALREADY_PAID_NOTE),
   // Welcome message with the family's personal QR code, used at the entrance (check-in) and at the
   // sweets counter (one box per adult).
   SWEETS_PASS: r => {
     const adults = Number(r.adults_count) || 0, kids612 = Number(r.kids_6_12_count) || 0, kidsUnder6 = Number(r.kids_below_6_count) || 0;
     const payment = paymentBlock(r);
-    const start = sweetsStartText();
-    return `${HEADER}
+    const e = ev(r);
+    const sweets = !!e.sweets_enabled;
+    const start = sweetsStartText(e);
+    const contacts = String(e.contacts_text || "").trim();
+    return `${HEADER(r)}
 
 Vanakkam ${r.first_name} 🙏
-Thank you for registering for our *Diwali celebration*! 🎉 We are happy to welcome you.
+Thank you for registering for *${short(r)}*! 🎉 We are happy to welcome you.
 
-🎟️ *Your Diwali QR code*
+🎟️ *Your QR code*
 ${sweetsPassUrl(r)}
 
 👨‍👩‍👧 *Your registration #${r.id}*
@@ -64,32 +75,31 @@ Kids 6–12: ${kids612}
 Kids under 6: ${kidsUnder6}
 Total: ${adults + kids612 + kidsUnder6} people
 
-Please use this *one QR code* twice:
+${sweets ? `Please use this *one QR code* twice:
 1️⃣ *At the entrance:* show it to check in your registration.
 2️⃣ *At the sweets counter:* show it again to collect *${adults} sweet box${adults === 1 ? "" : "es"}* (one for each adult).
-⚠️ Entrance check-in is mandatory. If you skip it, your QR code will not work at the sweets counter.
+⚠️ Entrance check-in is mandatory. If you skip it, your QR code will not work at the sweets counter.${start ? `
 
-🕒 *Sweet box distribution starts at ${start.time}* on ${start.day}. Until then the QR code won't work for sweets.${payment ? `
+🕒 *Sweet box distribution starts at ${start.time}* on ${start.day}. Until then the QR code won't work for sweets.` : ""}` : `Please show this QR code *at the entrance* to check in your registration.`}${payment ? `
 
-${payment}` : ""}
+${payment}` : ""}${contacts ? `
 
 📞 *If you have any queries, please contact:*
-Ajish: 0722199316
-Pradeep: 0725283137
+${contacts}` : ""}
 
-${FOOTER}`;
+${FOOTER(r)}`;
   },
   // After the event: ask every family to fill in the feedback form.
-  FEEDBACK: r => `${HEADER}
+  FEEDBACK: r => `${HEADER(r)}
 
 Vanakkam ${r.first_name} 🙏
-Thank you for celebrating *Diwali 2026* with us! 🎉 It was wonderful to see you.
+Thank you for celebrating *${short(r)}* with us! 🎉 It was wonderful to see you.
 
 📝 *Please share your feedback*
 It takes about 2 minutes and helps us make our next event even better. You can also rate the food stalls.
 👉 ${FEEDBACK_URL}
 
-Looking forward to seeing you at our future events! 🪔
+Looking forward to seeing you at our future events! ${ev(r).emoji || "🎉"}
 
 Nandri! 🙏
 – Skåne Tamil Sangam`,
@@ -97,13 +107,13 @@ Nandri! 🙏
   CUSTOM: (r, custom) => {
     const fill = s => String(s || "").replace(/\{first_name\}/g, r.first_name).replace(/\{amount_due\}/g, String(amountDue(r))).replace(/\{registration_id\}/g, String(r.id));
     const payment = custom.includePayment ? paymentBlock(r) : "";
-    return `${HEADER}
+    return `${HEADER(r)}
 
 ${fill(custom.body)}${payment ? `
 
 ${payment}` : ""}
 
-${FOOTER}`;
+${FOOTER(r)}`;
   }
 };
 

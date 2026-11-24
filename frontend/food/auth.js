@@ -38,8 +38,12 @@ async function authFetch(url, options={}) {
   if (!token) { logout(); throw new Error("Authentication required"); }
   const headers=new Headers(options.headers || {});
   headers.set("Authorization", `Bearer ${token}`);
+  // The event chosen in the admin pages' event picker (event-bar.js); the server uses the current event without it.
+  // Only pages with the picker send it, so live pages (scanner, live dashboard) always show the current event.
+  const eventId=window.EVENT_PICKER ? sessionStorage.getItem("admin_event_id") : null;
+  if (eventId && !headers.has("X-Event-Id")) headers.set("X-Event-Id", eventId);
   const response=await fetch(url,{...options,headers});
-  if (response.status===401 || response.status===403) { sessionStorage.clear(); window.location.replace("login.html"); throw new Error("Session expired or access denied"); }
+  if (response.status===401 || response.status===403) { const to=loginPage(); sessionStorage.clear(); window.location.replace(to); throw new Error("Session expired or access denied"); }
   return response;
 }
 // Re-reads the staff member's areas from the server (an admin may have changed them), then runs done().
@@ -50,7 +54,14 @@ async function refreshAccess(done) {
   } catch (e) { /* keep what we have */ }
   if (done) done();
 }
-function logout(){ sessionStorage.clear(); window.location.replace("login.html"); }
+// Vendors sign in on the Click2Eat login; admins and staff on the separate admin login (/admin/).
+function loginPage(){
+  const role=sessionStorage.getItem("user_role");
+  if (role === "vendor") return "login.html";
+  if (role) return "/admin/";
+  return /[?&]admin=true/.test(location.search) || /\/admin[^/]*\.html$/.test(location.pathname) ? "/admin/" : "login.html";
+}
+function logout(){ const to=loginPage(); sessionStorage.clear(); window.location.replace(to); }
 
 // WhatsApp links.
 // Phones: wa.me (opens the WhatsApp app). Computers: whatsapp://send, which opens WhatsApp Desktop

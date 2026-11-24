@@ -4,8 +4,13 @@
 const nodemailer = require("nodemailer");
 const pool = require("./db");
 const { bookingUrl } = require("./booking-link");
+const events = require("./events");
 
-const EVENT_LINE = "Sunday 15 November 2026 at Tryckeriet, from 10:00 AM";
+// Name, emoji and "Sunday 15 November 2026 at Tryckeriet, from 10:00 AM" of the registration's event.
+function eventInfo(r) {
+  const ev = events.of(r);
+  return { name: ev.name || "our event", short: ev.short_name || ev.name || "our event", emoji: ev.emoji || "🎉", when: events.instance ? events.instance.whenText(ev) : "" };
+}
 
 let transporter = null;
 function configured() {
@@ -34,16 +39,17 @@ function amountDue(r) {
 }
 
 // One festive layout for every email. bodyHtml must already be escaped.
-function layout(title, bodyHtml) {
+function layout(title, bodyHtml, r) {
+  const e = eventInfo(r || {});
   return `<!doctype html><html><body style="margin:0;background:#fdfaf6;font-family:Arial,Helvetica,sans-serif;color:#1c1c1e">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fdfaf6;padding:24px 12px"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #f4e2b8">
 <tr><td style="background:#0056b3;color:#fff;padding:22px 26px">
 <div style="font-size:13px;letter-spacing:2px;color:#ffc107;font-weight:bold">SKÅNE TAMIL SANGAM</div>
-<div style="font-size:22px;font-weight:bold;margin-top:6px">🪔 ${esc(title)}</div></td></tr>
+<div style="font-size:22px;font-weight:bold;margin-top:6px">${esc(e.emoji)} ${esc(title)}</div></td></tr>
 <tr><td style="padding:24px 26px;font-size:15px;line-height:1.6">${bodyHtml}</td></tr>
 <tr><td style="padding:16px 26px;background:#fff8e6;color:#6b5b2e;font-size:12px;line-height:1.5">
-Diwali Celebration 2026 · ${esc(EVENT_LINE)}<br>You are receiving this because you registered for this event. Reply to this email if you have questions.<br>Found this in Spam or Junk? Please mark it as "Not spam" so our next emails reach your inbox.</td></tr>
+${esc(e.name)}${e.when ? ` · ${esc(e.when)}` : ""}<br>You are receiving this because you registered for this event. Reply to this email if you have questions.<br>Found this in Spam or Junk? Please mark it as "Not spam" so our next emails reach your inbox.</td></tr>
 </table></td></tr></table></body></html>`;
 }
 
@@ -62,47 +68,45 @@ function paymentBlock(r) {
   const due = amountDue(r);
   if (r.payment_status === "PAID" || due <= 0) return "";
   if (!r.swish_number) return `<p><b>Payment:</b> ${due} kr. The payment details will be shared soon.</p>`;
-  return `<p style="background:#fff8e6;border:1px solid #f4d48a;border-radius:12px;padding:12px 14px"><b>Amount to pay: ${due} kr</b><br>Swish number: <b>${esc(r.swish_number)}</b><br>Message: Diwali 2026 Reg ${esc(r.id)}</p>
+  return `<p style="background:#fff8e6;border:1px solid #f4d48a;border-radius:12px;padding:12px 14px"><b>Amount to pay: ${due} kr</b><br>Swish number: <b>${esc(r.swish_number)}</b><br>Message: ${esc(eventInfo(r).short)} Reg ${esc(r.id)}</p>
 <p>After paying, open <a href="${esc(bookingUrl(r))}">your booking</a>, upload the Swish screenshot and tap <b>Mark as Paid</b>.</p>`;
 }
 
+const seeYou = e => e.when ? `<p>See you on ${esc(e.when)}!</p>` : "";
+
 const TEMPLATES = {
-  REGISTRATION: r => ({
-    subject: "Your Diwali 2026 registration is confirmed",
+  REGISTRATION: r => { const e = eventInfo(r); return {
+    subject: `Your ${e.short} registration is confirmed`,
     html: layout("Registration confirmed", `<p>Vanakkam ${esc(r.first_name)},</p>
-<p>Thank you for registering for <b>Skåne Tamil Sangam Diwali 2026</b>. Here are your details:</p>
+<p>Thank you for registering for <b>Skåne Tamil Sangam ${esc(e.short)}</b>. Here are your details:</p>
 <p><b>Registration number:</b> ${esc(r.id)}<br><b>Participants:</b> ${esc(participants(r))}<br><b>Registration fee:</b> ${esc(r.total_amount)} kr</p>
 ${paymentBlock(r)}
 <p>You can view or change your booking at any time with this button.</p>${button("Open my registration", bookingUrl(r))}
-<p>See you on ${esc(EVENT_LINE)}!</p>`)
-  }),
-  PAYMENT_RECEIVED: r => ({
-    subject: "Payment received – Diwali 2026",
+${seeYou(e)}`, r) }; },
+  PAYMENT_RECEIVED: r => { const e = eventInfo(r); return {
+    subject: `Payment received – ${e.short}`,
     html: layout("Payment received", `<p>Vanakkam ${esc(r.first_name)},</p>
-<p>We have received your payment confirmation for registration <b>${esc(r.id)}</b>. Your registration for <b>Skåne Tamil Sangam Diwali 2026</b> is complete. Thank you!</p>
+<p>We have received your payment confirmation for registration <b>${esc(r.id)}</b>. Your registration for <b>Skåne Tamil Sangam ${esc(e.short)}</b> is complete. Thank you!</p>
 <p><b>Participants:</b> ${esc(participants(r))}<br><b>Paid:</b> ${esc(Math.min(Number(r.paid_amount || r.total_amount), Number(r.total_amount)))} kr</p>
-<p>See you on ${esc(EVENT_LINE)}!</p>`)
-  }),
-  PAYMENT_OPEN: r => ({
-    subject: "Payment is now open – Diwali 2026",
+${seeYou(e)}`, r) }; },
+  PAYMENT_OPEN: r => { const e = eventInfo(r); return {
+    subject: `Payment is now open – ${e.short}`,
     html: layout("Payment is now open", `<p>Vanakkam ${esc(r.first_name)},</p>
-<p>Payment for <b>Skåne Tamil Sangam Diwali 2026</b> is now open. Please pay your registration fee by Swish.</p>
-${paymentBlock(r)}${button("Pay for my registration", bookingUrl(r))}`)
-  }),
-  PAYMENT_REMINDER: r => ({
-    subject: "Reminder: please complete your Diwali 2026 payment",
+<p>Payment for <b>Skåne Tamil Sangam ${esc(e.short)}</b> is now open. Please pay your registration fee by Swish.</p>
+${paymentBlock(r)}${button("Pay for my registration", bookingUrl(r))}`, r) }; },
+  PAYMENT_REMINDER: r => { const e = eventInfo(r); return {
+    subject: `Reminder: please complete your ${e.short} payment`,
     html: layout("Payment reminder", `<p>Vanakkam ${esc(r.first_name)},</p>
-<p>This is a friendly reminder that the payment for your Diwali 2026 registration (number <b>${esc(r.id)}</b>) is still pending.</p>
+<p>This is a friendly reminder that the payment for your ${esc(e.short)} registration (number <b>${esc(r.id)}</b>) is still pending.</p>
 ${paymentBlock(r)}${button("Pay now", bookingUrl(r))}
-<p>If you have already paid, please upload your Swish screenshot and tap Mark as Paid on the registration page so we can confirm it.</p>`)
-  }),
+<p>If you have already paid, please upload your Swish screenshot and tap Mark as Paid on the registration page so we can confirm it.</p>`, r) }; },
   // Admin-written message. {first_name}, {amount_due} and {registration_id} are filled in per person.
   CUSTOM: (r, custom) => {
     const fill = s => String(s || "").replace(/\{first_name\}/g, r.first_name).replace(/\{amount_due\}/g, String(amountDue(r))).replace(/\{registration_id\}/g, String(r.id));
     const body = esc(fill(custom.body)).replace(/\n/g, "<br>");
     return {
       subject: fill(custom.subject).slice(0, 200),
-      html: layout(fill(custom.subject).slice(0, 120), `<p>${body}</p>${custom.includePayment ? paymentBlock(r) : ""}${button("Open my registration", bookingUrl(r))}`)
+      html: layout(fill(custom.subject).slice(0, 120), `<p>${body}</p>${custom.includePayment ? paymentBlock(r) : ""}${button("Open my registration", bookingUrl(r))}`, r)
     };
   }
 };

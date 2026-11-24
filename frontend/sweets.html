@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Diwali QR Code | Skåne Tamil Sangam</title>
+<title>Your QR Code | Skåne Tamil Sangam</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 *{box-sizing:border-box}
@@ -40,9 +40,9 @@ footer a{color:#ffd76a}
 </style>
 </head>
 <body>
-<header><b>🪔 Diwali 2026</b><span>Skåne Tamil Sangam</span></header>
+<header><b id="ev-head">🎟️ Event QR code</b><span>Skåne Tamil Sangam</span></header>
 <div class="pass" id="pass"><p>Loading your QR code…</p></div>
-<footer>📅 Sun 15 Nov · 10:00 AM · Tryckeriet<br><a href="/">skanetamilsangam.duckdns.org</a></footer>
+<footer><span id="ev-when"></span><a href="/">skanetamilsangam.duckdns.org</a></footer>
 <script>
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const box = document.getElementById('pass');
@@ -53,19 +53,24 @@ const code = new URLSearchParams(location.search).get('pass') || '';
     const r = await fetch(`/food-api/event/sweets-pass/${encodeURIComponent(code)}`, { cache: 'no-store' });
     const p = await r.json().catch(() => ({}));
     if (!r.ok) { box.innerHTML = `<div class="state bad">${esc(p.error || 'This QR code could not be found.')}</div>`; return; }
+    const ev = p.event || {};
+    if (ev.shortName) document.getElementById('ev-head').textContent = `${ev.emoji || ''} ${ev.shortName}`.trim();
+    if (ev.whenText) document.getElementById('ev-when').innerHTML = `📅 ${esc(ev.whenText)}<br>`;
+    if (p.pastEvent) { box.innerHTML = `<div class="state bad">This QR code was for ${esc(ev.shortName || 'an earlier event')}, which is over.</div>`; return; }
+    const sweets = p.sweetsEnabled !== false;
     const boxes = `${p.boxes} sweet box${p.boxes === 1 ? '' : 'es'}`;
     const at = d => esc(new Date(d).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }));
-    const startTime = esc(new Date(p.startsAt).toLocaleString('en-GB', { timeZone: 'Europe/Stockholm', hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase());
-    const startDay = esc(new Date(p.startsAt).toLocaleString('en-GB', { timeZone: 'Europe/Stockholm', weekday: 'long', day: 'numeric', month: 'short' }));
+    const startTime = !p.startsAt ? '' : esc(new Date(p.startsAt).toLocaleString('en-GB', { timeZone: 'Europe/Stockholm', hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase());
+    const startDay = !p.startsAt ? '' : esc(new Date(p.startsAt).toLocaleString('en-GB', { timeZone: 'Europe/Stockholm', weekday: 'long', day: 'numeric', month: 'short' }));
     const unpaid = p.paid ? '' : `Your registration payment is still pending${p.amountDue ? ` (${p.amountDue} kr)` : ''}. Please pay before the event.`;
     let state = '';
     if (p.cancelled) state = '<div class="state bad">This registration was cancelled, so this QR code can\'t be used.</div>';
-    else if (p.collected) {
+    else if (sweets && p.collected) {
       box.classList.add('used');
       state = `<div class="state used">✓ Sweet boxes already collected<br><span style="font-weight:600">${p.collected.boxes} box${p.collected.boxes === 1 ? '' : 'es'} on ${at(p.collected.at)}</span></div>`;
-    } else if (!p.open) state = `<div class="state warn">🕒 Sweet box distribution starts at <b>${startTime}</b> on ${startDay}. Until then this QR code won't work for sweets, so please keep it safe.${unpaid ? `<br><br>${unpaid}` : ''}</div>`;
+    } else if (sweets && !p.open && p.startsAt) state = `<div class="state warn">🕒 Sweet box distribution starts at <b>${startTime}</b> on ${startDay}. Until then this QR code won't work for sweets, so please keep it safe.${unpaid ? `<br><br>${unpaid}` : ''}</div>`;
     else if (unpaid) state = `<div class="state warn">${unpaid}</div>`;
-    box.innerHTML = `<h1>🎟️ Your Diwali QR code</h1>
+    box.innerHTML = `<h1>🎟️ Your QR code</h1>
       <p class="who">${esc(p.name)} · Registration #${p.id}</p>
       <div class="people">
         <div><b>${p.adults}</b><span>Adults</span></div><div><b>${p.kids612}</b><span>Kids 6–12</span></div>
@@ -75,9 +80,9 @@ const code = new URLSearchParams(location.search).get('pass') || '';
       <div class="code">${esc(code)}</div>
       <ol class="steps">
         <li class="${p.checkedIn ? 'done' : ''}"><b>1</b><div><strong>At the entrance:</strong> show this QR code to check in.${p.checkedIn ? `<small>✓ Checked in ${at(p.checkedIn.at)}</small>` : ''}</div></li>
-        <li class="${p.collected ? 'done' : ''}"><b>2</b><div><strong>At the sweets counter:</strong> show it again to collect <strong>${esc(boxes)}</strong> (one per adult).${p.collected ? '<small>✓ Collected</small>' : ''}</div></li>
+        ${sweets ? `<li class="${p.collected ? 'done' : ''}"><b>2</b><div><strong>At the sweets counter:</strong> show it again to collect <strong>${esc(boxes)}</strong> (one per adult).${p.collected ? '<small>✓ Collected</small>' : ''}</div></li>` : ''}
       </ol>
-      ${p.checkedIn || p.cancelled ? '' : '<p class="mandatory">⚠️ Entrance check-in is mandatory. If you skip it, your QR code will not work at the sweets counter.</p>'}
+      ${!sweets || p.checkedIn || p.cancelled ? '' : '<p class="mandatory">⚠️ Entrance check-in is mandatory. If you skip it, your QR code will not work at the sweets counter.</p>'}
       ${state}`;
     if (typeof QRCode !== 'undefined') new QRCode(document.getElementById('qr'), { text: location.href, width: 512, height: 512, correctLevel: QRCode.CorrectLevel.M });
     else document.getElementById('qr').textContent = 'Show the code below at the counter.';

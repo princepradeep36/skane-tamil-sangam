@@ -75,7 +75,7 @@
             style="animation-delay: 0.2s; position: relative; z-index: 2;">
             <a href="events.html#diwali" class="home-notice" id="diwali-notice">
                 <span class="new">NEW</span>
-                <span>🪔 Diwali 2026 · Sunday 15 November at Tryckeriet — <span id="notice-status">registration is open</span></span>
+                <span><span id="notice-event">Our next event</span> — <span id="notice-status">registration is open</span></span>
                 <span class="go">See invitation →</span>
             </a><br>
             <div class="section-label"
@@ -92,9 +92,8 @@
             </p>
             <div style="display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap; margin-top: 3rem;">
                 
-                <a href="feedback.html" class="btn btn-outline"
-                    style="border-color: white; color: white; padding: 1.1rem 2.5rem; font-size: 1.05rem;">📝 Diwali 2026
-                    Feedback</a>
+                <a href="feedback.html" class="btn btn-outline" id="feedback-btn"
+                    style="border-color: white; color: white; padding: 1.1rem 2.5rem; font-size: 1.05rem;">📝 Event Feedback</a>
                 <a href="events.html" class="btn btn-outline"
                     style="border-color: white; color: white; padding: 1.1rem 2.5rem; font-size: 1.05rem;">Explore
                     Events →</a>
@@ -265,10 +264,20 @@
     <button class="back-to-top" id="back-to-top" aria-label="Back to top">↑</button>
 
     <script>
-        // The notice always links to the invitation; its wording follows Site Controls.
-        fetch('/food-api/settings', { cache: 'no-store' })
+        // The notice shows the current event (Admin → Events) and links to the invitation. It is hidden
+        // once the event day has passed; its wording follows whether registration is open.
+        fetch('/food-api/event/current', { cache: 'no-store' })
             .then(r => r.ok ? r.json() : null)
-            .then(st => { if (st && st.event_registration_enabled === false) document.getElementById('notice-status').textContent = 'see you there'; })
+            .then(ev => {
+                const notice = document.getElementById('diwali-notice');
+                if (!ev) { notice.style.display = 'none'; return; }
+                const day = ev.date ? new Date(ev.date + 'T12:00:00Z') : null;
+                const dayText = day ? `${day.toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })} ${day.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' })}` : '';
+                document.getElementById('notice-event').textContent = [`${ev.emoji} ${ev.shortName}`, [dayText, ev.venue && `at ${ev.venue}`].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+                document.getElementById('notice-status').textContent = ev.registrationOpen ? 'registration is open' : 'see you there';
+                document.getElementById('feedback-btn').textContent = `📝 ${ev.shortName} Feedback`;
+                if (ev.date && new Date(ev.date + 'T23:59:59') < new Date()) notice.style.display = 'none';
+            })
             .catch(() => { });
     </script>
     <script src="js/cms.js"></script>

@@ -1,4 +1,7 @@
-const { Pool } = require("pg");
+const { Pool, types } = require("pg");
+
+// DATE columns (event dates) as plain "YYYY-MM-DD" strings, not Date objects shifted by the time zone.
+types.setTypeParser(1082, value => value);
 
 const isLocalDocker = process.env.DB_SSL === "false";
 

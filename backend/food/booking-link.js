@@ -18,17 +18,20 @@ function validBookingKey(id, key) {
   return typeof key === "string" && key.length === expected.length && crypto.timingSafeEqual(Buffer.from(key), Buffer.from(expected));
 }
 
-// Sweet boxes are given from this moment (Swedish time); before it the counter needs an admin override.
-const SWEETS_OPEN_AT = new Date(process.env.SWEETS_OPEN_AT || "2026-11-15T15:45:00+01:00");
-const sweetsOpen = () => Date.now() >= SWEETS_OPEN_AT.getTime();
-// The start time families are told (the counter opens a little earlier, at SWEETS_OPEN_AT).
-const SWEETS_START_AT = new Date(process.env.SWEETS_START_AT || "2026-11-15T16:00:00+01:00");
-function sweetsStartText() {
-  const part = options => SWEETS_START_AT.toLocaleString("en-GB", { timeZone: "Europe/Stockholm", ...options });
+// Sweet boxes start at the event's "sweet boxes from" time (Events page). The counter opens 15 minutes
+// earlier as a buffer; before that it needs an admin override. No time set means the counter is open.
+const SWEETS_EARLY_MS = 15 * 60 * 1000;
+const sweetsStartAt = ev => (ev && ev.sweets_start_at ? new Date(ev.sweets_start_at) : null);
+const sweetsOpenAt = ev => { const t = sweetsStartAt(ev); return t ? new Date(t.getTime() - SWEETS_EARLY_MS) : null; };
+const sweetsOpen = ev => { const t = sweetsOpenAt(ev); return !t || Date.now() >= t.getTime(); };
+function sweetsStartText(ev) {
+  const t = sweetsStartAt(ev);
+  if (!t) return null;
+  const part = options => t.toLocaleString("en-GB", { timeZone: "Europe/Stockholm", ...options });
   return { day: part({ weekday: "long", day: "numeric", month: "short" }), time: part({ hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase() };
 }
 
-// Diwali sweet-box pass: "<id>-<signature>", shown as a QR code on sweets.html.
+// Event QR pass (entrance check-in and sweet boxes): "<id>-<signature>", shown as a QR code on sweets.html.
 function sweetsPassCode(id) {
   const sig = crypto.createHmac("sha256", process.env.JWT_SECRET || "").update(`sweets:${id}`).digest("base64url").slice(0, 12);
   return `${id}-${sig}`;
@@ -49,4 +52,4 @@ function readSweetsPass(value) {
   return code.length === expected.length && crypto.timingSafeEqual(Buffer.from(code), Buffer.from(expected)) ? Number(m[1]) : null;
 }
 
-module.exports = { bookingUrl, validBookingKey, sweetsPassCode, sweetsPassUrl, readSweetsPass, SWEETS_OPEN_AT, SWEETS_START_AT, sweetsOpen, sweetsStartText };
+module.exports = { bookingUrl, validBookingKey, sweetsPassCode, sweetsPassUrl, readSweetsPass, sweetsStartAt, sweetsOpenAt, sweetsOpen, sweetsStartText };

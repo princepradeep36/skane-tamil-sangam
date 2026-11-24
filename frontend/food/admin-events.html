@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Events | Sangam Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.snow.min.css">
+<style>
+  :root { --primary: #4f46e5; --ink: #0f172a; --muted: #64748b; --bg: #f5f6fb; --line: #e8eaf2; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 20px; font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  h1 { margin: 0; font-size: 1.7rem; letter-spacing: -.02em; }
+  .top p { margin: 4px 0 0; color: var(--muted); }
+  .btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 10px; padding: 9px 14px; font: inherit; font-weight: 600; font-size: .9rem; cursor: pointer; text-decoration: none; }
+  .btn:hover { border-color: #c7d2fe; }
+  .btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .btn.primary:hover { background: #4338ca; }
+  .btn.danger { color: #be123c; border-color: #fecdd3; }
+  .btn:disabled { opacity: .55; cursor: wait; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
+  .list { display: grid; gap: 10px; }
+  .ev { display: flex; align-items: center; gap: 14px; padding: 14px 16px; }
+  .ev .emo { width: 48px; height: 48px; border-radius: 14px; background: #eef2ff; display: grid; place-items: center; font-size: 1.6rem; flex: 0 0 48px; }
+  .ev .info { flex: 1; min-width: 0; }
+  .ev .info b { display: block; font-size: 1.02rem; }
+  .ev .info span { color: var(--muted); font-size: .86rem; }
+  .ev .acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .pill { display: inline-block; font-size: .75rem; font-weight: 700; border-radius: 999px; padding: 3px 9px; margin-left: 6px; vertical-align: 2px; }
+  .pill.cur { background: #dcfce7; color: #166534; }
+  .pill.open { background: #e0f2fe; color: #075985; }
+  .pill.closed { background: #f1f5f9; color: #475569; }
+  .editor { margin-top: 22px; padding: 22px; }
+  .editor h2 { margin: 0 0 4px; font-size: 1.3rem; }
+  .editor .lead { margin: 0 0 18px; color: var(--muted); font-size: .92rem; }
+  fieldset { border: 0; border-top: 1px solid #f1f5f9; padding: 18px 0 6px; margin: 0; }
+  legend { font-weight: 800; font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; color: var(--primary); padding: 0 8px 0 0; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
+  .grid.three { grid-template-columns: 2fr 1fr 1fr; }
+  .f { display: flex; flex-direction: column; gap: 6px; }
+  .f.wide { grid-column: 1 / -1; }
+  label.t { font-weight: 600; font-size: .86rem; color: #334155; }
+  .hint { color: var(--muted); font-size: .8rem; line-height: 1.4; }
+  input[type=text], input[type=number], input[type=date], input[type=datetime-local], textarea {
+    width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0; border-radius: 10px; font: inherit; font-size: .95rem; background: #fcfcfe; }
+  input:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, .12); background: #fff; }
+  textarea { resize: vertical; min-height: 70px; }
+  .rich { background: #fff; border-radius: 10px; }
+  .rich .ql-toolbar { border-radius: 10px 10px 0 0; border-color: #e2e8f0; }
+  .rich .ql-container { border-radius: 0 0 10px 10px; border-color: #e2e8f0; font: inherit; font-size: .95rem; min-height: 120px; }
+  .rich .ql-editor { min-height: 120px; }
+  .switches { display: grid; gap: 10px; }
+  .sw { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border: 1px solid #f1f5f9; border-radius: 12px; background: #fafbff; }
+  .sw b { display: block; font-size: .93rem; }
+  .sw span { color: var(--muted); font-size: .82rem; }
+  .switch { position: relative; display: inline-block; width: 50px; height: 28px; flex: 0 0 50px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; inset: 0; background: #d0d5dd; border-radius: 28px; cursor: pointer; transition: .2s; }
+  .slider:before { content: ""; position: absolute; width: 22px; height: 22px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; box-shadow: 0 1px 3px #0003; }
+  .switch input:checked + .slider { background: #16a34a; }
+  .switch input:checked + .slider:before { transform: translateX(22px); }
+  .img-box { border: 1.5px dashed #cbd5e1; border-radius: 12px; padding: 12px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; background: #fafbff; }
+  .img-box img { max-height: 110px; max-width: 100%; border-radius: 8px; background: #0b1b3a; }
+  .img-box img.logo { width: 80px; height: 80px; object-fit: cover; border-radius: 50%; background: #fff; }
+  .img-box .none { color: var(--muted); font-size: .88rem; }
+  .bar { position: sticky; bottom: 0; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 14px 0 4px; margin-top: 10px; background: linear-gradient(to top, #fff 70%, rgba(255,255,255,0)); }
+  .msg { font-size: .9rem; color: var(--muted); }
+  .msg.ok { color: #166534; font-weight: 600; }
+  .msg.err { color: #be123c; font-weight: 600; }
+  .note { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; font-size: .88rem; }
+  .copy-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; color: var(--muted); font-size: .9rem; }
+  .copy-row select { font: inherit; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line); background: #fff; }
+  [hidden] { display: none !important; }
+  @media (max-width: 640px) {
+    body { padding: 14px; }
+    .grid, .grid.three { grid-template-columns: 1fr; }
+    .ev { flex-wrap: wrap; }
+    .ev .acts { width: 100%; justify-content: flex-start; }
+    .editor { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>📅 Events</h1>
+      <p>Each event has its own registration page, prices, texts and banner. The current event is the one families see.</p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn primary" id="newBtn" type="button">＋ New event</button>
+      <a class="btn" href="admin.html?admin=true">Admin Home</a>
+    </div>
+  </div>
+
+  <div class="list" id="list"><div class="card ev">Loading…</div></div>
+
+  <form class="card editor" id="editor" hidden novalidate>
+    <h2 id="edTitle">Edit event</h2>
+    <p class="lead" id="edLead"></p>
+    <p class="note" id="notCurrentNote" hidden>This is not the current event, so families don't see it yet. When it is ready, press <b>Make current</b> in the list above.</p>
+    <div class="copy-row" id="copyRow" hidden>
+      Start from an earlier event's prices and texts:
+      <select id="copyFrom"><option value="">Empty form</option></select>
+    </div>
+
+    <fieldset>
+      <legend>Basics</legend>
+      <div class="grid">
+        <div class="f"><label class="t" for="name">Event name</label><input type="text" id="name" maxlength="150" placeholder="e.g. Pongal Vizha 2027"><span class="hint">Page title and emails.</span></div>
+        <div class="f"><label class="t" for="shortName">Short name</label><input type="text" id="shortName" maxlength="60" placeholder="e.g. Pongal 2027"><span class="hint">Used in WhatsApp messages and as the Swish message ("Pongal 2027 Reg 12").</span></div>
+      </div>
+      <div class="grid three" style="margin-top:14px">
+        <div class="f"><label class="t" for="venue">Venue</label><input type="text" id="venue" maxlength="150" placeholder="e.g. Tryckeriet"></div>
+        <div class="f"><label class="t" for="date">Date</label><input type="date" id="date"></div>
+        <div class="f"><label class="t" for="emoji">Emoji</label><input type="text" id="emoji" maxlength="20" placeholder="🌾"></div>
+      </div>
+      <div class="grid" style="margin-top:14px">
+        <div class="f"><label class="t" for="timeText">Time</label><input type="text" id="timeText" maxlength="100" placeholder="e.g. from 10:00 AM"></div>
+        <div class="f"><label class="t">Shown as</label><div class="hint" id="whenPreview" style="padding-top:10px">–</div></div>
+        <div class="f wide"><label class="t" for="summary">Short description for the Events page</label><textarea id="summary" maxlength="500" rows="2"></textarea></div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Banner &amp; partner</legend>
+      <div class="f wide">
+        <label class="t">Banner image</label>
+        <div class="img-box" id="bannerBox"></div>
+        <span class="hint">Shown at the top of the registration page. A wide image works best (about 3 : 1, e.g. 1600 × 533). JPG, PNG or WebP, up to 5 MB.</span>
+      </div>
+      <div class="grid" style="margin-top:14px">
+        <div class="f"><label class="t" for="partnerName">“In collaboration with” (optional)</label><input type="text" id="partnerName" maxlength="150" placeholder="Leave empty to hide"></div>
+        <div class="f"><label class="t">Partner logo</label><div class="img-box" id="partnerBox"></div></div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Registration page</legend>
+      <div class="grid">
+        <div class="f"><label class="t" for="adultPrice">Adult price (kr)</label><input type="number" id="adultPrice" min="0" step="1"></div>
+        <div class="f"><label class="t" for="childPrice">Kids 6–12 price (kr)</label><input type="number" id="childPrice" min="0" step="1"><span class="hint">Kids under 6 are free.</span></div>
+      </div>
+      <div class="f wide" style="margin-top:14px">
+        <label class="t">Text under the banner (optional)</label>
+        <div class="rich"><div id="introHtml"></div></div>
+        <span class="hint">Invitation text, programme, what to bring… Use the toolbar for headings, bold, lists and links.</span>
+      </div>
+      <div class="f wide" style="margin-top:14px">
+        <label class="t">Photo consent text</label>
+        <div class="rich"><div id="consentHtml"></div></div>
+        <span class="hint">Families must tick this to register.</span>
+      </div>
+      <div class="f wide" style="margin-top:14px">
+        <label class="t">Extra thank-you text after payment (optional)</label>
+        <div class="rich"><div id="thanksHtml"></div></div>
+      </div>
+      <div class="switches" style="margin-top:14px">
+        <div class="sw"><div><b>Ask “Volunteer interest?”</b><span>Shows the volunteer question on the form.</span></div><label class="switch"><input type="checkbox" id="askVolunteer"><span class="slider"></span></label></div>
+        <div class="sw"><div><b>Ask about cultural activities</b><span>Shows the Group Dance / Group Singing question.</span></div><label class="switch"><input type="checkbox" id="askCultural"><span class="slider"></span></label></div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Open or closed</legend>
+      <div class="switches">
+        <div class="sw"><div><b>Registration open</b><span>New registrations and changes. When closed, families can still find their booking and pay.</span></div><label class="switch"><input type="checkbox" id="registrationOpen"><span class="slider"></span></label></div>
+        <div class="sw"><div><b>Click2Eat food ordering open</b><span>Only paid registrations of this event can order food.</span></div><label class="switch"><input type="checkbox" id="foodOpen"><span class="slider"></span></label></div>
+      </div>
+      <p class="hint" style="margin:8px 0 0">These only matter while this is the current event. Site Controls changes the same switches.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>QR code, sweet boxes &amp; WhatsApp</legend>
+      <div class="switches">
+        <div class="sw"><div><b>Sweet boxes (one per adult)</b><span>Turn off if this event has no sweet boxes: the QR code is then only for entrance check-in.</span></div><label class="switch"><input type="checkbox" id="sweetsEnabled"><span class="slider"></span></label></div>
+      </div>
+      <div class="grid" style="margin-top:14px">
+        <div class="f"><label class="t" for="sweetsStartAt">Sweet boxes from (Swedish time)</label><input type="datetime-local" id="sweetsStartAt"><span class="hint">The counter opens 15 minutes earlier. Leave empty to allow it any time.</span></div>
+        <div class="f"><label class="t" for="contactsText">Contact people in the WhatsApp welcome message</label><textarea id="contactsText" rows="3" maxlength="1000" placeholder="Ajish: 0722199316&#10;Pradeep: 0725283137"></textarea></div>
+      </div>
+    </fieldset>
+
+    <div class="bar">
+      <button class="btn primary" type="submit" id="saveBtn">Save event</button>
+      <a class="btn" id="previewBtn" target="_blank" rel="noopener" hidden>Preview registration page ↗</a>
+      <button class="btn" type="button" id="cancelBtn">Close</button>
+      <span class="msg" id="msg"></span>
+    </div>
+  </form>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
+<script src="auth.js"></script>
+<script>
+checkAuth('settings');
+const API = '/food-api';
+let events = [];
+let editing = null; // the event being edited, or null for a new one
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const $ = id => document.getElementById(id);
+
+const toolbar = [[{ header: [2, 3, false] }], ['bold', 'italic', 'underline'], [{ color: [] }], [{ list: 'ordered' }, { list: 'bullet' }], [{ align: [] }], ['link'], ['clean']];
+const editors = {};
+['introHtml', 'consentHtml', 'thanksHtml'].forEach(id => {
+  editors[id] = typeof Quill === 'function'
+    ? new Quill('#' + id, { theme: 'snow', modules: { toolbar } })
+    : null;
+  if (!editors[id]) $(id).outerHTML = `<textarea id="${id}" rows="5" placeholder="HTML"></textarea>`; // editor failed to load
+});
+function getHtml(id) {
+  const q = editors[id];
+  if (!q) return $(id).value;
+  return q.getText().trim() ? q.root.innerHTML : '';
+}
+function setHtml(id, html) {
+  const q = editors[id];
+  if (!q) { $(id).value = html || ''; return; }
+  q.setContents([]);
+  if (html) q.clipboard.dangerouslyPasteHTML(0, html); // the server cleans all HTML before saving
+}
+
+function dateLabel(ev) {
+  if (!ev.date) return 'No date yet';
+  return new Date(ev.date + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+
+function renderList() {
+  $('list').innerHTML = events.length ? events.map(ev => `
+    <div class="card ev">
+      <div class="emo">${esc(ev.emoji)}</div>
+      <div class="info">
+        <b>${esc(ev.name)}${ev.isCurrent ? '<span class="pill cur">Current</span>' : ''}</b>
+        <span>${esc(dateLabel(ev))}${ev.venue ? ' · ' + esc(ev.venue) : ''} · ${ev.registrations} registration${ev.registrations === 1 ? '' : 's'} · ${ev.orders} food order${ev.orders === 1 ? '' : 's'}</span>
+        ${ev.isCurrent ? `<div style="margin-top:6px"><span class="pill ${ev.registrationOpen ? 'open' : 'closed'}" style="margin:0">Registration ${ev.registrationOpen ? 'open' : 'closed'}</span><span class="pill ${ev.foodOpen ? 'open' : 'closed'}">Food ordering ${ev.foodOpen ? 'open' : 'closed'}</span></div>` : ''}
+      </div>
+      <div class="acts">
+        <button class="btn" type="button" onclick="edit(${ev.id})">Edit</button>
+        ${ev.isCurrent ? '' : `<button class="btn" type="button" onclick="makeCurrent(${ev.id})">Make current</button>`}
+        ${!ev.isCurrent && !ev.registrations && !ev.orders ? `<button class="btn danger" type="button" onclick="removeEvent(${ev.id})">Delete</button>` : ''}
+      </div>
+    </div>`).join('') : '<div class="card ev">No events yet. Press “New event”.</div>';
+  $('copyFrom').innerHTML = '<option value="">Empty form</option>' + events.map(ev => `<option value="${ev.id}">${esc(ev.name)}</option>`).join('');
+}
+
+async function load() {
+  const r = await authFetch(API + '/admin/events', { headers: { 'X-Event-Id': '' } });
+  events = await r.json();
+  renderList();
+}
+
+const FIELDS = ['name', 'shortName', 'emoji', 'date', 'timeText', 'venue', 'summary', 'adultPrice', 'childPrice', 'partnerName', 'contactsText'];
+const SWITCHES = ['askVolunteer', 'askCultural', 'registrationOpen', 'foodOpen', 'sweetsEnabled'];
+
+function toLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
+function fillForm(ev, { keepDates } = {}) {
+  FIELDS.forEach(f => { $(f).value = ev[f] ?? ''; });
+  SWITCHES.forEach(f => { $(f).checked = !!ev[f]; });
+  $('sweetsStartAt').value = keepDates === false ? '' : toLocalInput(ev.sweetsStartAt);
+  setHtml('introHtml', ev.introHtml);
+  setHtml('consentHtml', ev.consentHtml);
+  setHtml('thanksHtml', ev.thanksHtml);
+  updateWhen();
+}
+
+function imageBox(kind) {
+  const box = $(kind === 'banner' ? 'bannerBox' : 'partnerBox');
+  if (!editing) { box.innerHTML = '<span class="none">Save the event first, then add the image.</span>'; return; }
+  const url = kind === 'banner' ? editing.bannerUrl : editing.partnerImageUrl;
+  const has = !!url;
+  box.innerHTML = `${has && url ? `<img src="${esc(url)}" alt="" class="${kind === 'partner' ? 'logo' : ''}">` : `<span class="none">No ${kind === 'banner' ? 'banner' : 'logo'} yet.</span>`}
+    <label class="btn">${has ? 'Change' : 'Upload'}…<input type="file" accept="image/jpeg,image/png,image/webp" hidden onchange="uploadImage('${kind}', this)"></label>
+    ${has ? `<button class="btn danger" type="button" onclick="removeImage('${kind}')">Remove</button>` : ''}`;
+}
+
+function openEditor(ev) {
+  editing = ev;
+  $('editor').hidden = false;
+  $('edTitle').textContent = ev ? `Edit: ${ev.name}` : 'New event';
+  $('edLead').textContent = ev ? (ev.isCurrent ? 'This is the current event: changes show on the website as soon as you save.' : '') : 'Fill in the details and save. The new event stays hidden until you make it current.';
+  $('notCurrentNote').hidden = !ev || ev.isCurrent;
+  $('copyRow').hidden = !!ev;
+  $('previewBtn').hidden = !ev;
+  if (ev) $('previewBtn').href = `../event-registration.html?preview=${ev.id}`;
+  $('msg').textContent = '';
+  $('msg').className = 'msg';
+  if (ev) fillForm(ev);
+  else {
+    fillForm({ emoji: '🎉', adultPrice: 0, childPrice: 0, askVolunteer: true, askCultural: true, sweetsEnabled: false, registrationOpen: true, foodOpen: true });
+    $('copyFrom').value = '';
+  }
+  imageBox('banner');
+  imageBox('partner');
+  $('editor').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function edit(id) { openEditor(events.find(e => e.id === id)); }
+$('newBtn').onclick = () => openEditor(null);
+$('cancelBtn').onclick = () => { $('editor').hidden = true; editing = null; };
+
+// New event from an earlier one: copy prices, texts and settings, but not the name, date or images.
+$('copyFrom').onchange = () => {
+  const src = events.find(e => e.id === Number($('copyFrom').value));
+  if (!src) return;
+  fillForm({ ...src, name: '', shortName: '', date: '', sweetsStartAt: null, summary: src.summary }, { keepDates: false });
+};
+
+function updateWhen() {
+  const ev = { date: $('date').value, venue: $('venue').value.trim(), timeText: $('timeText').value.trim() };
+  if (!ev.date && !ev.venue) { $('whenPreview').textContent = '–'; return; }
+  const d = ev.date ? new Date(ev.date + 'T12:00:00Z') : null;
+  const day = d ? `${d.toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })} ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })}` : '';
+  $('whenPreview').textContent = [day, ev.venue && `at ${ev.venue}`].filter(Boolean).join(' ') + (ev.timeText ? `, ${ev.timeText}` : '');
+}
+['date', 'venue', 'timeText'].forEach(id => $(id).addEventListener('input', updateWhen));
+
+function formData() {
+  const d = {};
+  FIELDS.forEach(f => { d[f] = $(f).value; });
+  d.adultPrice = Number(d.adultPrice || 0);
+  d.childPrice = Number(d.childPrice || 0);
+  SWITCHES.forEach(f => { d[f] = $(f).checked; });
+  d.sweetsStartAt = $('sweetsStartAt').value ? new Date($('sweetsStartAt').value).toISOString() : '';
+  d.introHtml = getHtml('introHtml');
+  d.consentHtml = getHtml('consentHtml');
+  d.thanksHtml = getHtml('thanksHtml');
+  return d;
+}
+
+function say(text, kind) { $('msg').textContent = text; $('msg').className = 'msg ' + (kind || ''); }
+
+$('editor').addEventListener('submit', async e => {
+  e.preventDefault();
+  const data = formData();
+  if (!data.name.trim()) { say('Please give the event a name.', 'err'); $('name').focus(); return; }
+  $('saveBtn').disabled = true;
+  say('Saving…');
+  try {
+    const r = await authFetch(editing ? `${API}/admin/events/${editing.id}` : `${API}/admin/events`, {
+      method: editing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+    });
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(out.error || 'Could not save.');
+    await load();
+    const wasNew = !editing;
+    openEditor(events.find(ev => ev.id === out.id));
+    say(wasNew ? 'Saved. You can now add the banner, and press “Make current” when it is ready.' : 'Saved.', 'ok');
+  } catch (err) { say(err.message, 'err'); }
+  finally { $('saveBtn').disabled = false; }
+});
+
+async function makeCurrent(id) {
+  const ev = events.find(e => e.id === id);
+  if (!confirm(`Make “${ev.name}” the current event?\n\nThe registration page, Click2Eat, the QR scanner and the feedback form will switch to this event. Earlier events and their data are kept.`)) return;
+  const r = await authFetch(`${API}/admin/events/${id}/current`, { method: 'PUT' });
+  if (!r.ok) { alert((await r.json().catch(() => ({}))).error || 'Could not change the current event.'); return; }
+  sessionStorage.removeItem('admin_event_id');
+  await load();
+  if (editing) openEditor(events.find(e => e.id === editing.id));
+}
+
+async function removeEvent(id) {
+  const ev = events.find(e => e.id === id);
+  if (!confirm(`Delete “${ev.name}”? This can't be undone.`)) return;
+  const r = await authFetch(`${API}/admin/events/${id}`, { method: 'DELETE' });
+  if (!r.ok) { alert((await r.json().catch(() => ({}))).error || 'Could not delete.'); return; }
+  if (editing && editing.id === id) { $('editor').hidden = true; editing = null; }
+  await load();
+}
+
+async function uploadImage(kind, input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { say('That image is bigger than 5 MB. Please choose a smaller one.', 'err'); return; }
+  say('Uploading…');
+  try {
+    const r = await authFetch(`${API}/admin/events/${editing.id}/image/${kind}`, { method: 'PUT', headers: { 'Content-Type': file.type || 'image/jpeg' }, body: file });
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(out.error || 'Could not upload.');
+    await load();
+    editing = events.find(e => e.id === editing.id);
+    imageBox(kind);
+    say('Image saved.', 'ok');
+  } catch (err) { say(err.message, 'err'); }
+}
+
+async function removeImage(kind) {
+  if (!confirm(`Remove the ${kind === 'banner' ? 'banner' : 'partner logo'}?`)) return;
+  const r = await authFetch(`${API}/admin/events/${editing.id}/image/${kind}`, { method: 'DELETE' });
+  if (!r.ok) { say('Could not remove the image.', 'err'); return; }
+  await load();
+  editing = events.find(e => e.id === editing.id);
+  imageBox(kind);
+  say('Image removed.', 'ok');
+}
+
+load().then(() => {
+  const want = Number(new URLSearchParams(location.search).get('edit'));
+  if (want && events.some(e => e.id === want)) edit(want);
+}).catch(() => { $('list').innerHTML = '<div class="card ev">Could not load events. Please refresh.</div>'; });
+</script>
+</body>
+</html>

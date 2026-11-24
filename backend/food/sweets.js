@@ -1,4 +1,4 @@
-// One Diwali QR code per registration (a link to sweets.html with a signed pass code), used twice:
+// One QR code per registration (a link to sweets.html with a signed pass code), used twice:
 //  1. Check-in at the entrance: an admin scans it and sees the registered adults and kids; the
 //     registration is marked as checked in.
 //  2. Sweet boxes: one box per adult. The pass is marked as used once the boxes are given. Before
@@ -6,9 +6,12 @@
 //     can still give the boxes after confirming. Only an admin can mark either step as not done again.
 // Who may do what comes from staff accounts (staff.js): "checkin" for the entrance, "sweets" for the
 // sweets counter, "scan_override" to give boxes anyway and to undo a scan; full admins can do everything.
-const { sweetsPassCode, readSweetsPass, SWEETS_OPEN_AT, SWEETS_START_AT, sweetsOpen } = require("./booking-link");
+// Scans only work for registrations of the current event (Events page).
+const { sweetsPassCode, readSweetsPass, sweetsStartAt, sweetsOpenAt, sweetsOpen } = require("./booking-link");
 
-module.exports = function registerSweets(app, { pool, requirePerm, hasPerm, wa }) {
+module.exports = function registerSweets(app, { pool, requirePerm, hasPerm, wa, events }) {
+  const notThisEvent = r => r.event_id !== events.currentEventId();
+  const otherEventError = r => `This QR code is for ${events.get(r.event_id)?.short_name || "an earlier event"}, not ${events.current()?.short_name || "this event"}.`;
   async function ensureSweetsTable() {
     await pool.query(`CREATE TABLE IF NOT EXISTS event_sweet_collections (
       registration_id INTEGER PRIMARY KEY REFERENCES event_registrations(id) ON DELETE CASCADE,
@@ -22,7 +25,7 @@ module.exports = function registerSweets(app, { pool, requirePerm, hasPerm, wa }
   }
 
   async function registrationWithCollection(id) {
-    const q = await pool.query(`SELECT r.id, r.first_name, r.last_name, r.adults_count, r.kids_6_12_count, r.kids_below_6_count,
+    const q = await pool.query(`SELECT r.id, r.event_id, r.first_name, r.last_name, r.adults_count, r.kids_6_12_count, r.kids_below_6_count,
         r.payment_status, r.registration_status, GREATEST(r.total_amount - r.paid_amount, 0) AS amount_due,
         c.boxes AS collected_boxes, c.collected_at, c.collected_by, k.checked_in_at, k.checked_in_by
       FROM event_registrations r
@@ -51,13 +54,16 @@ module.exports = function registerSweets(app, { pool, requirePerm, hasPerm, wa }
       const r = id && await registrationWithCollection(id);
       if (!r) return res.status(404).json({ error: "This QR code is not valid." });
       const f = family(r);
+      const ev = events.get(r.event_id);
       res.json({
         ...f,
         checkedIn: f.checkedIn ? { at: f.checkedIn.at } : null,
         collected: f.collected ? { at: f.collected.at, boxes: f.collected.boxes } : null,
         firstName: r.first_name,
         cancelled: r.registration_status === "CANCELLED",
-        startsAt: SWEETS_START_AT, open: sweetsOpen()
+        startsAt: sweetsStartAt(ev), open: sweetsOpen(ev), sweetsEnabled: !!ev?.sweets_enabled,
+        event: ev ? { name: ev.name, shortName: ev.short_name, emoji: ev.emoji, whenText: events.whenText(ev) } : null,
+        pastEvent: notThisEvent(r)
       });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
@@ -67,7 +73,8 @@ module.exports = function registerSweets(app, { pool, requirePerm, hasPerm, wa }
     try {
       const id = readSweetsPass(req.body?.code);
       const r = id && await registrationWithCollection(id);
-      if (!r) return res.status(404).json({ result: "INVALID", error: "This is not a valid Diwali QR code." });
+      if (!r) return res.status(404).json({ result: "INVALID", error: "This is not a valid QR code from the Sangam." });
+      if (notThisEvent(r)) return res.status(404).json({ result: "INVALID", error: otherEventError(r) });
       if (r.registration_status === "CANCELLED") return res.json({ result: "CANCELLED", ...family(r) });
       if (r.checked_in_at) return res.json({ result: "ALREADY_CHECKED_IN", ...family(r) });
       const saved = await pool.query(`INSERT INTO event_checkins(registration_id, checked_in_by) VALUES($1,$2)
@@ -94,16 +101,17 @@ module.exports = function registerSweets(app, { pool, requirePerm, hasPerm, wa }
       const force = !!req.body?.force && hasPerm(req, "scan_override"); // "Give anyway" needs that access
       const id = readSweetsPass(req.body?.code);
       const r = id && await registrationWithCollection(id);
-      if (!r) return res.status(404).json({ result: "INVALID", error: "This is not a valid Diwali QR code." });
+      if (!r) return res.status(404).json({ result: "INVALID", error: "This is not a valid QR code from the Sangam." });
+      if (notThisEvent(r)) return res.status(404).json({ result: "INVALID", error: otherEventError(r) });
       const who = family(r);
       if (r.registration_status === "CANCELLED") return res.json({ result: "CANCELLED", ...who });
       if (r.collected_at) return res.json({ result: "ALREADY_USED", ...who });
       if (!who.boxes) return res.json({ result: "NO_ADULTS", ...who });
       const warnings = [];
-      if (!sweetsOpen()) warnings.push("NOT_OPEN");
+      if (!sweetsOpen(events.current())) warnings.push("NOT_OPEN");
       if (!who.checkedIn) warnings.push("NOT_CHECKED_IN");
       if (!who.paid) warnings.push("NOT_PAID");
-      if (warnings.length && !force) return res.json({ result: warnings[0], warnings, ...who, opensAt: SWEETS_OPEN_AT });
+      if (warnings.length && !force) return res.json({ result: warnings[0], warnings, ...who, opensAt: sweetsOpenAt(events.current()) });
       const saved = await pool.query(`INSERT INTO event_sweet_collections(registration_id, boxes, collected_by) VALUES($1,$2,$3)
         ON CONFLICT (registration_id) DO NOTHING RETURNING collected_at`, [r.id, who.boxes, adminName(req)]);
       const now = family(await registrationWithCollection(r.id));
@@ -136,8 +144,9 @@ module.exports = function registerSweets(app, { pool, requirePerm, hasPerm, wa }
         FROM event_registrations r
         LEFT JOIN event_sweet_collections c ON c.registration_id = r.id
         LEFT JOIN event_checkins k ON k.registration_id = r.id
-        WHERE r.registration_status <> 'CANCELLED'`);
-      res.json({ ...q.rows[0], opensAt: SWEETS_OPEN_AT, open: sweetsOpen() });
+        WHERE r.registration_status <> 'CANCELLED' AND r.event_id = $1`, [events.currentEventId()]);
+      const ev = events.current();
+      res.json({ ...q.rows[0], opensAt: sweetsOpenAt(ev), open: sweetsOpen(ev), sweetsEnabled: !!ev?.sweets_enabled, eventName: ev?.short_name || "" });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 

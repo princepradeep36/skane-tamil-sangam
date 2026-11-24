@@ -1,8 +1,9 @@
-// Diwali 2026 feedback form (public /feedback.html), modelled on the Pongal Vizha 2026 Google Form:
+// Event feedback form (public /feedback.html), for the current event, modelled on the Pongal Vizha 2026 Google Form:
 // event success rating, open questions, food stalls / Click2Eat rating, and star ratings per vendor.
 // Every submission is kept as it was sent (like a Google Form). Vendors see only their own stall's
 // ratings and comments, never the guest's name or phone. Admins see everything.
-module.exports = function registerFeedback(app, { pool, requireVendor, requirePerm, vendorScope, normalizePhone }) {
+// Each answer is stored with its event, and the admin page shows one event at a time.
+module.exports = function registerFeedback(app, { pool, requireVendor, requirePerm, vendorScope, normalizePhone, events }) {
   const text = (v, max = 2000) => { const s = String(v ?? "").trim().slice(0, max); return s || null; };
   const stars = v => { const n = Number(v); return Number.isInteger(n) && n >= 1 && n <= 5 ? n : null; };
 
@@ -53,7 +54,7 @@ module.exports = function registerFeedback(app, { pool, requireVendor, requirePe
   app.post("/feedback", async (req, res) => {
     const b = req.body || {};
     const success = stars(b.successRating);
-    if (!success) return res.status(400).json({ error: "Please rate the success of Diwali 2026 (1 to 5 stars)." });
+    if (!success) return res.status(400).json({ error: `Please rate the success of ${events.current()?.short_name || "the event"} (1 to 5 stars).` });
     const phone = text(b.phone, 30) ? normalizePhone(b.phone) : null;
     if (text(b.phone, 30) && !phone) return res.status(400).json({ error: "Please check your phone number, e.g. +46 70 123 45 67, or leave it empty." });
     const hadProblems = b.hadProblems === true || b.hadProblems === "yes" ? true : b.hadProblems === false || b.hadProblems === "no" ? false : null;
@@ -69,11 +70,11 @@ module.exports = function registerFeedback(app, { pool, requireVendor, requirePe
       const known = new Set((await pool.query("SELECT id FROM vendors")).rows.map(r => r.id));
       const name = text(b.name, 100);
       const ins = await pool.query(`INSERT INTO event_feedback(success_rating, enjoyed, not_worked, had_problems, problems_prepare, differently, food_rating, food_comment, sweets_rating, sweets_comment, name, phone,
-          app_reg_rating, app_pay_rating, app_food_rating, app_game_rating, app_comment, other_comments)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id`,
+          app_reg_rating, app_pay_rating, app_food_rating, app_game_rating, app_comment, other_comments, event_id)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING id`,
         [success, text(b.enjoyed), text(b.notWorked), hadProblems, hadProblems ? text(b.problemsPrepare) : null, text(b.differently),
          stars(b.foodRating), text(b.foodComment), stars(b.sweetsRating), text(b.sweetsComment), name, phone,
-         stars(b.appRegRating), stars(b.appPayRating), stars(b.appFoodRating), stars(b.appGameRating), text(b.appComment), text(b.otherComments)]);
+         stars(b.appRegRating), stars(b.appPayRating), stars(b.appFoodRating), stars(b.appGameRating), text(b.appComment), text(b.otherComments), events.currentEventId()]);
       for (const v of vendorRatings.filter(v => known.has(v.id))) {
         await pool.query("INSERT INTO feedback(vendor_id, rating, comment, name, phone, event_feedback_id) VALUES($1,$2,$3,$4,$5,$6)",
           [v.id, v.rating, v.comment, name, phone, ins.rows[0].id]);
@@ -85,9 +86,11 @@ module.exports = function registerFeedback(app, { pool, requireVendor, requirePe
   // Admin: every answer, the averages and per-vendor averages.
   app.get("/admin/event-feedback", requirePerm("registrations"), async (req, res) => {
     try {
-      const subs = (await pool.query("SELECT * FROM event_feedback ORDER BY id DESC")).rows;
+      const eventId = events.adminEventId(req);
+      const subs = (await pool.query("SELECT * FROM event_feedback WHERE event_id = $1 ORDER BY id DESC", [eventId])).rows;
       const vr = (await pool.query(`SELECT f.event_feedback_id, f.vendor_id, v.name AS vendor_name, f.rating, f.comment
-        FROM feedback f JOIN vendors v ON v.id = f.vendor_id WHERE f.vendor_id IS NOT NULL ORDER BY f.id`)).rows;
+        FROM feedback f JOIN vendors v ON v.id = f.vendor_id JOIN event_feedback ef ON ef.id = f.event_feedback_id
+        WHERE f.vendor_id IS NOT NULL AND ef.event_id = $1 ORDER BY f.id`, [eventId])).rows;
       const byForm = {};
       vr.forEach(r => { (byForm[r.event_feedback_id] = byForm[r.event_feedback_id] || []).push(r); });
       const avg = list => list.length ? Math.round(10 * list.reduce((a, b) => a + b, 0) / list.length) / 10 : null;

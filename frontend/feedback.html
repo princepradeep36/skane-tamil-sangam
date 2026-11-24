@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Diwali 2026 Feedback | Skåne Tamil Sangam</title>
+<title>Event Feedback | Skåne Tamil Sangam</title>
 <style>
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:linear-gradient(170deg,#003d80,#0056b3 60%,#0b75d1);color:#fff;display:flex;flex-direction:column;align-items:center;padding:20px 16px 28px}
@@ -52,17 +52,17 @@ footer a{color:#ffd76a}
 </style>
 </head>
 <body>
-<header><b>🪔 Diwali 2026</b><span>Skåne Tamil Sangam</span></header>
+<header><b><span class="ev-emoji">🎉</span> <span class="ev-short">our event</span></b><span>Skåne Tamil Sangam</span></header>
 
 <form id="form" novalidate>
   <div class="card">
-    <h1>📝 Diwali 2026 Feedback</h1>
-    <p class="sub">Thank you for celebrating Diwali with us! Your feedback helps us make our next event even better. It takes about 2 minutes and is anonymous. Questions marked <b style="color:#c62828">*</b> are required.</p>
+    <h1>📝 <span class="ev-short">Event</span> Feedback</h1>
+    <p class="sub">Thank you for celebrating <span class="ev-short">our event</span> with us! Your feedback helps us make our next event even better. It takes about 2 minutes and is anonymous. Questions marked <b style="color:#c62828">*</b> are required.</p>
   </div>
 
   <div class="card">
-    <span class="q">1. Rate the success of Diwali 2026 <span class="req">*</span></span>
-    <div class="stars" data-key="success" role="radiogroup" aria-label="Rate the success of Diwali 2026"></div>
+    <span class="q">1. Rate the success of <span class="ev-short">the event</span> <span class="req">*</span></span>
+    <div class="stars" data-key="success" role="radiogroup" aria-label="Rate the success of the event"></div>
     <div class="stars-label" id="lbl-success"></div>
   </div>
 
@@ -106,21 +106,21 @@ footer a{color:#ffd76a}
     <textarea id="appComment" class="mt" maxlength="2000" placeholder="Comment (optional)"></textarea>
   </div>
 
-  <div class="card">
-    <span class="q">7. Rate the Diwali sweet boxes</span>
-    <div class="stars" data-key="sweets" role="radiogroup" aria-label="Rate the Diwali sweet boxes"></div>
+  <div class="card" id="sweetsCard">
+    <span class="q"><span class="qn">7</span>. Rate the sweet boxes</span>
+    <div class="stars" data-key="sweets" role="radiogroup" aria-label="Rate the sweet boxes"></div>
     <div class="stars-label" id="lbl-sweets"></div>
     <textarea id="sweetsComment" class="mt" maxlength="2000" placeholder="Comment (optional)"></textarea>
   </div>
 
   <div class="card">
-    <span class="q">8. Vendor feedback<small>Pick a food stall, give it stars and a comment. Your rating and comment are shared with that stall.</small></span>
+    <span class="q"><span class="qn">8</span>. Vendor feedback<small>Pick a food stall, give it stars and a comment. Your rating and comment are shared with that stall.</small></span>
     <div id="vendors"></div>
     <button type="button" class="add" id="addVendor">+ Add feedback for another vendor</button>
   </div>
 
   <div class="card">
-    <label class="q" for="otherComments">9. Any other comments?</label>
+    <label class="q" for="otherComments"><span class="qn">9</span>. Any other comments?</label>
     <textarea id="otherComments" maxlength="2000"></textarea>
   </div>
 
@@ -193,6 +193,19 @@ function addVendorRow(preselect) {
 }
 $('addVendor').addEventListener('click', () => addVendorRow());
 
+// The form is for the current event (Admin → Events). Without sweet boxes, question 7 is left out.
+let EVENT_SHORT = 'the event';
+fetch(`${API}/event/current`, { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(ev => {
+  if (!ev) return;
+  EVENT_SHORT = ev.shortName;
+  document.title = `${ev.shortName} Feedback | Skåne Tamil Sangam`;
+  document.querySelectorAll('.ev-short').forEach(el => { el.textContent = ev.shortName; });
+  document.querySelectorAll('.ev-emoji').forEach(el => { el.textContent = ev.emoji; });
+  if (!ev.sweetsEnabled) {
+    document.getElementById('sweetsCard').classList.add('hidden');
+    document.querySelectorAll('.qn').forEach((el, i) => { if (i > 0) el.textContent = String(6 + i); });
+  }
+}).catch(() => {});
 fetch(`${API}/feedback/vendors`).then(r => r.json()).then(list => {
   vendors = Array.isArray(list) ? list : [];
   if (vendors.length) addVendorRow(new URLSearchParams(location.search).get('vendor'));
@@ -204,7 +217,7 @@ $('form').addEventListener('submit', async e => {
   e.preventDefault();
   const err = $('error'); err.classList.add('hidden');
   const fail = msg => { err.textContent = msg; err.classList.remove('hidden'); err.scrollIntoView({ behavior: 'smooth', block: 'center' }); };
-  if (!rating.success) return fail('Please rate the success of Diwali 2026 (question 1).');
+  if (!rating.success) return fail(`Please rate the success of ${EVENT_SHORT} (question 1).`);
   const vendorRows = [...document.querySelectorAll('.vendor')].map(row => ({
     vendorId: Number(row.querySelector('select').value), rating: rating[row.dataset.key] || 0, comment: row.querySelector('textarea').value.trim()
   }));

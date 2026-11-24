@@ -14,16 +14,18 @@ const registerConnectionGame = require("./connection-game"); // not "whatsapp": 
 const registerSweets = require("./sweets");
 const registerFeedback = require("./feedback");
 const registerStaff = require("./staff");
+const createEvents = require("./events");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error("JWT_SECRET environment variable is required");
 
 const app = express();
+const events = createEvents(pool);
 
 app.use(cors({
   origin: "*",
   methods: ["GET", "POST", "PUT", "DELETE"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  allowedHeaders: ["Content-Type", "Authorization", "X-Event-Id"]
 }));
 
 app.use(bodyParser.json());
@@ -78,10 +80,16 @@ async function ensureSiteSettings() {
   }
 }
 
+// Registration and food ordering open/closed belong to the current event (Events page); the
+// vendor menu switch is a site-wide setting.
+const EVENT_SWITCHES = { event_registration_enabled: "registration_open", food_ordering_enabled: "food_open" };
 async function getSettings() {
   const result = await pool.query(`SELECT key, value FROM site_settings`);
   const settings = { ...SETTING_DEFAULTS };
   result.rows.forEach(r => { if (r.key in settings) settings[r.key] = r.value; });
+  const ev = events.current();
+  for (const [key, column] of Object.entries(EVENT_SWITCHES)) settings[key] = ev ? !!ev[column] : false;
+  if (ev) settings.event = { id: ev.id, name: ev.name, shortName: ev.short_name };
   return settings;
 }
 
@@ -108,9 +116,9 @@ app.get("/settings", async (req, res) => {
 app.put("/admin/settings", requirePerm("settings"), async (req, res) => {
   try {
     for (const key of Object.keys(SETTING_DEFAULTS)) {
-      if (typeof req.body[key] === "boolean") {
-        await pool.query(`INSERT INTO site_settings(key,value) VALUES($1,$2) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value`, [key, req.body[key]]);
-      }
+      if (typeof req.body[key] !== "boolean") continue;
+      if (EVENT_SWITCHES[key]) { await events.setCurrentSwitch(EVENT_SWITCHES[key], req.body[key]); continue; }
+      await pool.query(`INSERT INTO site_settings(key,value) VALUES($1,$2) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value`, [key, req.body[key]]);
     }
     res.json(await getSettings());
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -282,13 +290,14 @@ app.get("/vendors", async (req, res) => {
     FROM vendors v 
     LEFT JOIN menu_items m ON v.id = m.vendor_id
     LEFT JOIN (
-      SELECT menu_item_id, SUM(quantity) as qty
-      FROM order_items
-      GROUP BY menu_item_id
+      SELECT oi.menu_item_id, SUM(oi.quantity) as qty
+      FROM order_items oi JOIN orders o ON o.id = oi.order_id
+      WHERE o.event_id = $1
+      GROUP BY oi.menu_item_id
     ) sold ON m.id = sold.menu_item_id
     GROUP BY v.id 
     ORDER BY v.id
-  `);
+  `, [events.currentEventId()]);
   res.json(vendors.rows);
 });
 
@@ -403,10 +412,10 @@ async function foodOrderEligibility(phone) {
   if (!digits) return notRegistered;
   const normalized = normalizeInternationalPhone(String(phone));
   const q = await pool.query(`SELECT payment_status FROM event_registrations
-    WHERE registration_status <> 'CANCELLED'
+    WHERE registration_status <> 'CANCELLED' AND event_id = $4
       AND (phone = $1 OR phone = $2 OR (length($3) = 10 AND left($3, 1) <> '0' AND phone LIKE '+%' AND right(phone, 10) = $3))
     ORDER BY (payment_status = 'PAID') DESC, id LIMIT 1`,
-    [normalized, legacySwedishPhone(normalized) || digits, digits]);
+    [normalized, legacySwedishPhone(normalized) || digits, digits, events.currentEventId()]);
   if (!q.rows.length) return notRegistered;
   if (q.rows[0].payment_status !== "PAID") return { eligible: false, code: "NOT_PAID",
     error: "Your event registration isn't paid yet. Please pay your event fee and mark it as paid on the event registration page, then come back to order food." };
@@ -441,8 +450,8 @@ async function orderProblem(cart) {
   }
   if (!wanted.size) return "Your cart is empty.";
   const q = await pool.query(`SELECT m.id, m.item_name, m.is_active, m.sold_out, m.max_quantity, v.closed, v.name AS vendor,
-      (SELECT COALESCE(SUM(quantity), 0) FROM order_items WHERE menu_item_id = m.id)::int AS sold
-    FROM menu_items m JOIN vendors v ON v.id = m.vendor_id WHERE m.id = ANY($1)`, [[...wanted.keys()]]);
+      (SELECT COALESCE(SUM(si.quantity), 0) FROM order_items si JOIN orders so ON so.id = si.order_id WHERE si.menu_item_id = m.id AND so.event_id = $2)::int AS sold
+    FROM menu_items m JOIN vendors v ON v.id = m.vendor_id WHERE m.id = ANY($1)`, [[...wanted.keys()], events.currentEventId()]);
   for (const id of wanted.keys()) if (!q.rows.some(r => r.id === id)) return "An item in your cart is no longer on the menu. Please refresh the page.";
   for (const r of q.rows) {
     if (r.closed) return `${r.vendor} is closed now, so ${r.item_name} can't be ordered. Please remove it from your cart.`;
@@ -478,8 +487,8 @@ app.post("/order", requireFoodOrderingOpen, async (req, res) => {
     const pStatus = cart[vendorId].paid ? 'PAID' : 'UNPAID';
 
     const order = await pool.query(
-      "INSERT INTO orders(customer_id, vendor_id, total, payment_status, delivery_status) VALUES($1,$2,$3,$4,'Pending') RETURNING id",
-      [customerId, vendorId, total, pStatus]
+      "INSERT INTO orders(customer_id, vendor_id, total, payment_status, delivery_status, event_id) VALUES($1,$2,$3,$4,'Pending',$5) RETURNING id",
+      [customerId, vendorId, total, pStatus, events.currentEventId()]
     );
 
     for (const item of cart[vendorId].items) {
@@ -497,7 +506,7 @@ app.get("/orders/:phone", async (req, res) => {
       EXISTS (SELECT 1 FROM order_items pi JOIN menu_items pm ON pm.id = pi.menu_item_id WHERE pi.order_id = o.id AND pm.category <> 'SNACKS') AS has_food,
       EXISTS (SELECT 1 FROM order_items pi JOIN menu_items pm ON pm.id = pi.menu_item_id WHERE pi.order_id = o.id AND pm.category = 'SNACKS') AS has_snacks
     FROM orders o JOIN vendors v ON o.vendor_id = v.id
-    JOIN customers c ON o.customer_id = c.id WHERE c.phone = ANY($1) ORDER BY o.id`, [customerPhones(req.params.phone)]);
+    JOIN customers c ON o.customer_id = c.id WHERE c.phone = ANY($1) AND o.event_id = $2 ORDER BY o.id`, [customerPhones(req.params.phone), events.currentEventId()]);
   res.json(data.rows);
 });
 
@@ -522,8 +531,8 @@ async function findUnpaidOrder(req, res) {
 async function cannotAdd(menuItemId, extra) {
   if (!(await getSettings()).food_ordering_enabled) return "Food ordering is closed now, so you can only lower quantities or remove items.";
   const q = await pool.query(`SELECT m.item_name, m.max_quantity, m.is_active, m.sold_out, v.closed, v.name AS vendor,
-    (SELECT COALESCE(SUM(quantity), 0) FROM order_items WHERE menu_item_id = m.id)::int AS sold
-    FROM menu_items m JOIN vendors v ON v.id = m.vendor_id WHERE m.id = $1`, [menuItemId]);
+    (SELECT COALESCE(SUM(si.quantity), 0) FROM order_items si JOIN orders so ON so.id = si.order_id WHERE si.menu_item_id = m.id AND so.event_id = $2)::int AS sold
+    FROM menu_items m JOIN vendors v ON v.id = m.vendor_id WHERE m.id = $1`, [menuItemId, events.currentEventId()]);
   const item = q.rows[0];
   if (!item || !item.is_active) return "This item isn't available any more.";
   if (item.closed) return `${item.vendor} is closed now, so you can only lower quantities or remove items.`;
@@ -625,7 +634,7 @@ app.get("/vendor-orders/:vendorId", requireVendor, async (req, res) => {
     FROM orders o JOIN customers c ON o.customer_id = c.id
     JOIN order_items oi ON o.id = oi.order_id
     JOIN menu_items m ON oi.menu_item_id = m.id
-    WHERE o.vendor_id = $1 AND o.payment_status = 'PAID' ORDER BY o.id DESC`, [vendorId]);
+    WHERE o.vendor_id = $1 AND o.payment_status = 'PAID' AND o.event_id = $2 ORDER BY o.id DESC`, [vendorId, events.adminEventId(req)]);
   res.json(data.rows);
 });
 
@@ -639,7 +648,7 @@ app.get("/vendor-unpaid-orders/:vendorId", requireVendor, async (req, res) => {
       FROM orders o JOIN customers c ON o.customer_id = c.id
       JOIN order_items oi ON o.id = oi.order_id
       JOIN menu_items m ON oi.menu_item_id = m.id
-      WHERE o.vendor_id = $1 AND o.payment_status <> 'PAID' ORDER BY o.id DESC, oi.id`, [vendorId]);
+      WHERE o.vendor_id = $1 AND o.payment_status <> 'PAID' AND o.event_id = $2 ORDER BY o.id DESC, oi.id`, [vendorId, events.adminEventId(req)]);
     res.json(data.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -647,15 +656,15 @@ app.get("/vendor-unpaid-orders/:vendorId", requireVendor, async (req, res) => {
 app.get("/vendor-summary", requireVendor, async (req, res) => {
   const requested = req.query.vendorId;
   const vendorId = vendorScope(req, requested);
-  const params = [];
+  const params = [events.adminEventId(req)];
   let vendorFilter = "";
-  if (req.user.role !== "admin" || requested) { params.push(vendorId); vendorFilter = " AND o.vendor_id = $1"; }
+  if (req.user.role !== "admin" || requested) { params.push(vendorId); vendorFilter = " AND o.vendor_id = $2"; }
   const data = await pool.query(`
     SELECT v.name AS vendor_name, v.phone, m.item_name, SUM(oi.quantity) AS total_quantity, SUM(oi.quantity * m.price) AS total_amount
     FROM orders o JOIN vendors v ON o.vendor_id = v.id
     JOIN order_items oi ON o.id = oi.order_id
     JOIN menu_items m ON oi.menu_item_id = m.id
-    WHERE o.payment_status = 'PAID'${vendorFilter}
+    WHERE o.payment_status = 'PAID' AND o.event_id = $1${vendorFilter}
     GROUP BY v.id, v.name, v.phone, m.item_name`, params);
   res.json(data.rows);
 });
@@ -730,11 +739,9 @@ app.put("/change-password", authenticateToken, async (req, res) => {
 
 /* ================= EVENT REGISTRATION ROUTES ================= */
 
-// Central event prices in SEK. Always calculate on the server, never trust client totals.
-const EVENT_ADULT_PRICE = 100;
-const EVENT_CHILD_6_12_PRICE = 60;
-function eventTotal(adults, children) {
-  return adults * EVENT_ADULT_PRICE + children * EVENT_CHILD_6_12_PRICE;
+// Event prices in SEK come from the event (Events page). Always calculate on the server, never trust client totals.
+function eventTotal(ev, adults, children) {
+  return adults * Number(ev?.adult_price || 0) + children * Number(ev?.child_price || 0);
 }
 function validCount(value) {
   return Number.isInteger(value) && value >= 0;
@@ -789,10 +796,11 @@ async function ensureEventRegistrationLifecycle() {
 }
 
 
-async function allocateSwishAccount(client, amount, excludeRegistrationId = null) {
+// A Swish number's limit counts the registrations of one event, so each event starts afresh.
+async function allocateSwishAccount(client, amount, excludeRegistrationId = null, eventId = events.currentEventId()) {
   const accounts = await client.query(`SELECT id,label,swish_number,limit_amount,priority FROM event_swish_accounts WHERE active=TRUE ORDER BY priority,id FOR UPDATE`);
   for (const a of accounts.rows) {
-    const used = await client.query(`SELECT COALESCE(SUM(total_amount),0)::int AS allocated_amount FROM event_registrations WHERE swish_account_id=$1 AND registration_status <> 'CANCELLED' AND id IS DISTINCT FROM $2`, [a.id, excludeRegistrationId]);
+    const used = await client.query(`SELECT COALESCE(SUM(total_amount),0)::int AS allocated_amount FROM event_registrations WHERE swish_account_id=$1 AND registration_status <> 'CANCELLED' AND id IS DISTINCT FROM $2 AND event_id=$3`, [a.id, excludeRegistrationId, eventId]);
     a.allocated_amount = used.rows[0].allocated_amount;
     if (Number(a.allocated_amount) + Number(amount) <= Number(a.limit_amount)) return a;
   }
@@ -808,7 +816,7 @@ async function registrationWithSwish(client, id) {
 
 // Route older unpaid registrations after an admin adds or increases a Swish account.
 async function assignPendingUnroutedRegistrations(client) {
-  const pending = await client.query(`SELECT id,total_amount FROM event_registrations WHERE registration_status <> 'CANCELLED' AND payment_status <> 'PAID' AND swish_account_id IS NULL ORDER BY created_at,id FOR UPDATE`);
+  const pending = await client.query(`SELECT id,total_amount FROM event_registrations WHERE registration_status <> 'CANCELLED' AND payment_status <> 'PAID' AND swish_account_id IS NULL AND event_id=$1 ORDER BY created_at,id FOR UPDATE`, [events.currentEventId()]);
   let assigned = 0;
   for (const registration of pending.rows) {
     if (Number(registration.total_amount) <= 0) continue;
@@ -855,12 +863,13 @@ app.post("/event/register", requireEventRegistrationOpen, async (req, res) => {
       adultsCount + kids6to12Count + kidsBelow6Count < 1) {
     return res.status(400).json({ error: "Please complete all mandatory fields, enter phone and WhatsApp numbers with country code (for example +46701234567 or +919876543210), accept the consent, and register at least one participant." });
   }
+  const ev = events.current();
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const amount = eventTotal(adultsCount, kids6to12Count);
+    const amount = eventTotal(ev, adultsCount, kids6to12Count);
     const legacyPhone = legacySwedishPhone(normalizedPhone);
-    const existing = await client.query(`SELECT id,registration_status FROM event_registrations WHERE phone=$1 OR ($2::text IS NOT NULL AND phone=$2) FOR UPDATE`, [normalizedPhone, legacyPhone]);
+    const existing = await client.query(`SELECT id,registration_status FROM event_registrations WHERE (phone=$1 OR ($2::text IS NOT NULL AND phone=$2)) AND event_id=$3 FOR UPDATE`, [normalizedPhone, legacyPhone, ev.id]);
     const swish = await allocateSwishAccount(client, amount, existing.rows[0]?.id || null);
     if (existing.rows.length && existing.rows[0].registration_status === 'CANCELLED') {
       const revived = await client.query(`UPDATE event_registrations SET
@@ -880,9 +889,9 @@ app.post("/event/register", requireEventRegistrationOpen, async (req, res) => {
       return res.status(409).json({ code: "BOOKING_EXISTS", error: "You are already booked with this phone number. Please use Find Booking above to view or update your registration." });
     }
     const result = await client.query(`INSERT INTO event_registrations
-      (first_name,last_name,email,phone,whatsapp,adults_count,kids_6_12_count,kids_below_6_count,volunteer_interest,cultural_interest,cultural_activity_type,comments,photo_consent,total_amount,swish_account_id)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
-      [firstName.trim(),lastName.trim(),email.trim(),normalizedPhone,normalizedWhatsapp,adultsCount,kids6to12Count,kidsBelow6Count,!!volunteerInterest,!!culturalInterest,normalizedCulturalActivity,normalizedComments,!!photoConsent,amount,swish?.id || null]);
+      (first_name,last_name,email,phone,whatsapp,adults_count,kids_6_12_count,kids_below_6_count,volunteer_interest,cultural_interest,cultural_activity_type,comments,photo_consent,total_amount,swish_account_id,event_id)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
+      [firstName.trim(),lastName.trim(),email.trim(),normalizedPhone,normalizedWhatsapp,adultsCount,kids6to12Count,kidsBelow6Count,!!volunteerInterest,!!culturalInterest,normalizedCulturalActivity,normalizedComments,!!photoConsent,amount,swish?.id || null,ev.id]);
     const saved = await registrationWithSwish(client, result.rows[0].id);
     await client.query('COMMIT');
     res.status(201).json(saved);
@@ -903,7 +912,7 @@ app.get("/event/registration/:phone", async (req, res) => {
   try {
     await client.query('BEGIN');
     const found = await client.query(`SELECT id,total_amount,payment_status,swish_account_id
-      FROM event_registrations WHERE (phone=$1 OR ($2::text IS NOT NULL AND phone=$2)) AND registration_status <> 'CANCELLED' FOR UPDATE`, [normalizedPhone, legacyPhone]);
+      FROM event_registrations WHERE (phone=$1 OR ($2::text IS NOT NULL AND phone=$2)) AND registration_status <> 'CANCELLED' AND event_id=$3 FOR UPDATE`, [normalizedPhone, legacyPhone, events.currentEventId()]);
     if (!found.rows.length) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: "Registration not found" });
@@ -938,9 +947,13 @@ app.get("/event/booking/:id/:key", async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const found = await client.query(`SELECT id,total_amount,payment_status,swish_account_id FROM event_registrations
+    const found = await client.query(`SELECT id,total_amount,payment_status,swish_account_id,event_id FROM event_registrations
       WHERE id=$1 AND registration_status <> 'CANCELLED' FOR UPDATE`, [req.params.id]);
     if (!found.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: "Registration not found" }); }
+    if (found.rows[0].event_id !== events.currentEventId()) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: `This link is for ${events.get(found.rows[0].event_id)?.short_name || "an earlier event"}, which is over. Please register for the new event below.` });
+    }
     const registration = found.rows[0];
     // Same as the phone lookup: give an unpaid booking a Swish number if one has been configured since.
     if (registration.payment_status !== 'PAID' && !registration.swish_account_id) {
@@ -965,11 +978,11 @@ app.put("/admin/event-registration/:id", requirePerm("registrations"), (req, res
 async function saveRegistrationEdit(req, res, byAdmin) {
   const { firstName, lastName, email, phone, whatsapp, adultsCount, kids6to12Count, kidsBelow6Count, volunteerInterest, culturalInterest, culturalActivityType, comments } = req.body;
   let { photoConsent } = req.body;
-  if (byAdmin) {
-    const current = await pool.query("SELECT photo_consent FROM event_registrations WHERE id=$1", [req.params.id]).catch(() => ({ rows: [] }));
-    if (!current.rows.length) return res.status(404).json({ error: 'Registration not found' });
-    photoConsent = current.rows[0].photo_consent;
-  }
+  const current = await pool.query("SELECT photo_consent, event_id FROM event_registrations WHERE id=$1", [req.params.id]).catch(() => ({ rows: [] }));
+  // Families can only change bookings for the current event; admins can correct any event's.
+  if (!current.rows.length || (!byAdmin && current.rows[0].event_id !== events.currentEventId())) return res.status(404).json({ error: 'Registration not found' });
+  const ev = events.get(current.rows[0].event_id);
+  if (byAdmin) photoConsent = current.rows[0].photo_consent;
   const normalizedPhone = normalizeInternationalPhone(phone);
   const normalizedWhatsapp = normalizeInternationalPhone(whatsapp);
   const normalizedCulturalActivity = normalizeCulturalActivity(!!culturalInterest, culturalActivityType);
@@ -980,8 +993,8 @@ async function saveRegistrationEdit(req, res, byAdmin) {
   const client=await pool.connect();
   try {
     await client.query('BEGIN');
-    const amount=eventTotal(adultsCount,kids6to12Count);
-    const swish=await allocateSwishAccount(client, amount, Number(req.params.id));
+    const amount=eventTotal(ev,adultsCount,kids6to12Count);
+    const swish=await allocateSwishAccount(client, amount, Number(req.params.id), ev.id);
     const result=await client.query(`UPDATE event_registrations SET first_name=$1,last_name=$2,email=$3,phone=$4,whatsapp=$5,adults_count=$6,kids_6_12_count=$7,kids_below_6_count=$8,volunteer_interest=$9,cultural_interest=$10,cultural_activity_type=$11,comments=$12,photo_consent=$13,total_amount=$14,swish_account_id=$15,
       payment_status=CASE WHEN adults_count=$6 AND kids_6_12_count=$7 AND kids_below_6_count=$8 THEN payment_status
         WHEN paid_amount>0 AND $14<=paid_amount THEN 'PAID' ELSE 'PENDING' END,registration_status='ACTIVE',cancelled_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=$16 AND registration_status <> 'CANCELLED' RETURNING id`,
@@ -1011,8 +1024,8 @@ app.put("/event/registration/:id/pay", express.raw({ type: 'image/*', limit: '5m
     const result = await client.query(
       `UPDATE event_registrations
        SET payment_status='PAID', paid_amount=GREATEST(paid_amount, total_amount), updated_at=CURRENT_TIMESTAMP
-       WHERE id=$1 AND registration_status <> 'CANCELLED' RETURNING id`,
-      [req.params.id]
+       WHERE id=$1 AND registration_status <> 'CANCELLED' AND event_id=$2 RETURNING id`,
+      [req.params.id, events.currentEventId()]
     );
     if (!result.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: "Registration not found" }); }
     await client.query(`INSERT INTO event_payment_proofs(registration_id,content_type,image) VALUES($1,$2,$3)
@@ -1059,7 +1072,7 @@ app.get("/admin/event-registrations", requirePerm("registrations"), async (req, 
       FROM event_registrations r LEFT JOIN event_swish_accounts a ON a.id=r.swish_account_id
       LEFT JOIN event_payment_proofs p ON p.registration_id=r.id
       LEFT JOIN event_sweet_collections sw ON sw.registration_id=r.id
-      LEFT JOIN event_checkins ci ON ci.registration_id=r.id ORDER BY r.created_at DESC`);
+      LEFT JOIN event_checkins ci ON ci.registration_id=r.id WHERE r.event_id=$1 ORDER BY r.created_at DESC`, [events.adminEventId(req)]);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1077,7 +1090,7 @@ app.get("/admin/event-registration-summary", requirePerm("registrations"), async
       COALESCE(SUM(LEAST(paid_amount, total_amount)),0)::int AS total_amount_collected,
       COALESCE(SUM(GREATEST(total_amount - paid_amount, 0)),0)::int AS total_amount_pending
       FROM event_registrations
-      WHERE registration_status <> 'CANCELLED'`);
+      WHERE registration_status <> 'CANCELLED' AND event_id=$1`, [events.adminEventId(req)]);
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1106,16 +1119,16 @@ const GROUP_KINDS = ['PAYMENT_OPEN', 'PAYMENT_REMINDER', 'CUSTOM'];
 const emailBatches = new Map();
 
 // Registrations a group email would go to. skipHours leaves out people who got the same kind of email recently.
-async function emailRecipients(audience, kind, skipHours) {
+async function emailRecipients(audience, kind, skipHours, eventId) {
   const where = EMAIL_AUDIENCES[audience];
   if (!where) throw Object.assign(new Error("Unknown audience"), { status: 400 });
   const hours = Math.max(0, Math.min(Number(skipHours) || 0, 24 * 60));
   const q = await pool.query(`SELECT r.*, GREATEST(r.total_amount - r.paid_amount, 0) AS amount_due, a.swish_number
     FROM event_registrations r LEFT JOIN event_swish_accounts a ON a.id = r.swish_account_id
-    WHERE r.registration_status <> 'CANCELLED' AND COALESCE(r.email,'') <> '' AND ${where}
+    WHERE r.registration_status <> 'CANCELLED' AND r.event_id = $3 AND COALESCE(r.email,'') <> '' AND ${where}
       AND ($2::int = 0 OR NOT EXISTS (SELECT 1 FROM event_email_log l WHERE l.registration_id = r.id AND l.kind = $1
         AND l.channel = 'EMAIL' AND l.status = 'SENT' AND l.created_at > CURRENT_TIMESTAMP - make_interval(hours => $2::int)))
-    ORDER BY r.id`, [kind, hours]);
+    ORDER BY r.id`, [kind, hours, eventId]);
   return q.rows;
 }
 
@@ -1134,8 +1147,8 @@ app.get("/admin/email/status", requirePerm("messages"), (req, res) => {
 app.post("/admin/email/preview", requirePerm("messages"), async (req, res) => {
   try {
     const g = readGroupEmail(req.body);
-    const recipients = await emailRecipients(g.audience, g.kind, g.skipHours);
-    const sample = recipients[0] || { id: 123, first_name: 'Anu', adults_count: 2, kids_6_12_count: 1, kids_below_6_count: 0, total_amount: 260, paid_amount: 0, amount_due: 260, payment_status: 'PENDING', swish_number: '1234567890' };
+    const recipients = await emailRecipients(g.audience, g.kind, g.skipHours, events.adminEventId(req));
+    const sample = recipients[0] || { event_id: events.adminEventId(req), id: 123, first_name: 'Anu', adults_count: 2, kids_6_12_count: 1, kids_below_6_count: 0, total_amount: 260, paid_amount: 0, amount_due: 260, payment_status: 'PENDING', swish_number: '1234567890' };
     const { subject, html } = mailer.TEMPLATES[g.kind](sample, g.custom);
     res.json({ count: recipients.length, recipients: recipients.map(r => ({ id: r.id, name: `${r.first_name} ${r.last_name}`, email: r.email, amount_due: Number(r.amount_due) })), subject, html });
   } catch (err) { res.status(err.status || 500).json({ error: err.message }); }
@@ -1144,7 +1157,7 @@ app.post("/admin/email/preview", requirePerm("messages"), async (req, res) => {
 app.post("/admin/email/send", requirePerm("messages"), async (req, res) => {
   try {
     const g = readGroupEmail(req.body);
-    const recipients = await emailRecipients(g.audience, g.kind, g.skipHours);
+    const recipients = await emailRecipients(g.audience, g.kind, g.skipHours, events.adminEventId(req));
     if (!recipients.length) return res.status(400).json({ error: "Nobody matches this selection." });
     if (!mailer.configured()) return res.status(400).json({ error: "Email sending is not set up yet. Add the SMTP settings on the server first." });
     const batchId = crypto.randomUUID();
@@ -1201,8 +1214,8 @@ app.post("/admin/whatsapp/list", requirePerm("messages"), async (req, res) => {
     const q = await pool.query(`SELECT r.*, GREATEST(r.total_amount - r.paid_amount, 0) AS amount_due, a.swish_number,
         (SELECT MAX(l.created_at) FROM event_email_log l WHERE l.registration_id = r.id AND l.kind = $1 AND l.channel = 'WHATSAPP') AS last_sent
       FROM event_registrations r LEFT JOIN event_swish_accounts a ON a.id = r.swish_account_id
-      WHERE r.registration_status <> 'CANCELLED' AND ${where}
-      ORDER BY r.id`, [kind]);
+      WHERE r.registration_status <> 'CANCELLED' AND r.event_id = $2 AND ${where}
+      ORDER BY r.id`, [kind, events.adminEventId(req)]);
     const custom = { body: String(message || '').trim(), includePayment: !!includePayment };
     res.json(q.rows.map(r => ({
       id: r.id,
@@ -1221,15 +1234,15 @@ app.get("/admin/whatsapp/status", requirePerm("messages"), (req, res) => {
 });
 
 // Families who still owe money and have not had this WhatsApp message in the last skipHours.
-async function whatsappUnpaidRecipients(kind, skipHours) {
+async function whatsappUnpaidRecipients(kind, skipHours, eventId) {
   const hours = Math.max(0, Math.min(Number(skipHours) || 0, 24 * 60));
   const q = await pool.query(`SELECT r.*, GREATEST(r.total_amount - r.paid_amount, 0) AS amount_due, a.swish_number
     FROM event_registrations r LEFT JOIN event_swish_accounts a ON a.id = r.swish_account_id
-    WHERE r.registration_status <> 'CANCELLED' AND COALESCE(r.whatsapp,'') <> ''
+    WHERE r.registration_status <> 'CANCELLED' AND r.event_id = $3 AND COALESCE(r.whatsapp,'') <> ''
       AND r.payment_status <> 'PAID' AND r.total_amount > r.paid_amount
       AND ($2::int = 0 OR NOT EXISTS (SELECT 1 FROM event_email_log l WHERE l.registration_id = r.id AND l.kind = $1
         AND l.channel = 'WHATSAPP' AND l.status = 'SENT' AND l.created_at > CURRENT_TIMESTAMP - make_interval(hours => $2::int)))
-    ORDER BY r.id`, [kind, hours]);
+    ORDER BY r.id`, [kind, hours, eventId]);
   return q.rows;
 }
 
@@ -1237,7 +1250,7 @@ app.post("/admin/whatsapp/send-all", requirePerm("messages"), async (req, res) =
   const { kind, skipHours, dryRun } = req.body || {};
   if (!['PAYMENT_REMINDER', 'PAYMENT_OPEN'].includes(kind)) return res.status(400).json({ error: "Only payment reminders and payment-open messages can be sent to everyone." });
   try {
-    const recipients = await whatsappUnpaidRecipients(kind, skipHours);
+    const recipients = await whatsappUnpaidRecipients(kind, skipHours, events.adminEventId(req));
     if (dryRun) return res.json({ count: recipients.length });
     if (!recipients.length) return res.status(400).json({ error: "Nobody to message: every unpaid family already got it." });
     if (!wa.apiConfigured()) return res.status(400).json({ error: "Automatic WhatsApp is not set up yet. Add WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID on the server." });
@@ -1261,7 +1274,7 @@ app.post("/admin/whatsapp/sent", requirePerm("messages"), async (req, res) => {
   try {
     const q = await pool.query("SELECT id, whatsapp FROM event_registrations WHERE id=$1", [registrationId]);
     if (!q.rows.length) return res.status(404).json({ error: "Registration not found" });
-    const names = { PAYMENT_REMINDER: 'Payment reminder', PAYMENT_OPEN: 'Payment is now open', SWEETS_PASS: 'Welcome + Diwali QR code', FEEDBACK: 'Please share your feedback', CUSTOM: 'Own message' };
+    const names = { PAYMENT_REMINDER: 'Payment reminder', PAYMENT_OPEN: 'Payment is now open', SWEETS_PASS: 'Welcome + QR code', FEEDBACK: 'Please share your feedback', CUSTOM: 'Own message' };
     await pool.query(`INSERT INTO event_email_log(registration_id,kind,to_email,subject,status,channel) VALUES($1,$2,$3,$4,'SENT','WHATSAPP')`,
       [q.rows[0].id, kind, String(q.rows[0].whatsapp || '').slice(0, 255), `WhatsApp: ${names[kind]}`]);
     res.json({ success: true, sent_at: new Date().toISOString() });
@@ -1272,8 +1285,8 @@ app.post("/admin/whatsapp/sent", requirePerm("messages"), async (req, res) => {
 app.get('/admin/event-swish-accounts', requirePerm("swish"), async (req,res)=>{try{const q=await pool.query(`SELECT a.*,
   COALESCE(SUM(r.total_amount),0)::int allocated_amount,
   COALESCE(SUM(LEAST(r.paid_amount, r.total_amount)),0)::int paid_amount
-  FROM event_swish_accounts a LEFT JOIN event_registrations r ON r.swish_account_id=a.id AND r.registration_status <> 'CANCELLED'
-  GROUP BY a.id ORDER BY a.priority,a.id`);res.json(q.rows)}catch(e){res.status(500).json({error:e.message})}});
+  FROM event_swish_accounts a LEFT JOIN event_registrations r ON r.swish_account_id=a.id AND r.registration_status <> 'CANCELLED' AND r.event_id=$1
+  GROUP BY a.id ORDER BY a.priority,a.id`,[events.adminEventId(req)]);res.json(q.rows)}catch(e){res.status(500).json({error:e.message})}});
 app.post('/admin/event-swish-accounts', requirePerm("swish"), async (req,res)=>{
   const {label,swishNumber,limitAmount,priority=1,active=true}=req.body;
   if(!/^\d{10}$/.test(String(swishNumber||''))||Number(limitAmount)<=0) return res.status(400).json({error:'Swish number must be 10 digits and limit must be greater than 0.'});
@@ -1331,8 +1344,9 @@ app.get("/admin/orders", requirePerm("food"), async (req, res) => {
       FROM orders o
       JOIN vendors v ON o.vendor_id = v.id
       JOIN customers c ON o.customer_id = c.id
+      WHERE o.event_id = $1
       ORDER BY o.created_at DESC
-    `);
+    `, [events.adminEventId(req)]);
     res.json(result.rows);
   } catch (err) { res.status(500).send(err.message); }
 });
@@ -1385,8 +1399,9 @@ app.put("/admin/order/:id/payment", requirePerm("food"), async (req, res) => {
 
 const ensureConnectionTables = registerConnectionGame(app, { pool, requireAdmin: requirePerm("games"), imageContentType });
 const ensureClueTables = registerConnectionGame(app, { pool, requireAdmin: requirePerm("games"), imageContentType, kind: "clue" });
-const ensureSweetsTable = registerSweets(app, { pool, requirePerm, hasPerm, wa });
-const ensureFeedbackTable = registerFeedback(app, { pool, requireVendor, requirePerm, vendorScope, normalizePhone: normalizeFoodPhone });
+const ensureSweetsTable = registerSweets(app, { pool, requirePerm, hasPerm, wa, events });
+const ensureFeedbackTable = registerFeedback(app, { pool, requireVendor, requirePerm, vendorScope, normalizePhone: normalizeFoodPhone, events });
+events.register(app, { requirePerm, imageContentType, express });
 
 initializeDatabase()
   .then(() => ensureEventRegistrationLifecycle())
@@ -1397,5 +1412,6 @@ initializeDatabase()
   .then(() => ensureSweetsTable())
   .then(() => ensureFeedbackTable())
   .then(() => ensureSiteSettings())
+  .then(() => events.ensureTables())
   .then(() => app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`)))
   .catch(err => { console.error('Failed to initialize event registration lifecycle:', err); process.exit(1); });

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Click2Eat Admin Portal</title>
+    <title>Sangam Admin</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -56,7 +56,7 @@
 
         .container {
             width: 100%;
-            max-width: 860px;
+            max-width: 980px;
             text-align: center;
         }
 
@@ -152,19 +152,26 @@
             line-height: 1.45;
         }
 
-        .card:nth-child(1) { --accent: #d97706; --tint: #fef3c7; }
-        .card:nth-child(2) { --accent: #059669; --tint: #d1fae5; }
-        .card:nth-child(3) { --accent: #e11d48; --tint: #ffe4e6; }
-        .card:nth-child(4) { --accent: #4f46e5; --tint: #e0e7ff; }
-        .card:nth-child(5) { --accent: #0d9488; --tint: #ccfbf1; }
-        .card:nth-child(6) { --accent: #db2777; --tint: #fce7f3; }
-        .card:nth-child(7) { --accent: #475569; --tint: #e2e8f0; }
-        .card:nth-child(8) { --accent: #0284c7; --tint: #e0f2fe; }
-        .card:nth-child(9) { --accent: #b45309; --tint: #ffedd5; }
-        .card:nth-child(10) { --accent: #7c3aed; --tint: #ede9fe; }
-        .card:nth-child(11) { --accent: #ea580c; --tint: #ffedd5; }
-        .card:nth-child(12) { --accent: #0891b2; --tint: #cffafe; }
-        .card:nth-child(13) { --accent: #334155; --tint: #e2e8f0; }
+        .section { text-align: left; margin: 0 0 30px; }
+        .section[hidden] { display: none; }
+        .section-head { display: flex; align-items: center; gap: 10px; margin: 0 0 12px 2px; }
+        .section-head .dot { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-size: 1rem; background: var(--tint); }
+        .section-head h2 { margin: 0; font-size: 1.05rem; font-weight: 800; letter-spacing: -.01em; }
+        .section-head span { color: var(--muted); font-size: .85rem; }
+        .section .grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+        .section .card { padding: 20px 16px 18px; text-align: center; }
+        .section .icon { width: 54px; height: 54px; font-size: 1.65rem; border-radius: 16px; margin-bottom: 12px; }
+        .section .title { font-size: 1rem; }
+        .section .desc { font-size: .82rem; }
+        @media (max-width: 560px) {
+            .section-head h2 { font-size: 1rem !important; margin: 0 !important; }
+            .section-head span { display: none; }
+            .section { margin-bottom: 22px; }
+        }
+        .sec-reg { --accent: #059669; --tint: #d1fae5; }
+        .sec-food { --accent: #d97706; --tint: #fef3c7; }
+        .sec-games { --accent: #7c3aed; --tint: #ede9fe; }
+        .sec-settings { --accent: #475569; --tint: #e2e8f0; }
         .card[hidden] { display: none; }
         .who { margin: -18px 0 24px; color: #64748b; font-size: .9rem; }
 
@@ -172,9 +179,9 @@
             body { align-items: flex-start; padding-top: 76px; }
             h1 { font-size: 1.6rem; }
             .subtitle { margin-bottom: 24px; }
-            .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-            .card { padding: 18px 12px 16px; border-radius: 16px; }
-            .icon { width: 50px; height: 50px; font-size: 1.55rem; border-radius: 14px; margin-bottom: 10px; }
+            .grid, .section .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+            .card, .section .card { padding: 16px 10px 14px; border-radius: 16px; }
+            .icon, .section .icon { width: 46px; height: 46px; font-size: 1.4rem; border-radius: 13px; margin-bottom: 8px; }
             .title { font-size: .95rem; }
             .desc { font-size: .78rem; }
         }
@@ -185,89 +192,110 @@
 <body>
     <button class="logout-btn" onclick="logout()">Logout</button>
     <div class="container">
-        <div class="badge">Skåne Tamil Sangam · Diwali 2026</div>
-        <h1>Click2Eat Admin Portal</h1>
-        <p class="subtitle">Manage event registrations, food stalls and orders</p>
+        <div class="badge" id="eventBadge">Skåne Tamil Sangam</div>
+        <h1>Sangam Admin</h1>
+        <p class="subtitle">Registrations, food stalls, games and settings</p>
         <p class="who" id="who" hidden></p>
 
-        <div class="grid">
-            <a href="admin-orders.html?admin=true" class="card">
-                <div class="icon">📦</div>
-                <div class="title">Order Manager</div>
-                <div class="desc">View, edit, and delete customer orders</div>
-            </a>
+        <section class="section sec-reg">
+            <div class="section-head"><div class="dot">📝</div><h2>Registrations</h2><span>Families, payments and the event day</span></div>
+            <div class="grid">
+                <a href="admin-event-registrations.html?admin=true" class="card">
+                    <div class="icon">📝</div>
+                    <div class="title">Event Registrations</div>
+                    <div class="desc">View registrations and payment status</div>
+                </a>
+                <a href="admin-event-summary.html?admin=true" class="card">
+                    <div class="icon">👥</div>
+                    <div class="title">Registration Summary</div>
+                    <div class="desc">Adults, children and total participant counts</div>
+                </a>
+                <a href="admin-sweets.html?admin=true" class="card">
+                    <div class="icon">🎟️</div>
+                    <div class="title">QR Scanner</div>
+                    <div class="desc">Check families in at the entrance and give sweet boxes</div>
+                </a>
+                <a href="admin-event-email.html?admin=true" class="card">
+                    <div class="icon">✉️</div>
+                    <div class="title">Event Messages</div>
+                    <div class="desc">Email and WhatsApp registered families</div>
+                </a>
+                <a href="admin-event-swish.html?admin=true" class="card">
+                    <div class="icon">💳</div>
+                    <div class="title">Swish Routing</div>
+                    <div class="desc">Swish numbers, limits and routing priority</div>
+                </a>
+                <a href="admin-feedback.html?admin=true" class="card">
+                    <div class="icon">⭐</div>
+                    <div class="title">Event Feedback</div>
+                    <div class="desc">Feedback answers, ratings and Excel export</div>
+                </a>
+            </div>
+        </section>
 
-            <a href="admin-vendors.html?admin=true" class="card">
-                <div class="icon">🏪</div>
-                <div class="title">Stall & Menu Admin</div>
-                <div class="desc">Manage vendors and update menu items</div>
-            </a>
+        <section class="section sec-food">
+            <div class="section-head"><div class="dot">🍛</div><h2>Food · Click2Eat</h2><span>Stalls, menus and orders</span></div>
+            <div class="grid">
+                <a href="admin-orders.html?admin=true" class="card">
+                    <div class="icon">📦</div>
+                    <div class="title">Order Manager</div>
+                    <div class="desc">View, edit and delete customer orders</div>
+                </a>
+                <a href="admin-vendors.html?admin=true" class="card">
+                    <div class="icon">🏪</div>
+                    <div class="title">Stall &amp; Menu Admin</div>
+                    <div class="desc">Vendors, logins and menu items</div>
+                </a>
+                <a href="vendor-live.html?admin=true" class="card">
+                    <div class="icon">🔔</div>
+                    <div class="title">Live Vendor Dashboard</div>
+                    <div class="desc">Real-time incoming orders for display</div>
+                </a>
+                <a href="vendor-stats.html?admin=true" class="card">
+                    <div class="icon">📊</div>
+                    <div class="title">Sales Summary</div>
+                    <div class="desc">Total sales by vendor and item</div>
+                </a>
+            </div>
+        </section>
 
-            <a href="vendor-live.html?admin=true" class="card">
-                <div class="icon">🔔</div>
-                <div class="title">Live Vendor Dashboard</div>
-                <div class="desc">Real-time incoming orders for display</div>
-            </a>
+        <section class="section sec-games">
+            <div class="section-head"><div class="dot">🎮</div><h2>Games</h2><span>Stage games for the event</span></div>
+            <div class="grid">
+                <a href="admin-connection.html?admin=true" class="card">
+                    <div class="icon">🎯</div>
+                    <div class="title">Connection Game</div>
+                    <div class="desc">Image questions; players join by QR and buzz in</div>
+                </a>
+                <a href="admin-connection.html?admin=true&amp;game=clue" class="card">
+                    <div class="icon">🔎</div>
+                    <div class="title">Clue Game</div>
+                    <div class="desc">Clues shown one by one; everyone types an answer</div>
+                </a>
+            </div>
+        </section>
 
-            <a href="admin-event-registrations.html?admin=true" class="card">
-                <div class="icon">📝</div><div class="title">Event Registrations</div><div class="desc">View registrations and payment status</div>
-            </a>
+        <section class="section sec-settings">
+            <div class="section-head"><div class="dot">⚙️</div><h2>Settings</h2><span>Events, switches and logins</span></div>
+            <div class="grid">
+                <a href="admin-events.html?admin=true" class="card">
+                    <div class="icon">📅</div>
+                    <div class="title">Events</div>
+                    <div class="desc">Create and edit events: dates, prices, texts and banner</div>
+                </a>
+                <a href="admin-settings.html?admin=true" class="card">
+                    <div class="icon">🎛️</div>
+                    <div class="title">Site Controls</div>
+                    <div class="desc">Open or close registration, food ordering and menu editing</div>
+                </a>
+                <a href="admin-staff.html?admin=true" class="card" data-area="admin">
+                    <div class="icon">👤</div>
+                    <div class="title">Staff Accounts</div>
+                    <div class="desc">Logins for volunteers and what each one can use</div>
+                </a>
+            </div>
+        </section>
 
-            <a href="admin-event-summary.html?admin=true" class="card">
-                <div class="icon">👥</div><div class="title">Registration Summary</div><div class="desc">Adults, children and total participant counts</div>
-            </a>
-<a href="admin-event-swish.html?admin=true" class="card">
-                <div class="icon">💳</div><div class="title">Event Swish Routing</div><div class="desc">Configure Swish numbers, limits and routing priority</div>
-            </a>
-
-            <a href="admin-settings.html?admin=true" class="card">
-                <div class="icon">⚙️</div>
-                <div class="title">Site Controls</div>
-                <div class="desc">Open or close event registration, food ordering and vendor menu editing</div>
-            </a>
-
-            <a href="vendor-stats.html?admin=true" class="card">
-                <div class="icon">📊</div>
-                <div class="title">Sales Summary</div>
-                <div class="desc">Total sales report by vendor and item</div>
-            </a>
-
-            <a href="admin-event-email.html?admin=true" class="card">
-                <div class="icon">✉️</div>
-                <div class="title">Event Messages</div>
-                <div class="desc">Email and WhatsApp registered families: payment open, reminders and custom messages</div>
-            </a>
-
-            <a href="admin-connection.html?admin=true" class="card">
-                <div class="icon">🎯</div>
-                <div class="title">Connection Game</div>
-                <div class="desc">Stage game: load image questions, players join by QR code and buzz in</div>
-            </a>
-
-            <a href="admin-sweets.html?admin=true" class="card">
-                <div class="icon">🎟️</div>
-                <div class="title">Diwali QR Scanner</div>
-                <div class="desc">Scan families' QR codes: check in at the entrance, then give one sweet box per adult</div>
-            </a>
-
-            <a href="admin-connection.html?admin=true&game=clue" class="card">
-                <div class="icon">🔎</div>
-                <div class="title">Clue Game</div>
-                <div class="desc">Stage game with text clues shown one by one; players join by QR code and buzz in</div>
-            </a>
-
-            <a href="admin-feedback.html?admin=true" class="card">
-                <div class="icon">📝</div>
-                <div class="title">Event Feedback</div>
-                <div class="desc">All Diwali 2026 feedback answers, average ratings, vendor ratings and Excel export</div>
-            </a>
-
-            <a href="admin-staff.html?admin=true" class="card" data-area="admin">
-                <div class="icon">👥</div>
-                <div class="title">Staff Accounts</div>
-                <div class="desc">Create logins for volunteers and choose which admin options each one can use</div>
-            </a>
-        </div>
     </div>
 
     <script src="auth.js"></script>
@@ -275,11 +303,11 @@
         checkAuth('staff');
 
         const API = '/food-api';
-        // Staff accounts only see the cards for the areas they were given.
+        // Staff accounts only see the cards for the areas they were given; empty groups are hidden.
         const CARD_AREAS = {
             'admin-orders.html': 'food', 'admin-vendors.html': 'food', 'vendor-live.html': 'food', 'vendor-stats.html': 'food', 'admin-feedback.html': 'registrations',
             'admin-event-registrations.html': 'registrations', 'admin-event-summary.html': 'registrations',
-            'admin-event-swish.html': 'swish', 'admin-event-email.html': 'messages', 'admin-settings.html': 'settings',
+            'admin-event-swish.html': 'swish', 'admin-event-email.html': 'messages', 'admin-settings.html': 'settings', 'admin-events.html': 'settings',
             'admin-sweets.html': 'scan', 'admin-connection.html': 'games', 'admin-staff.html': 'admin'
         };
         const role = sessionStorage.getItem('user_role');
@@ -288,6 +316,7 @@
                 const area = CARD_AREAS[card.getAttribute('href').split('?')[0]];
                 card.hidden = area === 'admin' ? role !== 'admin' : !hasAccess(area);
             });
+            document.querySelectorAll('.section').forEach(sec => { sec.hidden = !sec.querySelector('.card:not([hidden])'); });
         }
         showCards();
         if (role !== 'admin') refreshAccess(showCards);
@@ -296,6 +325,10 @@
             who.hidden = false;
             who.textContent = 'You can use the options below. Ask an admin if you need more.';
         }
+        // The badge shows the current event.
+        fetch(API + '/event/current', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(ev => {
+            if (ev) document.getElementById('eventBadge').textContent = `Skåne Tamil Sangam · ${ev.emoji} ${ev.shortName}`;
+        }).catch(() => {});
     </script>
 </body>
 

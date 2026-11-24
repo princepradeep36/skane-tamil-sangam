@@ -507,7 +507,7 @@ Only press OK if the money is in. The order then moves to Paid and the customer 
           </div>`;
     }
 
-    // Guests' star ratings and comments for this stall (from the Diwali feedback form). No names or phone numbers.
+    // Guests' star ratings and comments for this stall (from the event feedback form). No names or phone numbers.
     function renderFeedback() {
       const f = vendorFeedback;
       if (!f.count) { ordersDiv.innerHTML = '<div class="empty-state">No feedback yet. Guests can rate your stall on the feedback form.</div>'; return; }

@@ -62,7 +62,7 @@ th{background:#f8fafc}
 <body>
 <div class="wrap">
   <div class="top">
-    <div><h1>Event Messages</h1><p>Email and WhatsApp the families registered for Diwali 2026.</p></div>
+    <div><h1>Event Messages</h1><p>Email and WhatsApp the families registered for <span data-event="short">the event</span>.</p></div>
     <div><a class="btn back" href="admin.html?admin=true">Admin Home</a></div>
   </div>
 
@@ -105,7 +105,7 @@ th{background:#f8fafc}
         <select id="waKind">
           <option value="PAYMENT_REMINDER">Payment reminder</option>
           <option value="PAYMENT_OPEN">Payment is now open</option>
-          <option value="SWEETS_PASS">Welcome + Diwali QR code (check-in &amp; sweets)</option>
+          <option value="SWEETS_PASS">Welcome + QR code (check-in &amp; sweets)</option>
           <option value="FEEDBACK">📝 Please share your feedback (feedback form link)</option>
           <option value="CUSTOM">My own message</option>
         </select>
@@ -155,7 +155,7 @@ th{background:#f8fafc}
       </div>
     </div>
     <div id="customBox" style="display:none">
-      <div class="field"><label for="subject">Subject</label><input type="text" id="subject" maxlength="150" placeholder="e.g. Diwali 2026 – programme update"></div>
+      <div class="field"><label for="subject">Subject</label><input type="text" id="subject" maxlength="150" placeholder="e.g. Programme update"></div>
       <div class="field"><label for="message">Message</label><textarea id="message" maxlength="5000" placeholder="Vanakkam {first_name}, …"></textarea>
         <span class="hint">You can use {first_name}, {amount_due} and {registration_id}. They are filled in for each family.</span></div>
       <label class="check"><input type="checkbox" id="includePayment"> Add each family's payment details (amount, Swish number) if they have not paid</label>
@@ -188,12 +188,12 @@ th{background:#f8fafc}
   </div>
 </div>
 
-<script src="auth.js"></script>
+<script src="auth.js"></script><script src="event-bar.js"></script>
 <script>
 checkAuth('messages');
 const API = '/food-api';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const KIND_NAMES = { REGISTRATION: 'Registration confirmed', PAYMENT_RECEIVED: 'Payment received', PAYMENT_OPEN: 'Payment is open', PAYMENT_REMINDER: 'Payment reminder', SWEETS_PASS: 'Welcome + Diwali QR code', FEEDBACK: 'Please share your feedback', CUSTOM: 'Own message' };
+const KIND_NAMES = { REGISTRATION: 'Registration confirmed', PAYMENT_RECEIVED: 'Payment received', PAYMENT_OPEN: 'Payment is open', PAYMENT_REMINDER: 'Payment reminder', SWEETS_PASS: 'Welcome + QR code', FEEDBACK: 'Please share your feedback', CUSTOM: 'Own message' };
 const $ = id => document.getElementById(id);
 let emailReady = false;
 
@@ -353,7 +353,8 @@ $('waNextBtn').addEventListener('click', () => {
 });
 
 // ---- WhatsApp: one general message for the group ----
-const GROUP_MESSAGE = `🪔 *Skåne Tamil Sangam · Diwali 2026* 🪔
+// Filled in with the event shown in the event picker (name, date, venue).
+const GROUP_MESSAGE = (ev = window.adminEvent || {}) => `${ev.emoji || '🎉'} *Skåne Tamil Sangam · ${ev.shortName || 'our event'}* ${ev.emoji || '🎉'}
 
 Vanakkam everyone 🙏
 
@@ -367,8 +368,8 @@ https://skanetamilsangam.duckdns.org/event-registration.html
 
 💡 _Already paid?_ Please upload your payment screenshot on the event registration page (step 1–2 above) and tap *Mark as Paid*, so we can confirm it. 🙏
 
-📅 Sunday 15 November 2026 · from 10:00 AM
-📍 Tryckeriet
+${ev.date ? `📅 ${new Date(ev.date + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })} ${new Date(ev.date + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })}${ev.timeText ? ` · ${ev.timeText}` : ''}` : ''}${ev.venue ? `
+📍 ${ev.venue}` : ''}
 
 With warm wishes,
 *Skåne Tamil Sangam* 🙏`;
@@ -379,8 +380,9 @@ function updateGroupLink() {
 // "Open WhatsApp in" pickers next to the group message and the family list
 const waPickerChanged = () => { updateGroupLink(); if ($('waArea').style.display !== 'none') renderWa(); document.querySelectorAll('.wa-mode select').forEach(s => { s.value = waMode(); }); };
 [$('groupOpen').parentNode, $('waLoadBtn').parentNode].forEach(el => { const pk = waModePicker(waPickerChanged); pk.classList.add('wa-mode'); el.after(pk); });
-$('groupMsg').value = GROUP_MESSAGE;
+$('groupMsg').value = GROUP_MESSAGE();
 updateGroupLink();
+document.addEventListener('admin-event', () => { $('groupMsg').value = GROUP_MESSAGE(); updateGroupLink(); });
 $('groupMsg').addEventListener('input', updateGroupLink);
 $('groupCopy').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText($('groupMsg').value); $('groupResult').textContent = '✓ Copied. Open your WhatsApp group, paste it and press Send.'; }
