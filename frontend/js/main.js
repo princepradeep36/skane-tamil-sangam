@@ -1,4 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // Footer year follows the calendar, so it never needs editing.
+  document.querySelectorAll('.copyright').forEach(el => { el.innerHTML = el.innerHTML.replace(/© \d{4}/, '© ' + new Date().getFullYear()); });
     const mobileBtn = document.getElementById('mobile-menu-btn');
     const navLinks = document.querySelector('.nav-links');
     const navbar = document.querySelector('.navbar');
