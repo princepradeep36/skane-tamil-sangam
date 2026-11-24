@@ -763,6 +763,11 @@
         // Events that sell only food or only snacks: show just that, with no Food / Snacks tabs.
         menuMode = (settings && settings.event && settings.event.menuMode) || 'BOTH';
         if (menuMode !== 'BOTH') activeCategory = menuMode;
+        if (settings && settings.event && settings.event.isOver) {
+          document.getElementById("vendors").innerHTML = `<div style="background:#eef6ff; border:1px solid #cfe3ff; color:#1849a9; padding:20px; border-radius:15px; margin-top:10px; text-align:center;"><strong>This event is over.</strong><p style="margin-bottom:0">Thank you! Click2Eat opens again with the next event.</p></div>`;
+          document.getElementById("checkoutBtn").style.display = "none";
+          return;
+        }
         if (settings && settings.food_ordering_enabled === false) {
           document.getElementById("vendors").innerHTML = `<div style="background:#fff3cd; border:1px solid #ffeeba; color:#856404; padding:20px; border-radius:15px; margin-top:10px; text-align:center;"><strong>Food ordering is closed.</strong><p style="margin-bottom:0">New orders are not being taken right now. You can still pay pending orders and view your receipts.</p></div>`;
           document.getElementById("checkoutBtn").style.display = "none";

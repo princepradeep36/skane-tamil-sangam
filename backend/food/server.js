@@ -90,13 +90,16 @@ async function getSettings() {
   result.rows.forEach(r => { if (r.key in settings) settings[r.key] = r.value; });
   const ev = events.current();
   for (const [key, column] of Object.entries(EVENT_SWITCHES)) settings[key] = ev ? !!ev[column] : false;
-  if (ev) settings.event = { id: ev.id, name: ev.name, shortName: ev.short_name, menuMode: ev.menu_mode || "BOTH" };
+  if (ev) settings.event = { id: ev.id, name: ev.name, shortName: ev.short_name, menuMode: ev.menu_mode || "BOTH", isOver: events.isOver(ev) };
   return settings;
 }
 
+const EVENT_OVER_MESSAGE = "This event is over. See you at the next one!";
+const EVENT_KEYS = ["event_registration_enabled", "food_ordering_enabled"];
 function requireSetting(key, message) {
   return async (req, res, next) => {
     try {
+      if (EVENT_KEYS.includes(key) && events.isOver()) return res.status(423).json({ error: EVENT_OVER_MESSAGE });
       if ((await getSettings())[key]) return next();
       res.status(423).json({ error: message }); // not 403: staff pages log out on 403
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -431,6 +434,7 @@ async function foodOrderEligibility(phone) {
 }
 
 app.get("/food-eligibility/:phone", async (req, res) => {
+  if (events.isOver()) return res.json({ eligible: false, code: "EVENT_OVER", error: EVENT_OVER_MESSAGE });
   try { res.json(await foodOrderEligibility(req.params.phone)); }
   catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -509,6 +513,7 @@ app.post("/order", requireFoodOrderingOpen, async (req, res) => {
 });
 
 app.get("/orders/:phone", async (req, res) => {
+  if (events.isOver()) return res.json([]);
   const data = await pool.query(`
     SELECT o.id, o.total, o.payment_status, o.delivery_status, v.name AS vendor, o.vendor_id,
       o.food_delivery, o.snacks_delivery,
@@ -915,6 +920,7 @@ app.post("/event/register", requireEventRegistrationOpen, async (req, res) => {
 });
 
 app.get("/event/registration/:phone", async (req, res) => {
+  if (events.isOver()) return res.status(410).json({ code: "EVENT_OVER", error: EVENT_OVER_MESSAGE });
   const normalizedPhone = normalizeInternationalPhone(req.params.phone);
   if (!normalizedPhone) return res.status(400).json({ error: "Enter a valid phone number with country code, for example +46701234567 or +919876543210." });
   const legacyPhone = legacySwedishPhone(normalizedPhone);
@@ -952,6 +958,7 @@ app.get("/event/registration/:phone", async (req, res) => {
 
 // Personal link from an email or WhatsApp message: opens the booking without typing the phone number.
 app.get("/event/booking/:id/:key", async (req, res) => {
+  if (events.isOver()) return res.status(410).json({ code: "EVENT_OVER", error: EVENT_OVER_MESSAGE });
   if (!/^\d+$/.test(req.params.id) || !validBookingKey(req.params.id, req.params.key))
     return res.status(404).json({ error: "This link is not valid any more. Please find your booking with your phone number." });
   const client = await pool.connect();
@@ -1025,6 +1032,7 @@ function imageContentType(buf) {
   return null;
 }
 app.put("/event/registration/:id/pay", express.raw({ type: 'image/*', limit: '5mb' }), async (req, res) => {
+  if (events.isOver()) return res.status(423).json({ error: EVENT_OVER_MESSAGE });
   const image = Buffer.isBuffer(req.body) ? req.body : null;
   const contentType = image && imageContentType(image);
   if (!contentType) return res.status(400).json({ error: "Please upload a screenshot of your Swish payment (JPG, PNG or WebP) before marking as paid." });
@@ -1435,6 +1443,7 @@ app.get("/my/booking", async (req, res) => {
       ORDER BY phone_match DESC, r.id DESC LIMIT 1`, [events.currentEventId(), phone || null, legacy, email]);
     const r = found.rows[0];
     const result = { member: { firstName: me.firstName || "", email: me.email || "", phone: me.phone || "", role: me.role || "member" }, registration: null, orders: [] };
+    if (events.isOver()) return res.json({ ...result, eventOver: true });
     if (r) {
       const checkin = await pool.query("SELECT checked_in_at FROM event_checkins WHERE registration_id=$1", [r.id]).catch(() => ({ rows: [] }));
       result.registration = {

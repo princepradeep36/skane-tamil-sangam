@@ -144,6 +144,16 @@ function createEvents(pool) {
   }
   const isoDate = ev => (ev && ev.event_date) || null;
 
+  // An event is over from the day after its date (Swedish time). Members and guests then no longer
+  // see its bookings, QR codes or food orders; admin pages still show everything.
+  function isOver(ev = current()) {
+    let d = isoDate(ev);
+    if (!d) return false;
+    if (d instanceof Date) d = d.toISOString().slice(0, 10);
+    const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Stockholm" });
+    return today > String(d).slice(0, 10);
+  }
+
   function imageUrl(ev, kind) {
     const v = ev.images && ev.images[kind];
     if (v) return `/food-api/event/${ev.id}/image/${kind}?v=${v}`;
@@ -161,6 +171,7 @@ function createEvents(pool) {
       introHtml: ev.intro_html, consentHtml: ev.consent_html, thanksHtml: ev.thanks_html,
       partnerName: ev.partner_name, partnerLogoUrl: ev.partner_name ? imageUrl(ev, "partner") : null, bannerUrl: imageUrl(ev, "banner"),
       askVolunteer: ev.ask_volunteer, askCultural: ev.ask_cultural,
+      isOver: isOver(ev),
       registrationOpen: ev.registration_open, foodOpen: ev.food_open, menuMode: ev.menu_mode || "BOTH",
       sweetsEnabled: ev.sweets_enabled, sweetsStartAt: ev.sweets_start_at
     };
@@ -330,7 +341,7 @@ function createEvents(pool) {
     const mode = (ev && ev.menu_mode) || "BOTH";
     return mode === "BOTH" ? ["FOOD", "SNACKS"] : [mode];
   }
-  const api = { menuCategories, ensureTables, reload, register, current, get, currentEventId, adminEventId, whenText, shortWhenText, publicView, setCurrentSwitch, cleanHtml };
+  const api = { isOver, menuCategories, ensureTables, reload, register, current, get, currentEventId, adminEventId, whenText, shortWhenText, publicView, setCurrentSwitch, cleanHtml };
   createEvents.instance = api;
   return api;
 }

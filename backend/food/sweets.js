@@ -55,6 +55,7 @@ module.exports = function registerSweets(app, { pool, requirePerm, hasPerm, wa, 
       if (!r) return res.status(404).json({ error: "This QR code is not valid." });
       const f = family(r);
       const ev = events.get(r.event_id);
+      if (ev && events.isOver(ev)) return res.status(410).json({ code: "EVENT_OVER", error: `${ev.short_name || "This event"} is over, so this QR code is no longer used. See you at the next event!` });
       res.json({
         ...f,
         checkedIn: f.checkedIn ? { at: f.checkedIn.at } : null,

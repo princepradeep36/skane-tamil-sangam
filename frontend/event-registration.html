@@ -356,6 +356,17 @@
                     document.getElementById('lookup-panel').classList.add('hidden');
                     return;
                 }
+                if (ev.isOver) {
+                    // The day after the event: bookings, payments and QR codes are no longer shown to guests.
+                    registrationClosed = true;
+                    const note = document.getElementById('registration-closed');
+                    note.innerHTML = `<strong>${ev.emoji || ''} ${ev.name} is over.</strong><br>Thank you for celebrating with us! The next event will be announced here.`;
+                    note.classList.remove('hidden');
+                    registrationForm.classList.add('hidden');
+                    document.getElementById('lookup-panel').classList.add('hidden');
+                    document.querySelectorAll('#payment-panel, #closed-booking-note').forEach(el => el.classList.add('hidden'));
+                    return;
+                }
                 if (ev.registrationOpen !== false) return;
                 registrationClosed = true;
                 document.getElementById('registration-closed').classList.remove('hidden');

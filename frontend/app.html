@@ -256,9 +256,20 @@
     const foodWord = ev => ({ FOOD: 'food', SNACKS: 'snacks' }[ev && ev.menuMode] || 'food & snacks');
     function isOver(ev) { return ev && ev.date && new Date(ev.date + 'T23:59:59') < new Date(); }
 
+    // The day after the event date the event shows only a thank-you and the feedback link.
+    function renderEventOver(ev) {
+        const card = $('event-card');
+        card.innerHTML = `${eventHead(ev)}
+            <div class="status info"><span class="ico">🙏</span><div><b>Thank you for celebrating with us!</b><span class="muted">The next event will show up here as soon as it's announced.</span></div></div>
+            <div class="btns one"><a class="btn gold" href="feedback.html">📝 Share your feedback</a></div></div>`;
+        card.hidden = false;
+        $('food-card').hidden = true;
+    }
+
     function renderEventLoggedOut(ev) {
         const card = $('event-card');
         if (!ev) { card.hidden = true; return; }
+        if (ev.isOver) return renderEventOver(ev);
         const open = ev.registrationOpen && !isOver(ev);
         card.innerHTML = `${eventHead(ev)}
             ${open ? `<div class="status info"><span class="ico">🎟️</span><div><b>Registration is open</b><span class="muted">Log in to see your booking, or find it with your phone number.</span></div></div>` : ''}
@@ -273,6 +284,7 @@
         const card = $('event-card');
         const reg = data.registration;
         if (!ev) { card.hidden = true; return; }
+        if (ev.isOver) return renderEventOver(ev);
         const open = ev.registrationOpen && !isOver(ev);
         let status = '', buttons = '';
         if (reg) {
@@ -313,6 +325,7 @@
     function renderFood(ev, data) {
         const card = $('food-card');
         const orders = data.orders || [];
+        if (ev && ev.isOver) { card.hidden = true; return; }
         if (!orders.length && !(ev && ev.foodOpen && data.registration)) { card.hidden = true; return; }
         const phone = data.orderPhone || (data.registration && data.registration.phone) || '';
         const name = data.registration ? data.registration.name : (data.member.firstName || '');
