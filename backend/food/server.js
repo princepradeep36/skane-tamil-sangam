@@ -9,7 +9,7 @@ const pool = require("./db");
 const initializeDatabase = require("./init-db");
 const mailer = require("./mailer");
 const wa = require("./whatsapp");
-const { validBookingKey } = require("./booking-link");
+const { validBookingKey, bookingUrl, sweetsPassUrl } = require("./booking-link");
 const registerConnectionGame = require("./connection-game"); // not "whatsapp": route bodies use that name for the phone field
 const registerQuizGame = require("./quiz-game");
 const registerSweets = require("./sweets");
@@ -1393,6 +1393,61 @@ app.put("/admin/order/:id/payment", requirePerm("food"), async (req, res) => {
     await pool.query("UPDATE orders SET payment_status=$1 WHERE id=$2", [status, req.params.id]);
     res.json({ success: true, status });
   } catch (err) { res.status(500).send(err.message); }
+});
+
+/* ================= MEMBER APP ("My Sangam" home, app.html) ================= */
+// A logged-in website member sees their booking for the current event, their QR pass and food orders.
+// The member's token is checked by the website backend, which also gives us the email and phone on the
+// account. The booking is the one registered with that phone number (or, failing that, that email).
+const SITE_BACKEND_URL = (process.env.SITE_BACKEND_URL || "http://site-backend:3001").replace(/\/$/, "");
+app.get("/my/booking", async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  const auth = String(req.headers.authorization || "");
+  if (!auth.startsWith("Bearer ")) return res.status(401).json({ error: "Please log in." });
+  let me;
+  try {
+    const r = await fetch(`${SITE_BACKEND_URL}/api/user/me`, { headers: { Authorization: auth } });
+    if (r.status === 401 || r.status === 404) return res.status(401).json({ error: "Please log in again." });
+    if (!r.ok) throw new Error(`site-backend ${r.status}`);
+    me = await r.json();
+  } catch (err) {
+    console.error("my/booking: member check failed:", err.message);
+    return res.status(502).json({ error: "Could not load your details right now. Please try again." });
+  }
+  try {
+    const phone = normalizeInternationalPhone(me.phone);
+    const legacy = phone ? legacySwedishPhone(phone) : null;
+    const email = String(me.email || "").trim().toLowerCase();
+    const found = await pool.query(`SELECT r.*, GREATEST(r.total_amount - r.paid_amount, 0) AS amount_due,
+        (r.phone = $2 OR ($3::text IS NOT NULL AND r.phone = $3)) AS phone_match
+      FROM event_registrations r
+      WHERE r.event_id = $1 AND r.registration_status <> 'CANCELLED'
+        AND ((($2::text IS NOT NULL) AND (r.phone = $2 OR ($3::text IS NOT NULL AND r.phone = $3))) OR ($4 <> '' AND lower(r.email) = $4))
+      ORDER BY phone_match DESC, r.id DESC LIMIT 1`, [events.currentEventId(), phone || null, legacy, email]);
+    const r = found.rows[0];
+    const result = { member: { firstName: me.firstName || "", email: me.email || "", phone: me.phone || "", role: me.role || "member" }, registration: null, orders: [] };
+    if (r) {
+      const checkin = await pool.query("SELECT checked_in_at FROM event_checkins WHERE registration_id=$1", [r.id]).catch(() => ({ rows: [] }));
+      result.registration = {
+        name: `${r.first_name} ${r.last_name}`.trim(), phone: r.phone,
+        adults: r.adults_count, kids6to12: r.kids_6_12_count, kidsUnder6: r.kids_below_6_count,
+        total: r.total_amount, amountDue: Number(r.amount_due), paymentStatus: r.payment_status,
+        checkedIn: !!(checkin.rows[0] && checkin.rows[0].checked_in_at),
+        // Relative links keep the member inside the app.
+        bookingUrl: bookingUrl(r).replace(/^https?:\/\/[^/]+/, ""), passUrl: sweetsPassUrl(r).replace(/^https?:\/\/[^/]+/, "")
+      };
+    }
+    const orderPhone = r ? r.phone : phone;
+    if (orderPhone) {
+      const orders = await pool.query(`SELECT o.id, o.total, o.payment_status, o.delivery_status, v.name AS vendor,
+          (SELECT COALESCE(SUM(oi.quantity),0) FROM order_items oi WHERE oi.order_id = o.id)::int AS items
+        FROM orders o JOIN vendors v ON v.id = o.vendor_id JOIN customers c ON c.id = o.customer_id
+        WHERE c.phone = ANY($1) AND o.event_id = $2 ORDER BY o.id DESC`, [customerPhones(orderPhone), events.currentEventId()]);
+      result.orders = orders.rows;
+      result.orderPhone = normalizeFoodPhone(orderPhone);
+    }
+    res.json(result);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Reuse existing details endpoint for fetching items of an order

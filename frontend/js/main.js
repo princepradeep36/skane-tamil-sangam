@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             loginLi.innerHTML = userRole === 'admin'
                 ? `<a href="admin-hub.html" class="nav-link">Dashboard</a>`
-                : `<a href="settings.html" class="nav-link">My Profile</a>`;
+                : `<a href="app.html" class="nav-link">My Sangam</a>`;
 
             const logoutBtn = document.createElement('button');
             logoutBtn.className = 'btn btn-outline';

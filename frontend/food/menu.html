@@ -1238,6 +1238,20 @@
     }
 
     // Removed payWithSwish and confirmPaid functions as they are moved to payment.html
+
+    // Opened from the phone app (app.html) or remembered from last time: fill in name and phone.
+    (function prefillGuest() {
+      const params = new URLSearchParams(location.search);
+      let saved = {};
+      try { saved = JSON.parse(localStorage.getItem("sts_guest") || "{}") || {}; } catch (e) { }
+      const name = params.get("name") || saved.name || "";
+      const phone = params.get("phone") || saved.phone || "";
+      const nameBox = document.getElementById("name"), phoneBox = document.getElementById("phone");
+      if (name && !nameBox.value) nameBox.value = name;
+      if (phone && !phoneBox.value) { phoneBox.value = phone; checkEligibility(); }
+      const remember = () => { try { localStorage.setItem("sts_guest", JSON.stringify({ name: nameBox.value.trim(), phone: phoneBox.value.trim() })); } catch (e) { } };
+      nameBox.addEventListener("change", remember); phoneBox.addEventListener("change", remember);
+    })();
   </script>
 </body>
 

@@ -40,6 +40,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/click2eat
       DB_SSL: "false"
       JWT_SECRET: ${FOOD_JWT_SECRET}
+      SITE_BACKEND_URL: http://site-backend:3001
     depends_on:
       postgres:
         condition: service_healthy

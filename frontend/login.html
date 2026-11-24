@@ -112,7 +112,7 @@
                     localStorage.setItem('user', JSON.stringify(data.user));
 
                     setTimeout(() => {
-                        window.location.href = data.role === 'admin' ? 'admin-hub.html' : 'index.html';
+                        window.location.href = data.role === 'admin' ? 'admin-hub.html' : 'app.html';
                     }, 800);
                 } else {
                     throw new Error(data.error || 'Invalid credentials');

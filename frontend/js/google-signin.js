@@ -38,7 +38,9 @@
             localStorage.setItem('authToken', data.token);
             localStorage.setItem('user', JSON.stringify(data.user));
             msg.textContent = '✓ Signed in. Redirecting…';
-            window.location.href = data.role === 'admin' ? 'admin-hub.html' : 'index.html';
+            // The app home (app.html) stays where it is; the website login goes to the member's app home.
+            if (box.dataset.next === 'app.html' && location.pathname.endsWith('/app.html')) { location.reload(); return; }
+            window.location.href = data.role === 'admin' ? 'admin-hub.html' : 'app.html';
         } catch (err) {
             msg.textContent = err.message;
         }

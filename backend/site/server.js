@@ -76,6 +76,9 @@ const sendResetEmail = async (email, token) => {
 
 
 
+// Members stay logged in on their phone app for 30 days; website admins still log in every 8 hours.
+const memberTokenLife = user => (user.role === 'admin' ? '8h' : '30d');
+
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'site-backend' }));
 
 // --- ROUTES ---
@@ -118,7 +121,7 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ error: "Invalid email or password" });
         }
 
-        const token = jwt.sign({ userId: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '8h' });
+        const token = jwt.sign({ userId: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: memberTokenLife(user) });
         res.json({
             message: "Login successful", role: user.role, token,
             user: { firstName: user.first_name, lastName: user.last_name, email: user.email }
@@ -156,13 +159,42 @@ app.post('/api/auth/google', async (req, res) => {
                 [info.given_name || email.split('@')[0], encryptData(info.family_name || ''), email, randomPassword]);
         }
         const user = result.rows[0];
-        const token = jwt.sign({ userId: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '8h' });
+        const token = jwt.sign({ userId: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: memberTokenLife(user) });
         res.json({
             message: "Login successful", role: user.role, token,
             user: { firstName: user.first_name, lastName: user.last_name, email: user.email }
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+// 1.1c The logged-in member's own details, for the app home (app.html). The food backend also calls this
+// to find the member's event booking by phone or email.
+app.get('/api/user/me', authenticateToken, async (req, res) => {
+    try {
+        const r = await pool.query('SELECT id, first_name, last_name, email, phone, role FROM members WHERE id = $1', [req.user.userId]);
+        if (!r.rows.length) return res.status(404).json({ error: "User not found" });
+        const m = r.rows[0];
+        let lastName = '', phone = '';
+        try { lastName = decryptData(m.last_name); } catch (e) { /* unreadable */ }
+        try { phone = decryptData(m.phone); } catch (e) { /* unreadable */ }
+        res.set('Cache-Control', 'no-store').json({ id: m.id, firstName: m.first_name, lastName, email: m.email, phone, role: m.role || 'member' });
+    } catch (err) {
+        res.status(500).json({ error: "Could not load your details" });
+    }
+});
+
+// 1.1d Members can add or change the phone number on their account (the one they register for events with).
+app.put('/api/user/phone', authenticateToken, async (req, res) => {
+    const phone = String(req.body?.phone || '').trim().replace(/[\s().-]/g, '');
+    if (!/^\+?\d{7,15}$/.test(phone)) return res.status(400).json({ error: "Please enter your phone number with country code, e.g. +46 70 123 45 67." });
+    try {
+        const r = await pool.query('UPDATE members SET phone = $1 WHERE id = $2', [encryptData(phone), req.user.userId]);
+        if (!r.rowCount) return res.status(404).json({ error: "User not found" });
+        res.json({ phone });
+    } catch (err) {
+        res.status(500).json({ error: "Could not save your phone number" });
     }
 });
 

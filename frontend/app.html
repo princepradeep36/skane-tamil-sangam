@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>My Sangam | Skåne Tamil Sangam</title>
+    <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --blue: #0056b3; --blue-dark: #003d80; --blue-light: #e6f0ff; --yellow: #ffc107; --yellow-light: #fff3cd;
+            --bg: #f6f3ee; --card: #ffffff; --text: #1a1a1a; --muted: #6b6b6b; --line: #ece7df;
+            --green: #1e8e3e; --green-light: #e6f4ea; --orange: #b45309; --orange-light: #fff4e5;
+            --radius: 18px; --shadow: 0 6px 24px rgba(0, 40, 100, .08);
+        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; }
+        body { background: var(--bg); color: var(--text); font-family: "League Spartan", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 17px; line-height: 1.4; -webkit-tap-highlight-color: transparent; }
+        [hidden] { display: none !important; }
+        a { color: inherit; }
+
+        .top { position: sticky; top: 0; z-index: 10; background: linear-gradient(135deg, var(--blue-dark), var(--blue)); color: #fff; padding: calc(12px + env(safe-area-inset-top)) 16px 12px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 12px rgba(0, 0, 0, .15); }
+        .top img { width: 40px; height: 40px; border-radius: 50%; background: #fff; }
+        .top .brand { flex: 1; min-width: 0; }
+        .top .brand b { display: block; font-size: 1.1rem; letter-spacing: .2px; }
+        .top .brand span { font-size: .8rem; opacity: .85; }
+        .top .me { background: rgba(255, 255, 255, .16); border: 0; color: #fff; border-radius: 999px; padding: 8px 14px; font: inherit; font-size: .9rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+
+        main { max-width: 560px; margin: 0 auto; padding: 16px 16px calc(32px + env(safe-area-inset-bottom)); }
+        .hello { margin: 6px 4px 14px; }
+        .hello h1 { margin: 0; font-size: 1.6rem; line-height: 1.15; }
+        .hello p { margin: 4px 0 0; color: var(--muted); font-size: .95rem; }
+
+        .card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; margin-bottom: 14px; overflow: hidden; }
+        .card h2 { margin: 0 0 10px; font-size: 1.15rem; display: flex; align-items: center; gap: 8px; }
+        .card h2 .count { margin-left: auto; font-size: .8rem; color: var(--muted); font-weight: 600; }
+        .muted { color: var(--muted); font-size: .92rem; }
+
+        .event { padding: 0; }
+        .event .banner { width: 100%; aspect-ratio: 16 / 7; object-fit: cover; display: block; background: var(--blue-light); }
+        .event .body { padding: 16px 18px 18px; }
+        .event .name { font-size: 1.3rem; font-weight: 800; margin: 0; }
+        .event .when { color: var(--muted); font-size: .95rem; margin-top: 2px; }
+
+        .status { margin-top: 14px; border-radius: 14px; padding: 12px 14px; display: flex; gap: 12px; align-items: flex-start; }
+        .status .ico { font-size: 1.4rem; line-height: 1; }
+        .status b { display: block; }
+        .status.ok { background: var(--green-light); }
+        .status.ok b { color: var(--green); }
+        .status.warn { background: var(--orange-light); }
+        .status.warn b { color: var(--orange); }
+        .status.info { background: var(--blue-light); }
+        .status.info b { color: var(--blue); }
+
+        .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .chip { background: #f1f1f1; border-radius: 999px; padding: 3px 10px; font-size: .82rem; font-weight: 600; }
+        .chip.paid { background: var(--green-light); color: var(--green); }
+        .chip.unpaid { background: var(--orange-light); color: var(--orange); }
+
+        .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+        .btns.one { grid-template-columns: 1fr; }
+        .btn { display: flex; align-items: center; justify-content: center; gap: 8px; text-align: center; text-decoration: none; border: 0; border-radius: 14px; padding: 13px 12px; font: inherit; font-weight: 700; font-size: 1rem; cursor: pointer; min-height: 50px; }
+        .btn.primary { background: var(--blue); color: #fff; }
+        .btn.gold { background: var(--yellow); color: #1a1a1a; }
+        .btn.ghost { background: var(--blue-light); color: var(--blue); }
+        .btn.plain { background: #f3f3f3; color: var(--text); }
+        .btn:active { transform: scale(.98); }
+
+        .live { background: linear-gradient(135deg, #5b21b6, #7c3aed); color: #fff; display: flex; align-items: center; gap: 14px; text-decoration: none; }
+        .live .ico { font-size: 2rem; }
+        .live b { display: block; font-size: 1.1rem; }
+        .live span { opacity: .9; font-size: .92rem; }
+        .live .go { margin-left: auto; background: #fff; color: #5b21b6; border-radius: 999px; padding: 8px 14px; font-weight: 800; white-space: nowrap; }
+        .pulse { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #4ade80; margin-right: 6px; animation: pulse 1.4s infinite; vertical-align: middle; }
+        @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: .3 } }
+
+        .orders { list-style: none; margin: 0; padding: 0; }
+        .orders li { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+        .orders li:first-child { border-top: 0; padding-top: 0; }
+        .orders .v { flex: 1; min-width: 0; }
+        .orders .v b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .orders .amt { font-weight: 800; white-space: nowrap; }
+
+        .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+        .tile { background: var(--card); border-radius: 16px; box-shadow: var(--shadow); padding: 14px 6px; text-align: center; text-decoration: none; font-weight: 600; font-size: .88rem; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+        .tile .e { font-size: 1.6rem; line-height: 1; }
+
+        .admin { background: linear-gradient(135deg, #7a1f2b, #a32a3a); color: #fff; }
+        .admin h2 { color: #fff; }
+        .admin .muted { color: rgba(255, 255, 255, .85); }
+        .admin .btn.gold { background: #ffd76a; }
+        .admin .btn.plain { background: rgba(255, 255, 255, .15); color: #fff; }
+
+        form { margin: 0; }
+        label { display: block; font-size: .85rem; font-weight: 600; color: var(--muted); margin: 12px 0 6px; }
+        input { width: 100%; border: 1.5px solid #ddd; border-radius: 12px; padding: 13px 14px; font: inherit; font-size: 1rem; background: #fff; }
+        input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-light); }
+        .err { color: #c62828; font-size: .9rem; margin-top: 10px; }
+        .links { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; font-size: .92rem; }
+        .links a { color: var(--blue); font-weight: 600; text-decoration: none; }
+        .or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .85rem; margin: 16px 0 12px; }
+        .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+        .hint { margin-top: 12px; background: #faf8f4; border-radius: 12px; padding: 10px 12px; font-size: .85rem; color: var(--muted); }
+
+        .skeleton { height: 120px; border-radius: var(--radius); background: linear-gradient(90deg, #eee 25%, #f6f6f6 50%, #eee 75%); background-size: 200% 100%; animation: sk 1.2s infinite; margin-bottom: 14px; }
+        @keyframes sk { to { background-position: -200% 0 } }
+        .foot { text-align: center; color: var(--muted); font-size: .8rem; margin-top: 18px; }
+        .foot a { color: var(--muted); }
+    </style>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#0056b3">
+    <link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Tamil Sangam">
+    <script src="/js/pwa.js" defer></script>
+</head>
+<body>
+    <header class="top">
+        <img src="/icons/icon-192.png" alt="">
+        <div class="brand"><b>Skåne Tamil Sangam</b><span>யாதும் ஊரே யாவரும் கேளிர்</span></div>
+        <button class="me" id="me-btn" type="button">Log in</button>
+    </header>
+
+    <main>
+        <div class="hello" id="hello"><h1>Vanakkam 🙏</h1><p>Your Sangam events, bookings and food in one place.</p></div>
+
+        <!-- Staff / admin / vendor session (Click2Eat login) -->
+        <section class="card admin" id="staff-card" hidden></section>
+
+        <!-- A game on stage right now -->
+        <div id="games"></div>
+
+        <!-- Current event + my booking -->
+        <div class="skeleton" id="loading"></div>
+        <section class="card event" id="event-card" hidden></section>
+
+        <!-- My food orders -->
+        <section class="card" id="food-card" hidden></section>
+
+        <!-- Log in -->
+        <section class="card" id="login-card" hidden>
+            <h2>🔐 Log in</h2>
+            <p class="muted" style="margin:0">See your booking, QR code and food orders in one place.</p>
+            <form id="login-form" autocomplete="on">
+                <label for="login-id">Email (members) or username (admins, staff, vendors)</label>
+                <input id="login-id" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+                <label for="login-pass">Password</label>
+                <input id="login-pass" name="password" type="password" autocomplete="current-password" required>
+                <div class="err" id="login-err" hidden></div>
+                <div class="btns one"><button class="btn primary" type="submit" id="login-btn">Log in</button></div>
+            </form>
+            <div id="google-signin" data-text="signin_with" data-next="app.html" hidden>
+                <div class="or">or</div>
+                <div id="google-signin-button" style="display:flex;justify-content:center"></div>
+                <div id="google-signin-msg" class="muted" style="text-align:center;margin-top:8px"></div>
+            </div>
+            <div class="links"><a href="join.html">Create account</a><a href="forgot-password.html">Forgot password?</a></div>
+        </section>
+
+        <!-- Shortcuts -->
+        <div class="tiles" id="tiles">
+            <a class="tile" href="events.html"><span class="e">📅</span>Events</a>
+            <a class="tile" href="gallery.html"><span class="e">📸</span>Gallery</a>
+            <a class="tile" href="feedback.html"><span class="e">📝</span>Feedback</a>
+            <a class="tile" href="about.html"><span class="e">🤝</span>About us</a>
+            <a class="tile" href="contact.html"><span class="e">✉️</span>Contact</a>
+            <a class="tile" href="index.html"><span class="e">🌐</span>Website</a>
+        </div>
+
+        <section class="card" id="account-card" hidden></section>
+
+        <p class="foot">Skåne Tamil Sangam · <a href="privacy.html">Privacy</a></p>
+    </main>
+
+    <script>
+    // "My Sangam": the phone app's home (manifest start_url). Shows the current event, the member's own
+    // booking, QR pass and food orders when they are logged in, a live game, and admin/staff/vendor shortcuts.
+    // Members log in with email (website account, kept in localStorage like the website login); admins, staff
+    // and vendors with a username (Click2Eat login, kept in sessionStorage like the admin pages).
+    const $ = id => document.getElementById(id);
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const kr = n => `${Number(n || 0).toLocaleString('sv-SE')} kr`;
+    const get = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+    const memberToken = () => get('authToken');
+    const staffRole = () => sessionStorage.getItem('user_role');
+    const staffToken = () => sessionStorage.getItem('auth_token');
+
+    function memberLogout() {
+        ['authToken', 'userRole', 'user', 'sts_booking', 'sts_guest'].forEach(k => { try { localStorage.removeItem(k); } catch (e) { } });
+    }
+    function staffLogout() { sessionStorage.clear(); }
+
+    async function getJson(url, opts) {
+        const r = await fetch(url, { cache: 'no-store', ...(opts || {}) });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) { const e = new Error(data.error || `HTTP ${r.status}`); e.status = r.status; throw e; }
+        return data;
+    }
+
+    /* ---------- Staff, admins and vendors ---------- */
+    function staffHome() {
+        const role = staffRole();
+        if (role === 'vendor') return `/food/vendor.html?vendor_id=${encodeURIComponent(sessionStorage.getItem('vendor_id') || '')}`;
+        if (role === 'scanner') return '/food/admin-sweets.html';
+        if (role === 'staff') {
+            let perms = []; try { perms = JSON.parse(sessionStorage.getItem('user_perms') || '[]'); } catch (e) { }
+            if (perms.length && perms.every(p => ['checkin', 'sweets', 'scan_override'].includes(p))) return '/food/admin-sweets.html';
+        }
+        return '/food/admin.html?admin=true';
+    }
+    function renderStaff() {
+        const card = $('staff-card');
+        const role = staffRole();
+        if (!staffToken() || !role) { card.hidden = true; return; }
+        const label = { admin: 'Admin', staff: 'Staff', scanner: 'QR scanner', vendor: 'Vendor' }[role] || 'Staff';
+        const title = role === 'vendor' ? '🍽️ Vendor dashboard' : '🛠️ Admin Home';
+        card.innerHTML = `<h2>${title}</h2>
+            <p class="muted" style="margin:0">You're logged in as <b>${label}</b>.</p>
+            <div class="btns"><a class="btn gold" href="${staffHome()}">Open</a><button class="btn plain" type="button" id="staff-out">Log out</button></div>`;
+        card.hidden = false;
+        $('staff-out').onclick = () => { staffLogout(); render(); };
+    }
+
+    /* ---------- Live games ---------- */
+    const GAMES = [
+        { kind: 'quiz', name: 'Quiz', url: '/quiz.html', token: 'quizToken', live: ['LOBBY', 'QUESTION', 'RESULT', 'BOARD'] },
+        { kind: 'clue', name: 'Clue Game', url: '/connection.html?game=clue', token: 'clueToken', live: ['LOBBY', 'PLAYING'] },
+        { kind: 'connection', name: 'Connection Game', url: '/connection.html', token: 'connectionToken', live: ['LOBBY', 'PLAYING'] }
+    ];
+    async function renderGames() {
+        const box = $('games');
+        const found = await Promise.all(GAMES.map(async g => {
+            try {
+                const t = get(g.token) || '';
+                const s = await getJson(`/food-api/${g.kind}/me?token=${encodeURIComponent(t)}`);
+                if (g.live.includes(s.status)) return { g, s, joined: !s.needJoin };
+            } catch (e) { }
+            return null;
+        }));
+        box.innerHTML = found.filter(Boolean).map(({ g, s, joined }) => `
+            <a class="card live" href="${g.url}">
+                <span class="ico">🎮</span>
+                <div><b><span class="pulse"></span>${esc(g.name)} is live</b><span>${joined ? `You're playing as ${esc(s.name || '')}` : (s.status === 'LOBBY' ? 'Join now before it starts' : 'Join the game now')}</span></div>
+                <span class="go">${joined ? 'Back to game' : 'Play'}</span>
+            </a>`).join('');
+    }
+
+    /* ---------- Event and my booking ---------- */
+    let currentEvent = null;
+    function eventHead(ev) {
+        return `${ev.bannerUrl ? `<img class="banner" src="${esc(ev.bannerUrl)}" alt="">` : ''}
+            <div class="body"><p class="name">${esc(ev.emoji || '')} ${esc(ev.name || ev.shortName || 'Our next event')}</p>
+            <div class="when">${esc([ev.whenText || ev.shortWhenText, ev.venue].filter(Boolean).join(' · '))}</div>`;
+    }
+    function isOver(ev) { return ev && ev.date && new Date(ev.date + 'T23:59:59') < new Date(); }
+
+    function renderEventLoggedOut(ev) {
+        const card = $('event-card');
+        if (!ev) { card.hidden = true; return; }
+        const open = ev.registrationOpen && !isOver(ev);
+        card.innerHTML = `${eventHead(ev)}
+            ${open ? `<div class="status info"><span class="ico">🎟️</span><div><b>Registration is open</b><span class="muted">Log in to see your booking, or find it with your phone number.</span></div></div>` : ''}
+            <div class="btns">${open ? `<a class="btn gold" href="event-registration.html">Register</a>` : `<a class="btn gold" href="events.html#diwali">See event</a>`}
+            <a class="btn ghost" href="event-registration.html#lookup-panel">Find my booking</a></div>
+            ${ev.foodOpen ? `<div class="btns one"><a class="btn plain" href="food/menu.html">🍛 Order food (Click2Eat)</a></div>` : ''}
+            </div>`;
+        card.hidden = false;
+    }
+
+    function renderEventMember(ev, data) {
+        const card = $('event-card');
+        const reg = data.registration;
+        if (!ev) { card.hidden = true; return; }
+        const open = ev.registrationOpen && !isOver(ev);
+        let status = '', buttons = '';
+        if (reg) {
+            const paid = reg.paymentStatus === 'PAID' && !reg.amountDue;
+            const people = [`${reg.adults} adult${reg.adults === 1 ? '' : 's'}`];
+            const kids = Number(reg.kids6to12 || 0) + Number(reg.kidsUnder6 || 0);
+            if (kids) people.push(`${kids} kid${kids === 1 ? '' : 's'}`);
+            status = paid
+                ? `<div class="status ok"><span class="ico">✅</span><div><b>You're registered and paid</b><span class="muted">${esc(reg.name)} · ${people.join(', ')}${reg.checkedIn ? ' · checked in' : ''}</span></div></div>`
+                : `<div class="status warn"><span class="ico">⏳</span><div><b>Registered, payment pending</b><span class="muted">${esc(reg.name)} · ${people.join(', ')} · ${kr(reg.amountDue || reg.total)} to pay</span></div></div>`;
+            buttons = `<div class="btns">
+                <a class="btn gold" href="${esc(reg.passUrl)}">🎟️ My QR code</a>
+                <a class="btn ${paid ? 'ghost' : 'primary'}" href="${esc(reg.bookingUrl)}">${paid ? 'View booking' : '💳 Pay now'}</a></div>`;
+        } else if (!data.member.phone) {
+            status = `<div class="status info"><span class="ico">📱</span><div><b>Add your phone number</b><span class="muted">Use the number you register for events with, so we can find your booking.</span></div></div>
+                <form id="phone-form"><label for="my-phone">Phone number</label><input id="my-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+46 70 123 45 67" required>
+                <div class="err" id="phone-err" hidden></div><div class="btns one"><button class="btn primary" type="submit">Save</button></div></form>`;
+            buttons = open ? `<div class="btns one"><a class="btn gold" href="event-registration.html">Register for this event</a></div>` : '';
+        } else if (open) {
+            status = `<div class="status info"><span class="ico">🎟️</span><div><b>You haven't registered yet</b><span class="muted">No booking found for ${esc(data.member.phone)}.</span></div></div>`;
+            buttons = `<div class="btns"><a class="btn gold" href="event-registration.html">Register now</a><a class="btn ghost" href="event-registration.html#lookup-panel">Find booking</a></div>`;
+        } else {
+            status = `<div class="status info"><span class="ico">ℹ️</span><div><b>No booking for this event</b><span class="muted">Registration is closed.</span></div></div>`;
+        }
+        card.innerHTML = `${eventHead(ev)}${status}${buttons}</div>`;
+        card.hidden = false;
+        const form = $('phone-form');
+        if (form) form.onsubmit = async e => {
+            e.preventDefault();
+            const err = $('phone-err'); err.hidden = true;
+            try {
+                await getJson('/api/user/phone', { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${memberToken()}` }, body: JSON.stringify({ phone: $('my-phone').value }) });
+                render();
+            } catch (x) { err.textContent = x.message; err.hidden = false; }
+        };
+    }
+
+    function renderFood(ev, data) {
+        const card = $('food-card');
+        const orders = data.orders || [];
+        if (!orders.length && !(ev && ev.foodOpen && data.registration)) { card.hidden = true; return; }
+        const phone = data.orderPhone || (data.registration && data.registration.phone) || '';
+        const name = data.registration ? data.registration.name : (data.member.firstName || '');
+        const q = `phone=${encodeURIComponent(phone)}&name=${encodeURIComponent(name)}`;
+        const list = orders.length ? `<ul class="orders">${orders.map(o => `<li>
+                <div class="v"><b>${esc(o.vendor)}</b><span class="muted">#${o.id} · ${o.items} item${o.items === 1 ? '' : 's'} · ${esc(o.delivery_status || 'Pending')}</span></div>
+                <span class="chip ${o.payment_status === 'PAID' ? 'paid' : 'unpaid'}">${o.payment_status === 'PAID' ? 'Paid' : 'Unpaid'}</span>
+                <span class="amt">${kr(o.total)}</span></li>`).join('')}</ul>`
+            : `<p class="muted" style="margin:0">No food orders yet.</p>`;
+        card.innerHTML = `<h2>🍛 My food orders <span class="count">${orders.length ? orders.length : ''}</span></h2>${list}
+            <div class="btns">${ev && ev.foodOpen ? `<a class="btn gold" href="food/menu.html?${q}">Order food</a>` : ''}
+            ${orders.length ? `<a class="btn ghost" href="food/receipts.html?phone=${encodeURIComponent(phone)}">Receipts</a>` : ''}
+            ${orders.some(o => o.payment_status !== 'PAID') ? `<a class="btn primary" href="food/payment.html?phone=${encodeURIComponent(phone)}">💳 Pay</a>` : ''}</div>`;
+        const n = card.querySelectorAll('.btns .btn').length;
+        card.querySelector('.btns').classList.toggle('one', n === 1);
+        if (n === 3) card.querySelector('.btns').style.gridTemplateColumns = '1fr 1fr 1fr';
+        card.hidden = false;
+    }
+
+    function renderAccount(data) {
+        const card = $('account-card');
+        const admin = data.member.role === 'admin';
+        card.innerHTML = `<h2>👤 ${esc(data.member.firstName || 'My account')}</h2>
+            <p class="muted" style="margin:0">${esc(data.member.email)}${data.member.phone ? ` · ${esc(data.member.phone)}` : ''}</p>
+            <div class="btns">${admin ? `<a class="btn ghost" href="admin-hub.html">🌐 Website admin</a>` : `<a class="btn ghost" href="settings.html">My profile</a>`}
+            <button class="btn plain" type="button" id="member-out">Log out</button></div>`;
+        card.hidden = false;
+        $('member-out').onclick = () => { memberLogout(); render(); };
+    }
+
+    /* ---------- Log in ---------- */
+    $('login-form').onsubmit = async e => {
+        e.preventDefault();
+        const id = $('login-id').value.trim(), pass = $('login-pass').value;
+        const err = $('login-err'), btn = $('login-btn');
+        err.hidden = true; btn.disabled = true; btn.textContent = 'Logging in…';
+        try {
+            if (id.includes('@')) {
+                const data = await getJson('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: id, password: pass }) });
+                localStorage.setItem('userRole', data.role);
+                localStorage.setItem('authToken', data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+                $('login-pass').value = '';
+                await render();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                const r = await fetch('/food-api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: id, password: pass }) });
+                if (!r.ok) throw new Error('Wrong username or password.');
+                const data = await r.json();
+                sessionStorage.clear();
+                sessionStorage.setItem('user_role', data.role);
+                sessionStorage.setItem('auth_token', data.token);
+                sessionStorage.setItem('vendor_id', data.vendor_id || '');
+                sessionStorage.setItem('user_perms', JSON.stringify(data.permissions || []));
+                location.href = staffHome();
+                return;
+            }
+        } catch (x) {
+            err.textContent = x.status === 401 ? 'Wrong email or password.' : x.message;
+            err.hidden = false;
+        }
+        btn.disabled = false; btn.textContent = 'Log in';
+    };
+    $('me-btn').onclick = () => {
+        if (memberToken()) $('account-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        else if (!$('login-card').hidden) { $('login-card').scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => $('login-id').focus(), 350); }
+    };
+
+    /* ---------- Page ---------- */
+    async function render() {
+        renderStaff();
+        renderGames();
+        const evP = getJson('/food-api/event/current').catch(() => null);
+        let data = null;
+        if (memberToken()) {
+            try { data = await getJson('/food-api/my/booking', { headers: { Authorization: `Bearer ${memberToken()}` } }); }
+            catch (x) { if (x.status === 401) memberLogout(); }
+        }
+        const ev = await evP;
+        currentEvent = ev;
+        $('loading').hidden = true;
+        if (data) {
+            const name = data.member.firstName || '';
+            $('hello').innerHTML = `<h1>Vanakkam${name ? `, ${esc(name)}` : ''} 🙏</h1><p>Here's everything for you in one place.</p>`;
+            $('me-btn').textContent = name ? name.slice(0, 14) : 'Account';
+            // Click2Eat (food/menu.html) fills in name and phone from this.
+            const phone = data.orderPhone || (data.registration && data.registration.phone) || data.member.phone;
+            // The Event tab opens the member's own booking.
+            try { data.registration ? localStorage.setItem('sts_booking', data.registration.bookingUrl) : localStorage.removeItem('sts_booking'); } catch (e) { }
+            if (phone) try { localStorage.setItem('sts_guest', JSON.stringify({ name: data.registration ? data.registration.name : name, phone })); } catch (e) { }
+            renderEventMember(ev, data);
+            renderFood(ev, data);
+            renderAccount(data);
+            $('login-card').hidden = true;
+        } else {
+            $('hello').innerHTML = `<h1>Vanakkam 🙏</h1><p>Your Sangam events, bookings and food in one place.</p>`;
+            $('me-btn').textContent = staffToken() ? 'Account' : 'Log in';
+            renderEventLoggedOut(ev);
+            $('food-card').hidden = true;
+            $('account-card').hidden = true;
+            $('login-card').hidden = false;
+        }
+    }
+    function showMe() {
+        if (location.hash !== '#me') return;
+        const target = memberToken() ? $('account-card') : $('login-card');
+        if (!target.hidden) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    render().then(showMe);
+    window.addEventListener('hashchange', () => {
+        document.querySelectorAll('#sts-tabs a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === (location.hash === '#me' ? '/app.html#me' : '/app.html')));
+        if (location.hash === '#me') showMe(); else window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    // Coming back to the app (or to this page) refreshes the booking, orders and live games.
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') render(); });
+    window.addEventListener('pageshow', e => { if (e.persisted) render(); });
+    </script>
+    <script src="js/google-signin.js"></script>
+</body>
+</html>

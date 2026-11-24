@@ -854,6 +854,9 @@
                 statusMsg.textContent = 'Error: ' + err.message;
             }
         });
+    
+        // Opened from the phone app: the phone number the member uses is already filled in for Find Booking.
+        try { const g = JSON.parse(localStorage.getItem('sts_guest') || '{}'); const box = document.getElementById('lookupPhone'); if (g.phone && box && !box.value && !new URLSearchParams(location.search).get('booking')) box.value = g.phone; } catch (e) { }
     </script>
 </body>
 
