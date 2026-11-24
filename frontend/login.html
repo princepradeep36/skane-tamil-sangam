@@ -39,7 +39,7 @@
                 </a>
                 <h1 class="text-primary" style="font-size: 2.2rem; margin-bottom: 0.5rem; letter-spacing: -0.5px;">
                     Welcome Back</h1>
-                <p class="text-muted" style="font-size: 1.05rem;">Sign in to access your dashboard.</p>
+                <p class="text-muted" style="font-size: 1.05rem;">Members sign in with their email. Admins, staff and vendors use their username.</p>
             </div>
 
             <div id="google-signin" data-text="signin_with" hidden style="margin-bottom: 1.75rem; text-align: center;">
@@ -51,8 +51,8 @@
             </div>
             <form id="login-form">
                 <div class="form-group">
-                    <label class="form-label">Email Address</label>
-                    <input type="email" class="form-input" placeholder="name@example.com" required>
+                    <label class="form-label" for="login-id">Email or username</label>
+                    <input type="text" id="login-id" class="form-input" placeholder="name@example.com or username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
                 </div>
                 <div class="form-group" style="margin-bottom: 1rem;">
                     <label class="form-label">Password</label>
@@ -84,7 +84,7 @@
 
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const email = document.querySelector('input[type="email"]').value;
+            const email = document.getElementById('login-id').value.trim();
             const password = document.querySelector('input[type="password"]').value;
             const statusMsg = document.getElementById('status-msg');
             const btn = document.getElementById('login-btn');
@@ -95,13 +95,29 @@
             statusMsg.textContent = '';
 
             try {
+                // No @: an admin, staff or vendor username (Click2Eat login), same as the app's login box.
+                if (!email.includes('@')) {
+                    const r = await fetch('/food-api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: email, password }) });
+                    if (!r.ok) throw new Error('Wrong username or password.');
+                    const d = await r.json();
+                    sessionStorage.clear();
+                    sessionStorage.setItem('user_role', d.role);
+                    sessionStorage.setItem('auth_token', d.token);
+                    sessionStorage.setItem('vendor_id', d.vendor_id || '');
+                    sessionStorage.setItem('user_perms', JSON.stringify(d.permissions || []));
+                    const perms = d.permissions || [];
+                    window.location.href = d.role === 'vendor' ? `food/vendor.html?vendor_id=${encodeURIComponent(d.vendor_id || '')}`
+                        : (d.role === 'scanner' || (d.role === 'staff' && perms.length && perms.every(p => ['checkin', 'sweets', 'scan_override'].includes(p)))) ? 'food/admin-sweets.html'
+                        : 'food/admin.html?admin=true';
+                    return;
+                }
                 const response = await fetch(`${API_BASE_URL}/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password })
                 });
 
-                const data = await response.json();
+                const data = await response.json().catch(() => ({ error: 'The server is busy. Please try again in a minute.' }));
 
                 if (response.ok) {
                     statusMsg.className = 'alert alert-success';

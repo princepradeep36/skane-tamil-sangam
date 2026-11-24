@@ -29,39 +29,38 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ─── Login State Aware Navigation ────────────────────────
+    // Every page's menu ends with the account links: "Log in" + "Join" when logged out, "My Sangam" +
+    // "Log out" for members, and "Admin" for admins, staff and vendors (Click2Eat login, this tab only).
     const updateNavbar = () => {
         if (!navLinks) return;
-        const user = JSON.parse(localStorage.getItem('user'));
+        let user = null;
+        try { user = JSON.parse(localStorage.getItem('user')); } catch (e) { }
         const userRole = localStorage.getItem('userRole');
-        const loginLink = Array.from(navLinks.querySelectorAll('a'))
-            .find(a => a.getAttribute('href') === 'login.html');
-        const joinBtn = navLinks.querySelector('.btn-secondary');
-
-        if (user && loginLink) {
-            const loginLi = loginLink.parentElement;
-            const joinLi = joinBtn ? joinBtn.parentElement : null;
-
-            loginLi.innerHTML = userRole === 'admin'
-                ? `<a href="admin-hub.html" class="nav-link">Dashboard</a>`
-                : `<a href="app.html" class="nav-link">My Sangam</a>`;
-
-            const logoutBtn = document.createElement('button');
-            logoutBtn.className = 'btn btn-outline';
-            logoutBtn.style.cssText = 'padding: 0.6rem 1.25rem; font-size: 0.9rem;';
-            logoutBtn.textContent = 'Logout';
-            logoutBtn.onclick = () => {
-                localStorage.clear();
+        const staffRole = sessionStorage.getItem('user_role');
+        const staffToken = sessionStorage.getItem('auth_token');
+        // Remove any account links already in the page's markup, then add the right ones.
+        navLinks.querySelectorAll('a[href="login.html"], a[href="join.html"], a[href="settings.html"], a[href="admin-hub.html"]').forEach(a => {
+            if (!a.closest('.nav-links > li')) return;
+            if (a.classList.contains('active')) return; // keep the current page's own link
+            a.closest('li').remove();
+        });
+        const here = location.pathname.split('/').pop();
+        const add = html => { const li = document.createElement('li'); li.className = 'nav-account'; li.innerHTML = html; navLinks.appendChild(li); return li; };
+        const btnStyle = 'padding: 0.6rem 1.25rem; font-size: 0.9rem;';
+        if (staffToken && staffRole) {
+            const href = staffRole === 'vendor' ? `food/vendor.html?vendor_id=${encodeURIComponent(sessionStorage.getItem('vendor_id') || '')}` : 'food/admin.html?admin=true';
+            add(`<a href="${href}" class="nav-link">${staffRole === 'vendor' ? 'Vendor' : 'Admin'}</a>`);
+        }
+        if (user) {
+            add(userRole === 'admin' ? `<a href="admin-hub.html" class="nav-link">Dashboard</a>` : `<a href="app.html" class="nav-link">My Sangam</a>`);
+            const li = add(`<button class="btn btn-outline" style="${btnStyle}">Log out</button>`);
+            li.querySelector('button').onclick = () => {
+                ['authToken', 'userRole', 'user', 'sts_booking', 'sts_guest'].forEach(k => localStorage.removeItem(k));
                 window.location.href = 'index.html';
             };
-
-            if (joinLi) {
-                joinLi.innerHTML = '';
-                joinLi.appendChild(logoutBtn);
-            } else {
-                const newLi = document.createElement('li');
-                newLi.appendChild(logoutBtn);
-                navLinks.appendChild(newLi);
-            }
+        } else if (!(staffToken && staffRole)) {
+            if (here !== 'login.html') add(`<a href="login.html" class="nav-link">Log in</a>`);
+            if (here !== 'join.html') add(`<a href="join.html" class="btn btn-secondary" style="${btnStyle}">Join</a>`);
         }
     };
 
