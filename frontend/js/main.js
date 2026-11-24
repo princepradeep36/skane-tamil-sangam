@@ -1,6 +1,14 @@
 document.addEventListener('DOMContentLoaded', () => {
-  // Footer year follows the calendar, so it never needs editing.
-  document.querySelectorAll('.copyright').forEach(el => { el.innerHTML = el.innerHTML.replace(/© \d{4}/, '© ' + new Date().getFullYear()); });
+  // Year labels (footer and [data-year]) follow the server's clock, so they never need editing.
+  // The phone's own year shows first; the server's year (from its Date header) replaces it a moment later.
+  const showYear = y => {
+    document.querySelectorAll('.copyright').forEach(el => { el.innerHTML = el.innerHTML.replace(/© \d{4}/, '© ' + y); });
+    document.querySelectorAll('[data-year]').forEach(el => { el.textContent = y; });
+  };
+  showYear(new Date().getFullYear());
+  fetch(location.pathname, { method: 'HEAD', cache: 'no-store' })
+    .then(r => { const y = new Date(r.headers.get('Date')).getFullYear(); if (y > 2000) showYear(y); })
+    .catch(() => {});
     const mobileBtn = document.getElementById('mobile-menu-btn');
     const navLinks = document.querySelector('.nav-links');
     const navbar = document.querySelector('.navbar');
