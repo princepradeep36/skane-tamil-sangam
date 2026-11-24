@@ -20,6 +20,16 @@ server {
     client_max_body_size 6m;
     proxy_set_header Host $host; proxy_set_header X-Real-IP $remote_addr; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; proxy_set_header X-Forwarded-Proto https;
   }
+  # Phone app (installable web app): the manifest and service worker must never be cached,
+  # so a deploy reaches installed apps straight away.
+  location = /manifest.webmanifest {
+    default_type application/manifest+json;
+    add_header Cache-Control "no-cache" always;
+  }
+  location = /sw.js {
+    add_header Cache-Control "no-cache" always;
+    add_header Service-Worker-Allowed "/" always;
+  }
   location / {
     try_files $uri $uri/ =404;
     location ~* \.(html|css|js)$ {
