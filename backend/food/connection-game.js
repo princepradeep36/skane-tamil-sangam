@@ -297,7 +297,7 @@ module.exports = function registerConnectionGame(app, { pool, requireAdmin, imag
     try {
       const q = await pool.query(`SELECT content_type, image FROM ${ITEMS} WHERE id=$1 AND image IS NOT NULL`, [id]);
       if (!q.rows.length) return res.status(404).json({ error: "Not found" });
-      res.set("Content-Type", q.rows[0].content_type).set("Cache-Control", "no-store").send(Buffer.from(q.rows[0].image));
+      res.set("Content-Type", q.rows[0].content_type).set("Cache-Control", "private, max-age=3600").send(Buffer.from(q.rows[0].image));
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 

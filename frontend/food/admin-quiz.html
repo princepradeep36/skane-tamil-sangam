@@ -302,7 +302,10 @@ setInterval(() => {
 }, 250);
 
 poll();
-setInterval(poll, 1000);
+// Poll only while this page is on screen (a locked phone or background tab stops asking the server);
+// coming back catches up straight away.
+setInterval(() => { if (!document.hidden) poll(); }, 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
 loadQuestions();
 </script>
 </body>

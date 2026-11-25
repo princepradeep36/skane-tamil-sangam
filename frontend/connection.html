@@ -288,7 +288,10 @@ async function tick() {
 }
 
 tick();
-setInterval(tick, 1200);
+// Poll only while this page is on screen (a locked phone or background tab stops asking the server);
+// coming back catches up straight away.
+setInterval(() => { if (!document.hidden) tick(); }, 1200);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
 </script>
 </body>
 </html>
