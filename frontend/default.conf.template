@@ -30,6 +30,10 @@ server {
     add_header Cache-Control "no-cache" always;
     add_header Service-Worker-Allowed "/" always;
   }
+  # The old separate admin login (/admin/) was removed; admins sign in on /login.html.
+  # Old bookmarks still work.
+  location = /admin { return 302 /login.html; }
+  location ^~ /admin/ { return 302 /login.html; }
   location / {
     try_files $uri $uri/ =404;
     location ~* \.(html|css|js)$ {

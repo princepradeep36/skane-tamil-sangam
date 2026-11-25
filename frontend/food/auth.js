@@ -54,12 +54,12 @@ async function refreshAccess(done) {
   } catch (e) { /* keep what we have */ }
   if (done) done();
 }
-// Vendors sign in on the Click2Eat login; admins and staff on the separate admin login (/admin/).
+// Vendors sign in on the Click2Eat login; admins and staff on the site login (/login.html, username box).
 function loginPage(){
   const role=sessionStorage.getItem("user_role");
   if (role === "vendor") return "login.html";
-  if (role) return "/admin/";
-  return /[?&]admin=true/.test(location.search) || /\/admin[^/]*\.html$/.test(location.pathname) ? "/admin/" : "login.html";
+  if (role) return "/login.html";
+  return /[?&]admin=true/.test(location.search) || /\/admin[^/]*\.html$/.test(location.pathname) ? "/login.html" : "login.html";
 }
 function logout(){ const to=loginPage(); sessionStorage.clear(); window.location.replace(to); }
 

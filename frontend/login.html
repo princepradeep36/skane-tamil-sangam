@@ -97,7 +97,8 @@
             try {
                 // No @: an admin, staff or vendor username (Click2Eat login), same as the app's login box.
                 if (!email.includes('@')) {
-                    const r = await fetch('/food-api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: email, password }) });
+                    const r = await fetch('/food-api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: email, password }), signal: AbortSignal.timeout(20000) })
+                        .catch(() => { throw new Error('The server did not answer. Please try again in a minute.'); });
                     if (!r.ok) throw new Error('Wrong username or password.');
                     const d = await r.json();
                     sessionStorage.clear();
@@ -114,8 +115,9 @@
                 const response = await fetch(`${API_BASE_URL}/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
-                });
+                    body: JSON.stringify({ email, password }),
+                    signal: AbortSignal.timeout(20000)
+                }).catch(() => { throw new Error('The server did not answer. Please try again in a minute.'); });
 
                 const data = await response.json().catch(() => ({ error: 'The server is busy. Please try again in a minute.' }));
 
